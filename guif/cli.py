@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from guif import __version__
+from guif.compositor import compose_masked_edit
 from guif.core import create_plan, init_project, project_root, record_memory, validate_project
 from guif.image_qa import compare_protected_pixels
 from guif.theme import create_theme, validate_theme_file
@@ -48,6 +49,28 @@ def build_parser() -> argparse.ArgumentParser:
     pixel_cmd.add_argument("edited", type=Path)
     pixel_cmd.add_argument("mask", type=Path)
     pixel_cmd.add_argument("--tolerance", type=int, default=0)
+
+    composite_cmd = sub.add_parser(
+        "compose-edit",
+        help="Compose generated pixels through a mask while preserving protected pixels",
+    )
+    composite_cmd.add_argument("original", type=Path)
+    composite_cmd.add_argument("generated", type=Path)
+    composite_cmd.add_argument("mask", type=Path)
+    composite_cmd.add_argument("output", type=Path)
+    composite_cmd.add_argument("--feather", type=float, default=0.0, help="Optional in-mask edge feather radius")
+    composite_cmd.add_argument(
+        "--threshold",
+        type=int,
+        default=1,
+        help="Binarize mask at this value before optional feathering; use 1 to preserve grayscale masks",
+    )
+    composite_cmd.add_argument(
+        "--verify",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Run zero-tolerance protected-pixel QA after composition",
+    )
     return parser
 
 
@@ -102,6 +125,23 @@ def main(argv: list[str] | None = None) -> int:
             report = compare_protected_pixels(args.original, args.edited, args.mask, args.tolerance)
             print(json.dumps(report.to_dict(), indent=2))
             return 0 if report.passed else 1
+        if args.command == "compose-edit":
+            report = compose_masked_edit(
+                args.original,
+                args.generated,
+                args.mask,
+                args.output,
+                feather_radius=args.feather,
+                threshold=args.threshold,
+            )
+            payload: dict[str, object] = {"composition": report.to_dict()}
+            if args.verify:
+                qa = compare_protected_pixels(args.original, args.output, args.mask, tolerance=0)
+                payload["protected_pixel_qa"] = qa.to_dict()
+                print(json.dumps(payload, indent=2))
+                return 0 if qa.passed else 1
+            print(json.dumps(payload, indent=2))
+            return 0
     except (FileExistsError, FileNotFoundError, RuntimeError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
