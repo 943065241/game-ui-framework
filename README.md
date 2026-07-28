@@ -4,7 +4,7 @@ GUIF is a local-first, AI-agnostic framework for planning, producing, reviewing,
 
 ## Status
 
-`v1.0.0-alpha.5` — executable workflow, project, theme, resource-manifest, protected-edit, memory, and QA bootstrap.
+`v1.0.0-alpha.6` — executable workflow, project, theme, resource-manifest, asset-validation, protected-edit, memory, and QA bootstrap.
 
 ## What works now
 
@@ -16,6 +16,7 @@ GUIF is a local-first, AI-agnostic framework for planning, producing, reviewing,
 - `guif theme-create` and `guif theme-validate` manage theme definitions.
 - `guif workflow-list`, `workflow-show`, and `workflow-validate` manage workflow manifests.
 - `guif resource-create`, `resource-show`, and `resource-validate` manage deterministic production resource contracts.
+- `guif asset-validate <manifest> <asset>` checks an actual image against dimensions, format, alpha, and output naming requirements.
 - `guif compose-edit` preserves protected pixels during local image edits.
 - `guif qa-pixels` verifies protected pixels at zero tolerance by default.
 - Tests run with `pytest` and GitHub Actions on Python 3.10, 3.11, and 3.12.
@@ -39,6 +40,7 @@ guif init LeekParty
 guif theme-create "Medieval Harbor" "Warm sunset harbor shop" --project LeekParty
 guif resource-create trade-button-long button 264 134 png --project LeekParty --target-engine unity
 guif resource-show projects/LeekParty/production-assets/trade-button-long.resource.json
+guif asset-validate projects/LeekParty/production-assets/trade-button-long.resource.json trade-button-long.png
 guif plan "Export transparent trading buttons" --project LeekParty
 guif validate LeekParty
 ```
@@ -62,7 +64,7 @@ A resource manifest defines the production contract before export:
 }
 ```
 
-Current validation covers:
+Current manifest validation covers:
 
 - lowercase kebab-case IDs
 - supported resource types and file formats
@@ -78,6 +80,24 @@ projects/<project>/production-assets/<resource-id>.resource.json
 ```
 
 `guif validate <project>` automatically validates every resource manifest in the project.
+
+## Actual asset validation
+
+```bash
+guif asset-validate \
+  projects/LeekParty/production-assets/trade-button-long.resource.json \
+  trade-button-long.png
+```
+
+The command opens the actual image and compares it with the manifest. It reports:
+
+- expected and actual pixel dimensions
+- expected and detected image format
+- whether an alpha channel is required and present
+- expected and actual output filename
+- a structured error list and pass/fail result
+
+A mismatch returns exit code `1`, so the command can be used in CI or export scripts.
 
 ## Workflow manifests
 
@@ -109,4 +129,4 @@ White mask pixels are editable. Black mask pixels are protected.
 
 ## Repository direction
 
-The next planned release focuses on validating actual image files against their resource manifests, including dimensions, alpha channels, and output naming.
+The next planned release focuses on batch validation and deterministic export staging for all production assets in a project.
