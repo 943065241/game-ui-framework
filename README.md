@@ -1,5 +1,7 @@
 # Game UI Framework (GUIF)
 
+**English** | [简体中文](README.zh-CN.md)
+
 GUIF is a local-first, AI-agnostic framework for planning, producing, reviewing, exporting, and evolving game UI work.
 
 ## Status
@@ -156,7 +158,7 @@ These JSON sidecars are deterministic GUIF metadata, not native engine-generated
 5. Effect images and production assets remain separate.
 6. Engine-specific behavior belongs in adapters, not the framework core.
 7. Local edits preserve non-target pixels through mask-based composition.
-8. A release is complete only when feature, tests, CI, README, version metadata, and the product specification agree.
+8. A release is complete only when feature, tests, CI, the English README, the Chinese README, version metadata, and the product specification agree.
 
 ## Repository direction
 
