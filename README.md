@@ -4,20 +4,21 @@ GUIF is a local-first, AI-agnostic framework for planning, producing, reviewing,
 
 ## Status
 
-`v1.0.0-alpha.2` — executable theme, planning, memory, protected edit composition, and image QA bootstrap.
+`v1.0.0-alpha.3` — executable project schema, theme, planning, memory, protected edit composition, and image QA bootstrap.
 
 ## What works now
 
 - `guif init <project>` creates a project workspace.
 - `guif inspect [project]` summarizes framework or project state.
 - `guif plan "<requirement>"` creates a routed task plan.
-- `guif validate <project>` validates required files and configuration.
+- `guif validate <project>` validates required directories, project semantics, active-theme references, and theme files.
 - `guif record <type> "<message>"` stores decisions, lessons, mistakes, or best practices.
 - `guif theme-create <name> <description> --project <project>` creates and activates a project theme.
 - `guif theme-validate <theme.json>` validates a theme definition.
 - `guif compose-edit <original> <generated> <mask> <output>` composites only the editable mask area over the original image.
 - `guif qa-pixels <original> <edited> <mask>` verifies that protected pixels remain unchanged.
 - Rule-based routing selects Director, Theme, Resource, QA, or Framework Manager.
+- Tests cover project creation, routing, memory, themes, schema validation, pixel QA, and protected composition.
 - Tests run with `pytest` and GitHub Actions.
 
 ## Install for development
@@ -52,6 +53,10 @@ guif qa-pixels original.png composed.png mask.png
 
 White mask pixels are editable. Black mask pixels are protected. The composition step copies generated pixels only inside the editable area, and the QA step verifies that protected pixels are unchanged.
 
+## Project validation contract
+
+`project.json` is now checked semantically, not only for existence. GUIF validates its schema version, project name, lifecycle status, creation timestamp, current-theme type, and whether the referenced theme file exists. Every theme JSON in the project is also validated during `guif validate`.
+
 ## Operating principles
 
 1. Natural language first.
@@ -62,4 +67,4 @@ White mask pixels are editable. Black mask pixels are protected. The composition
 
 ## Repository direction
 
-This bootstrap intentionally starts small and executable. Later releases will add atlas export, adapter plugins, richer schemas, workflow manifests, and production integrations without replacing the CLI contract.
+This bootstrap intentionally starts small and executable. Later releases will add workflow manifests, atlas export, adapter plugins, richer production schemas, and external production integrations without replacing the CLI contract.
