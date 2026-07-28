@@ -7,10 +7,12 @@ from pathlib import Path
 
 from guif.project_schema import validate_project_config_file
 from guif.theme import validate_theme_file
+from guif.workflow import load_workflow, validate_workflow_file
 
 PROJECT_DIRS = (
     "requirements",
     "themes",
+    "workflows",
     "effect-images",
     "production-assets",
     "qa",
@@ -68,18 +70,15 @@ def create_plan(workspace: Path, project: str, requirement: str) -> Path:
     if not (root / "project.json").exists():
         raise FileNotFoundError(f"Unknown project: {project}")
     route = route_requirement(requirement)
+    workflow = load_workflow(workspace, project, route.workflow)
     timestamp = datetime.now(timezone.utc)
     payload = {
         "schema_version": 1,
         "project": project,
         "requirement": requirement,
         "route": asdict(route),
-        "steps": [
-            "Load project context and confirmed decisions",
-            f"Execute {route.workflow} workflow",
-            "Run target-specific QA",
-            "Record approved outcome and reusable lessons",
-        ],
+        "workflow": workflow.to_dict(),
+        "steps": list(workflow.steps),
         "created_at": timestamp.isoformat(),
     }
     path = root / "plans" / f"{timestamp.strftime('%Y%m%dT%H%M%SZ')}.json"
@@ -105,6 +104,12 @@ def validate_project(workspace: Path, project: str) -> list[str]:
         for theme_path in sorted(themes_dir.glob("*.json")):
             for error in validate_theme_file(theme_path):
                 errors.append(f"{theme_path.relative_to(root)}: {error}")
+
+    workflows_dir = root / "workflows"
+    if workflows_dir.is_dir():
+        for workflow_path in sorted(workflows_dir.glob("*.json")):
+            for error in validate_workflow_file(workflow_path):
+                errors.append(f"{workflow_path.relative_to(root)}: {error}")
     return errors
 
 
