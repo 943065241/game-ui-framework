@@ -10,6 +10,7 @@ from guif.compositor import compose_masked_edit
 from guif.core import create_plan, init_project, project_root, record_memory, validate_project
 from guif.image_qa import compare_protected_pixels
 from guif.theme import create_theme, validate_theme_file
+from guif.workflow import list_workflows, load_workflow, validate_workflow_file
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -43,6 +44,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     theme_validate_cmd = sub.add_parser("theme-validate", help="Validate a theme JSON file")
     theme_validate_cmd.add_argument("path", type=Path)
+
+    workflow_list_cmd = sub.add_parser("workflow-list", help="List built-in and project workflow manifests")
+    workflow_list_cmd.add_argument("--project")
+
+    workflow_show_cmd = sub.add_parser("workflow-show", help="Show the resolved workflow manifest")
+    workflow_show_cmd.add_argument("workflow_id")
+    workflow_show_cmd.add_argument("--project", required=True)
+
+    workflow_validate_cmd = sub.add_parser("workflow-validate", help="Validate a workflow JSON file")
+    workflow_validate_cmd.add_argument("path", type=Path)
 
     pixel_cmd = sub.add_parser("qa-pixels", help="Verify that protected pixels did not change")
     pixel_cmd.add_argument("original", type=Path)
@@ -90,11 +101,12 @@ def main(argv: list[str] | None = None) -> int:
                 config = json.loads(config_path.read_text(encoding="utf-8"))
                 plans = len(list((root / "plans").glob("*.json")))
                 themes = sorted(path.stem for path in (root / "themes").glob("*.json"))
-                print(json.dumps({"root": str(root), "config": config, "plans": plans, "themes": themes}, ensure_ascii=False, indent=2))
+                workflows = list_workflows(workspace, args.project)
+                print(json.dumps({"root": str(root), "config": config, "plans": plans, "themes": themes, "workflows": workflows}, ensure_ascii=False, indent=2))
             else:
                 projects_dir = workspace / "projects"
                 projects = sorted(path.name for path in projects_dir.iterdir() if path.is_dir()) if projects_dir.exists() else []
-                print(json.dumps({"version": __version__, "workspace": str(workspace), "projects": projects}, ensure_ascii=False, indent=2))
+                print(json.dumps({"version": __version__, "workspace": str(workspace), "projects": projects, "workflows": list_workflows(workspace)}, ensure_ascii=False, indent=2))
             return 0
         if args.command == "plan":
             print(create_plan(workspace, args.project, args.requirement))
@@ -115,6 +127,20 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "theme-validate":
             errors = validate_theme_file(args.path)
+            if errors:
+                for error in errors:
+                    print(f"ERROR: {error}", file=sys.stderr)
+                return 1
+            print(f"OK: {args.path}")
+            return 0
+        if args.command == "workflow-list":
+            print(json.dumps(list_workflows(workspace, args.project), ensure_ascii=False, indent=2))
+            return 0
+        if args.command == "workflow-show":
+            print(json.dumps(load_workflow(workspace, args.project, args.workflow_id).to_dict(), ensure_ascii=False, indent=2))
+            return 0
+        if args.command == "workflow-validate":
+            errors = validate_workflow_file(args.path)
             if errors:
                 for error in errors:
                     print(f"ERROR: {error}", file=sys.stderr)
@@ -142,7 +168,7 @@ def main(argv: list[str] | None = None) -> int:
                 return 0 if qa.passed else 1
             print(json.dumps(payload, indent=2))
             return 0
-    except (FileExistsError, FileNotFoundError, RuntimeError, ValueError) as exc:
+    except (FileExistsError, FileNotFoundError, RuntimeError, ValueError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
     return 0
