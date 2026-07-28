@@ -9,6 +9,7 @@ from guif import __version__
 from guif.compositor import compose_masked_edit
 from guif.core import create_plan, init_project, project_root, record_memory, validate_project
 from guif.image_qa import compare_protected_pixels
+from guif.resource import create_resource_manifest, load_resource_manifest, validate_resource_file
 from guif.theme import create_theme, validate_theme_file
 from guif.workflow import list_workflows, load_workflow, validate_workflow_file
 
@@ -55,33 +56,38 @@ def build_parser() -> argparse.ArgumentParser:
     workflow_validate_cmd = sub.add_parser("workflow-validate", help="Validate a workflow JSON file")
     workflow_validate_cmd.add_argument("path", type=Path)
 
+    resource_create_cmd = sub.add_parser("resource-create", help="Create a production resource manifest")
+    resource_create_cmd.add_argument("resource_id")
+    resource_create_cmd.add_argument("resource_type")
+    resource_create_cmd.add_argument("width", type=int)
+    resource_create_cmd.add_argument("height", type=int)
+    resource_create_cmd.add_argument("file_format")
+    resource_create_cmd.add_argument("--project", required=True)
+    resource_create_cmd.add_argument("--target-engine", default="generic")
+    resource_create_cmd.add_argument("--output-name")
+    resource_create_cmd.add_argument("--source")
+    resource_create_cmd.add_argument("--alpha", action=argparse.BooleanOptionalAction, default=True)
+
+    resource_validate_cmd = sub.add_parser("resource-validate", help="Validate a production resource manifest")
+    resource_validate_cmd.add_argument("path", type=Path)
+
+    resource_show_cmd = sub.add_parser("resource-show", help="Show a normalized production resource manifest")
+    resource_show_cmd.add_argument("path", type=Path)
+
     pixel_cmd = sub.add_parser("qa-pixels", help="Verify that protected pixels did not change")
     pixel_cmd.add_argument("original", type=Path)
     pixel_cmd.add_argument("edited", type=Path)
     pixel_cmd.add_argument("mask", type=Path)
     pixel_cmd.add_argument("--tolerance", type=int, default=0)
 
-    composite_cmd = sub.add_parser(
-        "compose-edit",
-        help="Compose generated pixels through a mask while preserving protected pixels",
-    )
+    composite_cmd = sub.add_parser("compose-edit", help="Compose generated pixels through a mask while preserving protected pixels")
     composite_cmd.add_argument("original", type=Path)
     composite_cmd.add_argument("generated", type=Path)
     composite_cmd.add_argument("mask", type=Path)
     composite_cmd.add_argument("output", type=Path)
     composite_cmd.add_argument("--feather", type=float, default=0.0, help="Optional in-mask edge feather radius")
-    composite_cmd.add_argument(
-        "--threshold",
-        type=int,
-        default=1,
-        help="Binarize mask at this value before optional feathering; use 1 to preserve grayscale masks",
-    )
-    composite_cmd.add_argument(
-        "--verify",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help="Run zero-tolerance protected-pixel QA after composition",
-    )
+    composite_cmd.add_argument("--threshold", type=int, default=1, help="Binarize mask at this value before optional feathering")
+    composite_cmd.add_argument("--verify", action=argparse.BooleanOptionalAction, default=True, help="Run zero-tolerance protected-pixel QA after composition")
     return parser
 
 
@@ -101,8 +107,9 @@ def main(argv: list[str] | None = None) -> int:
                 config = json.loads(config_path.read_text(encoding="utf-8"))
                 plans = len(list((root / "plans").glob("*.json")))
                 themes = sorted(path.stem for path in (root / "themes").glob("*.json"))
+                resources = sorted(path.name for path in (root / "production-assets").glob("*.resource.json"))
                 workflows = list_workflows(workspace, args.project)
-                print(json.dumps({"root": str(root), "config": config, "plans": plans, "themes": themes, "workflows": workflows}, ensure_ascii=False, indent=2))
+                print(json.dumps({"root": str(root), "config": config, "plans": plans, "themes": themes, "resources": resources, "workflows": workflows}, ensure_ascii=False, indent=2))
             else:
                 projects_dir = workspace / "projects"
                 projects = sorted(path.name for path in projects_dir.iterdir() if path.is_dir()) if projects_dir.exists() else []
@@ -147,19 +154,26 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
             print(f"OK: {args.path}")
             return 0
+        if args.command == "resource-create":
+            print(create_resource_manifest(workspace, args.project, args.resource_id, args.resource_type, args.width, args.height, args.file_format, alpha_required=args.alpha, target_engine=args.target_engine, output_name=args.output_name, source=args.source))
+            return 0
+        if args.command == "resource-validate":
+            errors = validate_resource_file(args.path)
+            if errors:
+                for error in errors:
+                    print(f"ERROR: {error}", file=sys.stderr)
+                return 1
+            print(f"OK: {args.path}")
+            return 0
+        if args.command == "resource-show":
+            print(json.dumps(load_resource_manifest(args.path).to_dict(), ensure_ascii=False, indent=2))
+            return 0
         if args.command == "qa-pixels":
             report = compare_protected_pixels(args.original, args.edited, args.mask, args.tolerance)
             print(json.dumps(report.to_dict(), indent=2))
             return 0 if report.passed else 1
         if args.command == "compose-edit":
-            report = compose_masked_edit(
-                args.original,
-                args.generated,
-                args.mask,
-                args.output,
-                feather_radius=args.feather,
-                threshold=args.threshold,
-            )
+            report = compose_masked_edit(args.original, args.generated, args.mask, args.output, feather_radius=args.feather, threshold=args.threshold)
             payload: dict[str, object] = {"composition": report.to_dict()}
             if args.verify:
                 qa = compare_protected_pixels(args.original, args.output, args.mask, tolerance=0)
