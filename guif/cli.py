@@ -7,6 +7,8 @@ from pathlib import Path
 
 from guif import __version__
 from guif.core import create_plan, init_project, project_root, record_memory, validate_project
+from guif.image_qa import compare_protected_pixels
+from guif.theme import create_theme, validate_theme_file
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -32,6 +34,20 @@ def build_parser() -> argparse.ArgumentParser:
     record_cmd.add_argument("memory_type", choices=("decision", "lesson", "mistake", "best-practice"))
     record_cmd.add_argument("message")
     record_cmd.add_argument("--project", required=True)
+
+    theme_cmd = sub.add_parser("theme-create", help="Create and activate a project theme")
+    theme_cmd.add_argument("name")
+    theme_cmd.add_argument("description")
+    theme_cmd.add_argument("--project", required=True)
+
+    theme_validate_cmd = sub.add_parser("theme-validate", help="Validate a theme JSON file")
+    theme_validate_cmd.add_argument("path", type=Path)
+
+    pixel_cmd = sub.add_parser("qa-pixels", help="Verify that protected pixels did not change")
+    pixel_cmd.add_argument("original", type=Path)
+    pixel_cmd.add_argument("edited", type=Path)
+    pixel_cmd.add_argument("mask", type=Path)
+    pixel_cmd.add_argument("--tolerance", type=int, default=0)
     return parser
 
 
@@ -50,7 +66,8 @@ def main(argv: list[str] | None = None) -> int:
                     raise FileNotFoundError(f"Unknown project: {args.project}")
                 config = json.loads(config_path.read_text(encoding="utf-8"))
                 plans = len(list((root / "plans").glob("*.json")))
-                print(json.dumps({"root": str(root), "config": config, "plans": plans}, ensure_ascii=False, indent=2))
+                themes = sorted(path.stem for path in (root / "themes").glob("*.json"))
+                print(json.dumps({"root": str(root), "config": config, "plans": plans, "themes": themes}, ensure_ascii=False, indent=2))
             else:
                 projects_dir = workspace / "projects"
                 projects = sorted(path.name for path in projects_dir.iterdir() if path.is_dir()) if projects_dir.exists() else []
@@ -70,7 +87,22 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "record":
             print(record_memory(workspace, args.project, args.memory_type, args.message))
             return 0
-    except (FileExistsError, FileNotFoundError, ValueError) as exc:
+        if args.command == "theme-create":
+            print(create_theme(workspace, args.project, args.name, args.description))
+            return 0
+        if args.command == "theme-validate":
+            errors = validate_theme_file(args.path)
+            if errors:
+                for error in errors:
+                    print(f"ERROR: {error}", file=sys.stderr)
+                return 1
+            print(f"OK: {args.path}")
+            return 0
+        if args.command == "qa-pixels":
+            report = compare_protected_pixels(args.original, args.edited, args.mask, args.tolerance)
+            print(json.dumps(report.to_dict(), indent=2))
+            return 0 if report.passed else 1
+    except (FileExistsError, FileNotFoundError, RuntimeError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
     return 0
