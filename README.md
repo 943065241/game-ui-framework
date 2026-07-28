@@ -6,6 +6,12 @@ GUIF is a local-first, AI-agnostic framework for planning, producing, reviewing,
 
 `v1.0.0-alpha.9` — runtime contracts, composable agents and pipelines, project-context loading, engine-adapter exports, deterministic validation, protected editing, memory, workflows, projects, and themes.
 
+## Product specification
+
+The bilingual living product specification is maintained at [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md).
+
+It defines GUIF's expected product, verified current state, missing capabilities, development phases, non-goals, risks, open questions, and acceptance criteria. Any iteration that changes GUIF's product direction or core capability status must update that document in the same release or pull request.
+
 ## What works now
 
 - `guif init <project>` creates a project workspace.
@@ -150,8 +156,8 @@ These JSON sidecars are deterministic GUIF metadata, not native engine-generated
 5. Effect images and production assets remain separate.
 6. Engine-specific behavior belongs in adapters, not the framework core.
 7. Local edits preserve non-target pixels through mask-based composition.
-8. A release is complete only when feature, tests, CI, docs, and version metadata agree.
+8. A release is complete only when feature, tests, CI, README, version metadata, and the product specification agree.
 
 ## Repository direction
 
-The next step is to replace contract-only agents incrementally, beginning with a real Planner and persisted Task runs, while keeping the runtime usable and model-independent throughout the migration.
+The next step is to replace contract-only agents incrementally, beginning with a real Planner and persisted Task runs, while keeping the runtime usable and model-independent throughout the migration. The priorities and acceptance criteria are maintained in [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md).
