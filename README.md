@@ -4,24 +4,21 @@ GUIF is a local-first, AI-agnostic framework for planning, producing, reviewing,
 
 ## Status
 
-`v1.0.0-alpha.4` — executable workflow manifests, project schema, theme, planning, memory, protected edit composition, and image QA bootstrap.
+`v1.0.0-alpha.5` — executable workflow, project, theme, resource-manifest, protected-edit, memory, and QA bootstrap.
 
 ## What works now
 
 - `guif init <project>` creates a project workspace.
 - `guif inspect [project]` summarizes framework or project state.
-- `guif plan "<requirement>"` routes a requirement and builds the plan from a resolved workflow manifest.
-- `guif validate <project>` validates required directories, project semantics, active-theme references, theme files, and project workflow files.
+- `guif plan "<requirement>"` routes a requirement through a resolved workflow manifest.
+- `guif validate <project>` validates project semantics, themes, workflows, and production resource manifests.
 - `guif record <type> "<message>"` stores decisions, lessons, mistakes, or best practices.
-- `guif theme-create <name> <description> --project <project>` creates and activates a project theme.
-- `guif theme-validate <theme.json>` validates a theme definition.
-- `guif workflow-list [--project <project>]` lists built-in workflows and project overrides.
-- `guif workflow-show <id> --project <project>` shows the resolved workflow used by the planner.
-- `guif workflow-validate <workflow.json>` validates a workflow manifest.
-- `guif compose-edit <original> <generated> <mask> <output>` composites only the editable mask area over the original image.
-- `guif qa-pixels <original> <edited> <mask>` verifies that protected pixels remain unchanged.
-- Tests cover project creation, routing, memory, themes, schema validation, workflow overrides, pixel QA, and protected composition.
-- Tests run with `pytest` and GitHub Actions.
+- `guif theme-create` and `guif theme-validate` manage theme definitions.
+- `guif workflow-list`, `workflow-show`, and `workflow-validate` manage workflow manifests.
+- `guif resource-create`, `resource-show`, and `resource-validate` manage deterministic production resource contracts.
+- `guif compose-edit` preserves protected pixels during local image edits.
+- `guif qa-pixels` verifies protected pixels at zero tolerance by default.
+- Tests run with `pytest` and GitHub Actions on Python 3.10, 3.11, and 3.12.
 
 ## Install for development
 
@@ -40,47 +37,56 @@ pip install -e .[dev]
 ```bash
 guif init LeekParty
 guif theme-create "Medieval Harbor" "Warm sunset harbor shop" --project LeekParty
-guif workflow-list --project LeekParty
-guif workflow-show theme-direction --project LeekParty
-guif plan "Create a medieval harbor shop effect image" --project LeekParty
-guif inspect LeekParty
+guif resource-create trade-button-long button 264 134 png --project LeekParty --target-engine unity
+guif resource-show projects/LeekParty/production-assets/trade-button-long.resource.json
+guif plan "Export transparent trading buttons" --project LeekParty
 guif validate LeekParty
-guif record decision "Use one harbor window and warm sunset lighting" --project LeekParty
 ```
 
-## Workflow manifests
+## Production resource manifests
 
-GUIF ships with five executable workflow manifests:
-
-- `effect-image`
-- `theme-direction`
-- `resource-production`
-- `quality-assurance`
-- `framework-evolution`
-
-A project can override any built-in workflow by placing a valid JSON manifest at:
-
-```text
-projects/<project>/workflows/<workflow-id>.json
-```
-
-The planner resolves the project override first, then falls back to the built-in workflow. The resolved workflow name, manager, source, and exact steps are embedded in every generated plan.
-
-Example override:
+A resource manifest defines the production contract before export:
 
 ```json
 {
   "schema_version": 1,
-  "id": "theme-direction",
-  "name": "LeekParty Theme Review",
-  "manager": "Theme Manager",
-  "steps": [
-    "Load the active medieval harbor theme",
-    "Check warm sunset lighting and clean material rendering",
-    "Reject pirate skulls, excessive noise, and unrelated neon styling",
-    "Record the approved direction"
-  ]
+  "id": "trade-button-long",
+  "type": "button",
+  "width": 264,
+  "height": 134,
+  "format": "png",
+  "alpha_required": true,
+  "target_engine": "unity",
+  "output_name": "trade-button-long.png",
+  "source": null
 }
+```
+
+Current validation covers:
+
+- lowercase kebab-case IDs
+- supported resource types and file formats
+- positive pixel dimensions
+- alpha-channel requirements
+- output extension consistency
+- target-engine metadata (`generic`, `unity`, `godot`, or `unreal`)
+
+Resource manifests are stored at:
+
+```text
+projects/<project>/production-assets/<resource-id>.resource.json
+```
+
+`guif validate <project>` automatically validates every resource manifest in the project.
+
+## Workflow manifests
+
+GUIF ships with five built-in workflows: `effect-image`, `theme-direction`, `resource-production`, `quality-assurance`, and `framework-evolution`.
+
+Projects can override a workflow at:
+
+```text
+projects/<project>/workflows/<workflow-id>.json
 ```
 
 ## Protected local-edit workflow
@@ -90,20 +96,17 @@ guif compose-edit original.png generated.png mask.png composed.png
 guif qa-pixels original.png composed.png mask.png
 ```
 
-White mask pixels are editable. Black mask pixels are protected. The composition step copies generated pixels only inside the editable area, and the QA step verifies that protected pixels are unchanged.
-
-## Project validation contract
-
-`project.json` is checked semantically, not only for existence. GUIF validates its schema version, project name, lifecycle status, creation timestamp, current-theme type, and whether the referenced theme file exists. Every theme JSON and project workflow JSON is also validated during `guif validate`.
+White mask pixels are editable. Black mask pixels are protected.
 
 ## Operating principles
 
 1. Natural language first.
 2. Git is the long-term source of truth.
 3. Effect images and production assets remain separate.
-4. Local image edits must preserve non-target pixels through mask-based composition.
+4. Local edits must preserve non-target pixels through mask-based composition.
 5. Every confirmed decision can be recorded and reviewed.
+6. A release version is not complete until feature, tests, CI, docs, and version metadata agree.
 
 ## Repository direction
 
-The next planned release focuses on production resource manifests and deterministic export contracts for dimensions, transparency, naming, and target-engine metadata.
+The next planned release focuses on validating actual image files against their resource manifests, including dimensions, alpha channels, and output naming.
