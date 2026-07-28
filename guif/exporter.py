@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from guif.adapters import get_adapter
 from guif.asset_qa import validate_asset_against_manifest
 from guif.paths import project_root
 from guif.resource import load_resource_manifest, validate_resource_file
@@ -17,8 +18,9 @@ class ExportedAsset:
     source: str
     destination: str
     manifest: str
+    adapter: dict[str, object]
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, object]:
         return asdict(self)
 
 
@@ -67,6 +69,7 @@ def export_project_assets(
     if not (root / "project.json").is_file():
         raise FileNotFoundError(f"Unknown project: {project}")
 
+    adapter = get_adapter(target_engine)
     destination_root = output_dir or (root / "exports" / target_engine)
     if clean and destination_root.exists():
         shutil.rmtree(destination_root)
@@ -99,20 +102,28 @@ def export_project_assets(
         destination = destination_root / manifest.output_name
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(asset_path, destination)
+        try:
+            adapter_result = adapter.prepare(destination, manifest)
+        except (OSError, RuntimeError, ValueError) as exc:
+            destination.unlink(missing_ok=True)
+            errors.append(f"{manifest.resource_id}: adapter failed: {exc}")
+            continue
         exported.append(
             ExportedAsset(
                 resource_id=manifest.resource_id,
                 source=str(asset_path),
                 destination=str(destination),
                 manifest=str(manifest_path),
+                adapter=adapter_result.to_dict(),
             )
         )
 
     report_path = destination_root / "export-report.json"
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "project": project,
         "target_engine": target_engine,
+        "adapter": adapter.__class__.__name__,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "output_dir": str(destination_root),
         "exported": [item.to_dict() for item in exported],
