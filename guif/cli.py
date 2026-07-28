@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from guif import __version__
+from guif.asset_qa import validate_asset_against_manifest
 from guif.compositor import compose_masked_edit
 from guif.core import create_plan, init_project, project_root, record_memory, validate_project
 from guif.image_qa import compare_protected_pixels
@@ -73,6 +74,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     resource_show_cmd = sub.add_parser("resource-show", help="Show a normalized production resource manifest")
     resource_show_cmd.add_argument("path", type=Path)
+
+    asset_validate_cmd = sub.add_parser("asset-validate", help="Validate an image asset against a resource manifest")
+    asset_validate_cmd.add_argument("manifest", type=Path)
+    asset_validate_cmd.add_argument("asset", type=Path)
 
     pixel_cmd = sub.add_parser("qa-pixels", help="Verify that protected pixels did not change")
     pixel_cmd.add_argument("original", type=Path)
@@ -168,6 +173,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "resource-show":
             print(json.dumps(load_resource_manifest(args.path).to_dict(), ensure_ascii=False, indent=2))
             return 0
+        if args.command == "asset-validate":
+            report = validate_asset_against_manifest(args.manifest, args.asset)
+            print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2))
+            return 0 if report.passed else 1
         if args.command == "qa-pixels":
             report = compare_protected_pixels(args.original, args.edited, args.mask, args.tolerance)
             print(json.dumps(report.to_dict(), indent=2))
