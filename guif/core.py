@@ -5,6 +5,9 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from guif.project_schema import validate_project_config_file
+from guif.theme import validate_theme_file
+
 PROJECT_DIRS = (
     "requirements",
     "themes",
@@ -89,11 +92,19 @@ def validate_project(workspace: Path, project: str) -> list[str]:
     errors: list[str] = []
     if not root.exists():
         return [f"Project directory does not exist: {root}"]
-    if not (root / "project.json").is_file():
-        errors.append("Missing project.json")
+
+    config_path = root / "project.json"
+    errors.extend(validate_project_config_file(config_path, project_root=root))
+
     for relative in PROJECT_DIRS:
         if not (root / relative).is_dir():
             errors.append(f"Missing directory: {relative}")
+
+    themes_dir = root / "themes"
+    if themes_dir.is_dir():
+        for theme_path in sorted(themes_dir.glob("*.json")):
+            for error in validate_theme_file(theme_path):
+                errors.append(f"{theme_path.relative_to(root)}: {error}")
     return errors
 
 
