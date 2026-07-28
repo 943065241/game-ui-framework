@@ -25,7 +25,10 @@ def build_parser() -> argparse.ArgumentParser:
     init_cmd = sub.add_parser("init", help="Create a GUIF project"); init_cmd.add_argument("project")
     inspect_cmd = sub.add_parser("inspect", help="Inspect framework or project state"); inspect_cmd.add_argument("project", nargs="?")
     plan_cmd = sub.add_parser("plan", help="Create a routed plan from a requirement"); plan_cmd.add_argument("requirement"); plan_cmd.add_argument("--project", required=True)
-    run_cmd = sub.add_parser("run", help="Execute a requirement through the GUIF runtime contract"); run_cmd.add_argument("requirement"); run_cmd.add_argument("--project", required=True); run_cmd.add_argument("--pipeline", default="ui-production")
+    run_cmd = sub.add_parser("run", help="Execute and persist a requirement through the GUIF runtime"); run_cmd.add_argument("requirement"); run_cmd.add_argument("--project", required=True); run_cmd.add_argument("--pipeline", default="ui-production")
+    run_list_cmd = sub.add_parser("run-list", help="List persisted runtime task runs"); run_list_cmd.add_argument("--project", required=True)
+    run_show_cmd = sub.add_parser("run-show", help="Show a persisted runtime task"); run_show_cmd.add_argument("task_id"); run_show_cmd.add_argument("--project", required=True)
+    run_resume_cmd = sub.add_parser("run-resume", help="Resume a failed or interrupted runtime task"); run_resume_cmd.add_argument("task_id"); run_resume_cmd.add_argument("--project", required=True)
     validate_cmd = sub.add_parser("validate", help="Validate a project workspace"); validate_cmd.add_argument("project")
     record_cmd = sub.add_parser("record", help="Record reusable project memory"); record_cmd.add_argument("memory_type", choices=("decision", "lesson", "mistake", "best-practice")); record_cmd.add_argument("message"); record_cmd.add_argument("--project", required=True)
     theme_cmd = sub.add_parser("theme-create", help="Create and activate a project theme"); theme_cmd.add_argument("name"); theme_cmd.add_argument("description"); theme_cmd.add_argument("--project", required=True)
@@ -54,13 +57,21 @@ def main(argv: list[str] | None = None) -> int:
             if args.project:
                 root = project_root(workspace, args.project); config_path = root / "project.json"
                 if not config_path.exists(): raise FileNotFoundError(f"Unknown project: {args.project}")
-                payload = {"root": str(root), "config": json.loads(config_path.read_text(encoding="utf-8")), "plans": len(list((root / "plans").glob("*.json"))), "themes": sorted(path.stem for path in (root / "themes").glob("*.json")), "resources": sorted(path.name for path in (root / "production-assets").glob("*.resource.json")), "workflows": list_workflows(workspace, args.project)}
+                payload = {"root": str(root), "config": json.loads(config_path.read_text(encoding="utf-8")), "plans": len(list((root / "plans").glob("*.json"))), "runs": len(list((root / "runs").glob("*/task.json"))) if (root / "runs").exists() else 0, "themes": sorted(path.stem for path in (root / "themes").glob("*.json")), "resources": sorted(path.name for path in (root / "production-assets").glob("*.resource.json")), "workflows": list_workflows(workspace, args.project)}
             else:
                 projects_dir = workspace / "projects"; payload = {"version": __version__, "workspace": str(workspace), "projects": sorted(path.name for path in projects_dir.iterdir() if path.is_dir()) if projects_dir.exists() else [], "workflows": list_workflows(workspace)}
             print(json.dumps(payload, ensure_ascii=False, indent=2)); return 0
         if args.command == "plan": print(create_plan(workspace, args.project, args.requirement)); return 0
         if args.command == "run":
             task = Runtime(workspace).run(args.project, args.requirement, pipeline=args.pipeline)
+            print(json.dumps(task.to_dict(), ensure_ascii=False, indent=2)); return 0
+        if args.command == "run-list":
+            print(json.dumps(Runtime(workspace).list_runs(args.project), ensure_ascii=False, indent=2)); return 0
+        if args.command == "run-show":
+            task = Runtime(workspace).load_task(args.project, args.task_id)
+            print(json.dumps(task.to_dict(), ensure_ascii=False, indent=2)); return 0
+        if args.command == "run-resume":
+            task = Runtime(workspace).resume(args.project, args.task_id)
             print(json.dumps(task.to_dict(), ensure_ascii=False, indent=2)); return 0
         if args.command == "validate":
             errors = validate_project(workspace, args.project)
