@@ -5,6 +5,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from guif.paths import project_root
 from guif.project_schema import validate_project_config_file
 from guif.theme import validate_theme_file
 from guif.workflow import load_workflow, validate_workflow_file
@@ -42,10 +43,6 @@ def route_requirement(requirement: str) -> Route:
     if any(word in text for word in ("框架", "skill", "规则", "framework", "governance")):
         return Route("Framework Manager", "framework-evolution", "Framework governance terms detected.")
     return Route("UI Director", "effect-image", "Default visual production route.")
-
-
-def project_root(workspace: Path, project: str) -> Path:
-    return workspace / "projects" / project
 
 
 def init_project(workspace: Path, project: str) -> Path:
