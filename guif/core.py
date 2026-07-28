@@ -25,6 +25,8 @@ PROJECT_DIRS = (
     "memory/best-practices",
 )
 
+RUNTIME_DIRS = ("runs",)
+
 
 @dataclass(frozen=True)
 class Route:
@@ -50,7 +52,7 @@ def init_project(workspace: Path, project: str) -> Path:
     root = project_root(workspace, project)
     if root.exists():
         raise FileExistsError(f"Project already exists: {root}")
-    for relative in PROJECT_DIRS:
+    for relative in PROJECT_DIRS + RUNTIME_DIRS:
         (root / relative).mkdir(parents=True, exist_ok=True)
     config = {
         "schema_version": 1,
