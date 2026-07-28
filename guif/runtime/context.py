@@ -24,6 +24,17 @@ class RuntimeContext:
         payload["memory"] = list(self.memory)
         return payload
 
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "RuntimeContext":
+        return cls(
+            project_root=str(payload["project_root"]),
+            project_config=dict(payload.get("project_config", {})),
+            active_theme=payload.get("active_theme"),
+            workflows=tuple(payload.get("workflows", ())),
+            resources=tuple(payload.get("resources", ())),
+            memory=tuple(payload.get("memory", ())),
+        )
+
 
 def _read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
