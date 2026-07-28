@@ -7,6 +7,7 @@ from pathlib import Path
 
 from guif.paths import project_root
 from guif.project_schema import validate_project_config_file
+from guif.resource import validate_resource_file
 from guif.theme import validate_theme_file
 from guif.workflow import load_workflow, validate_workflow_file
 
@@ -88,25 +89,25 @@ def validate_project(workspace: Path, project: str) -> list[str]:
     errors: list[str] = []
     if not root.exists():
         return [f"Project directory does not exist: {root}"]
-
-    config_path = root / "project.json"
-    errors.extend(validate_project_config_file(config_path, project_root=root))
-
+    errors.extend(validate_project_config_file(root / "project.json", project_root=root))
     for relative in PROJECT_DIRS:
         if not (root / relative).is_dir():
             errors.append(f"Missing directory: {relative}")
-
     themes_dir = root / "themes"
     if themes_dir.is_dir():
-        for theme_path in sorted(themes_dir.glob("*.json")):
-            for error in validate_theme_file(theme_path):
-                errors.append(f"{theme_path.relative_to(root)}: {error}")
-
+        for path in sorted(themes_dir.glob("*.json")):
+            for error in validate_theme_file(path):
+                errors.append(f"{path.relative_to(root)}: {error}")
     workflows_dir = root / "workflows"
     if workflows_dir.is_dir():
-        for workflow_path in sorted(workflows_dir.glob("*.json")):
-            for error in validate_workflow_file(workflow_path):
-                errors.append(f"{workflow_path.relative_to(root)}: {error}")
+        for path in sorted(workflows_dir.glob("*.json")):
+            for error in validate_workflow_file(path):
+                errors.append(f"{path.relative_to(root)}: {error}")
+    resources_dir = root / "production-assets"
+    if resources_dir.is_dir():
+        for path in sorted(resources_dir.glob("*.resource.json")):
+            for error in validate_resource_file(path):
+                errors.append(f"{path.relative_to(root)}: {error}")
     return errors
 
 
