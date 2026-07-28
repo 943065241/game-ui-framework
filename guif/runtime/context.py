@@ -29,10 +29,16 @@ def _read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _read_json_files(directory: Path, pattern: str = "*.json") -> tuple[dict[str, Any], ...]:
+def _read_json_files(
+    directory: Path,
+    pattern: str = "*.json",
+    *,
+    recursive: bool = False,
+) -> tuple[dict[str, Any], ...]:
     if not directory.exists():
         return ()
-    return tuple(_read_json(path) for path in sorted(directory.glob(pattern)) if path.is_file())
+    paths = directory.rglob(pattern) if recursive else directory.glob(pattern)
+    return tuple(_read_json(path) for path in sorted(paths) if path.is_file())
 
 
 def load_runtime_context(workspace: Path, project: str) -> RuntimeContext:
@@ -43,7 +49,7 @@ def load_runtime_context(workspace: Path, project: str) -> RuntimeContext:
 
     project_config = _read_json(config_path)
     active_theme = None
-    theme_name = project_config.get("active_theme")
+    theme_name = project_config.get("current_theme")
     if theme_name:
         theme_path = root / "themes" / f"{theme_name}.json"
         if theme_path.is_file():
@@ -55,5 +61,5 @@ def load_runtime_context(workspace: Path, project: str) -> RuntimeContext:
         active_theme=active_theme,
         workflows=_read_json_files(root / "workflows"),
         resources=_read_json_files(root / "production-assets", "*.resource.json"),
-        memory=_read_json_files(root / "memory"),
+        memory=_read_json_files(root / "memory", recursive=True),
     )
