@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from guif.core import project_root
+from guif.paths import project_root
 
 REQUIRED_THEME_FIELDS = (
     "name",
