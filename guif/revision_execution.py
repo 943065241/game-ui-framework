@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from guif.artifacts import list_artifacts
@@ -10,9 +9,9 @@ from guif.revision import (
     mark_revision_execution,
     revision_approval_summary,
 )
+from guif.revision_review import RevisionReviewService
 from guif.runtime.task import Task
 from guif.tool_execution import ToolExecutionService
-from guif.visual_review import VisualReviewService
 
 
 class RevisionAwareToolExecutionService(ToolExecutionService):
@@ -58,7 +57,7 @@ class RevisionAwareToolExecutionService(ToolExecutionService):
 
     def _finalize_revision_artifact(self, task: Task, job_id: str) -> Task:
         try:
-            job = get_revision_job(task, job_id)
+            get_revision_job(task, job_id)
         except ValueError:
             return task
         artifact = next(
@@ -73,13 +72,7 @@ class RevisionAwareToolExecutionService(ToolExecutionService):
             return task
         link_revision_artifact(task, job_id, artifact)
         self.store.save(task)
-        if artifact.get("visual") is True and artifact.get("simulation") is not True:
-            return VisualReviewService(self.workspace, store=self.store).review(
-                task.project,
-                task.task_id,
-                str(artifact["artifact_id"]),
-            )
-        return VisualReviewService(self.workspace, store=self.store).review(
+        return RevisionReviewService(self.workspace, store=self.store).review(
             task.project,
             task.task_id,
             str(artifact["artifact_id"]),
