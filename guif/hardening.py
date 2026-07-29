@@ -55,7 +55,7 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 class HardeningService:
-    """Run bounded repeatability checks over read-only production contracts."""
+    """Run bounded repeatability checks over non-mutating production reads."""
 
     def __init__(
         self,
@@ -70,6 +70,27 @@ class HardeningService:
         self.bearer_token = bearer_token
         self.migrator = PrivateSchemaMigrator(self.workspace, data_root=data_root)
         self.backups = PrivateBackupService(self.workspace, data_root=data_root)
+
+    @staticmethod
+    def _peek_conversation_stage(
+        conversation: ConversationWorkflowService,
+        project: str,
+        conversation_id: str,
+    ) -> str:
+        session = conversation.store.get(project, conversation_id)
+        if session is None:
+            raise HardeningError("conversation-record-missing")
+        task = None
+        task_id = session.get("active_task_id")
+        if isinstance(task_id, str):
+            try:
+                task = conversation.runtime.load_task(project, task_id)
+            except FileNotFoundError as exc:
+                raise HardeningError("conversation-task-reference-missing") from exc
+        stage, _, _ = conversation._stage(session, task)
+        if not isinstance(stage, str) or not stage:
+            raise HardeningError("conversation-stage-missing")
+        return stage
 
     def soak(
         self,
@@ -90,12 +111,14 @@ class HardeningService:
                 self.workspace,
                 runtime=self.runtime,
                 bearer_token=self.bearer_token,
+                data_root=self.layout.root,
             )
             if conversation_id
             else None
         )
         samples: list[float] = []
         errors: list[dict[str, Any]] = []
+        observed_stages: set[str] = set()
         started = time.perf_counter()
         for index in range(iterations):
             iteration_started = time.perf_counter()
@@ -114,9 +137,13 @@ class HardeningService:
                 }:
                     raise HardeningError("operation-ledger-invalid")
                 if conversation is not None and conversation_id is not None:
-                    view = conversation.status(project, conversation_id)
-                    if not isinstance(view.get("stage"), str):
-                        raise HardeningError("conversation-stage-missing")
+                    observed_stages.add(
+                        self._peek_conversation_stage(
+                            conversation,
+                            project,
+                            conversation_id,
+                        )
+                    )
                 if backup_path is not None:
                     verification = self.backups.verify(backup_path)
                     if verification.get("status") != "verified":
@@ -142,6 +169,7 @@ class HardeningService:
             "status": status,
             "project": project,
             "conversation_checked": conversation_id is not None,
+            "observed_stages": sorted(observed_stages),
             "backup_checked": backup_path is not None,
             "iterations": iterations,
             "successful_iterations": iterations - len(errors),
@@ -158,6 +186,7 @@ class HardeningService:
             "errors": errors[:20],
             "error_count_truncated": max(0, len(errors) - 20),
             "mutating_operations_performed": False,
+            "production_state_mutated": False,
             "completed_at": _now(),
         }
         if persist:
