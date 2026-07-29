@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from guif.pillow_compat import flattened_image_data
+
 
 @dataclass(frozen=True)
 class PixelProtectionReport:
@@ -46,7 +48,12 @@ def compare_protected_pixels(
     protected = 0
     changed = 0
     max_delta = 0
-    for source, result, mask_value in zip(original.getdata(), edited.getdata(), mask.getdata()):
+    pixels = zip(
+        flattened_image_data(original),
+        flattened_image_data(edited),
+        flattened_image_data(mask),
+    )
+    for source, result, mask_value in pixels:
         # White mask pixels are editable. Black mask pixels are protected.
         if mask_value == 0:
             protected += 1
