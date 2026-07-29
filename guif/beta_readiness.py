@@ -102,6 +102,7 @@ def bootstrap_workspace(
         bearer_token=token,
     )
     view = workflow.open(project, conversation_id)
+    actions = view.get("actions") if isinstance(view.get("actions"), list) else []
     result: dict[str, Any] = {
         "schema_version": 1,
         "status": "ready",
@@ -112,7 +113,7 @@ def bootstrap_workspace(
         "credential_created": issued is not None,
         "credential_secret_visible_once": issued is not None,
         "conversation": view,
-        "next_action": view.get("actions", [None])[0],
+        "next_action": actions[0] if actions else None,
         "compatibility": compatibility_contract(),
     }
     if issued is not None:
@@ -286,16 +287,22 @@ class BetaReadinessService:
                 conversation = self._conversation_view(project, conversation_id)
                 stage = str(conversation.get("stage") or "unknown")
                 action_required = stage not in {"completed", "ready-to-export"}
+                actions = (
+                    conversation.get("actions")
+                    if isinstance(conversation.get("actions"), list)
+                    else []
+                )
+                next_action = (
+                    str(actions[0].get("action") or "recover")
+                    if action_required and actions and isinstance(actions[0], dict)
+                    else ("recover" if action_required else None)
+                )
                 checks.append(
                     self._check(
                         "conversation-state",
                         "warning" if action_required else "passed",
                         f"Conversation is at user-facing stage: {stage}.",
-                        (
-                            str(conversation.get("actions", [{}])[0].get("action") or "recover")
-                            if action_required
-                            else None
-                        ),
+                        next_action,
                     )
                 )
             except Exception as exc:
@@ -308,7 +315,11 @@ class BetaReadinessService:
                     )
                 )
         backup_root = self.layout.backups
-        backup_count = len(tuple(backup_root.glob("*.guif-private.zip"))) if backup_root.is_dir() else 0
+        backup_count = (
+            len(tuple(backup_root.glob("*.guif-private.zip")))
+            if backup_root.is_dir()
+            else 0
+        )
         checks.append(
             self._check(
                 "portable-backup",
@@ -318,6 +329,7 @@ class BetaReadinessService:
                 else "No portable private backup has been created yet.",
                 None if backup_count else "create-portable-backup",
             )
+        )
         blocked = sum(item["status"] == "blocked" for item in checks)
         warnings = sum(item["status"] == "warning" for item in checks)
         report: dict[str, Any] = {
