@@ -112,6 +112,11 @@ def _blockers(
     return deduped
 
 
+def task_objective(plan: dict[str, Any]) -> str:
+    page = plan.get("page", {}) if isinstance(plan.get("page"), dict) else {}
+    return f"Produce a {page.get('type') or 'game UI'} deliverable that follows the approved production contracts."
+
+
 def _global_contract(
     plan: dict[str, Any],
     direction: dict[str, Any],
@@ -156,11 +161,6 @@ def _global_contract(
     }
 
 
-def task_objective(plan: dict[str, Any]) -> str:
-    page = plan.get("page", {}) if isinstance(plan.get("page"), dict) else {}
-    return f"Produce a {page.get('type') or 'game UI'} deliverable that follows the approved production contracts."
-
-
 def _approved_references(resource_bundle: dict[str, Any]) -> list[dict[str, Any]]:
     values: list[dict[str, Any]] = []
     for item in resource_bundle.get("approved_existing", []):
@@ -200,7 +200,7 @@ def _effect_image_job(
         "id": f"{page_type}-effect-image",
         "artifact_kind": "effect-image",
         "operation": operation,
-        "executable": True,
+        "executable": False,
         "canvas": {
             "width": page.get("width"),
             "height": page.get("height"),
@@ -256,7 +256,7 @@ def _resource_jobs(
                 "id": resource_id,
                 "artifact_kind": "production-asset",
                 "operation": "generate",
-                "executable": True,
+                "executable": False,
                 "canvas": {
                     "width": manifest.get("width"),
                     "height": manifest.get("height"),
@@ -325,7 +325,7 @@ def build_prompt_ir(task: Any) -> dict[str, Any]:
         status = "review-required"
     else:
         status = "ready"
-    executable = status != "blocked"
+    executable = status == "ready"
     for job in jobs:
         job["executable"] = executable
 
