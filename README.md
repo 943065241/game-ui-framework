@@ -6,7 +6,7 @@ GUIF is a local-first, AI-agnostic framework for planning, directing, contractin
 
 ## Status
 
-`v1.0.0-alpha.14` — Workflow-driven Runtime Pipelines, real deterministic Planner, Director, Theme, Resource, and Prompt Agents, relevance-based Context selection, persisted and resumable Task Runs, Engine Adapter exports, deterministic validation, protected editing, and Git-friendly Project knowledge.
+`v1.0.0-alpha.15` — Workflow-driven Runtime Pipelines, real deterministic Planner, Director, Theme, Resource, Prompt, and Semantic QA Agents, relevance-based Context selection, persisted and resumable Task Runs, Engine Adapter exports, deterministic validation, protected editing, and Git-friendly Project knowledge.
 
 ## Product specification
 
@@ -23,7 +23,8 @@ It defines GUIF's expected product, verified current state, missing capabilities
 - `director` reviews composition, hierarchy, Theme constraints, Resource reuse, Memory constraints, conflicts, and approval points.
 - `theme` resolves an active Project Theme or creates a reviewable inferred Theme contract.
 - `resource` creates validated Resource manifest candidates without silently modifying Project files.
-- `prompt` creates a versioned, provider-independent Prompt IR with generation jobs, constraints, references, output contracts, approval points, and blockers.
+- `prompt` creates a versioned, provider-independent Prompt IR with jobs, constraints, references, output contracts, approval points, blockers, and provenance.
+- `qa` performs deterministic semantic Contract QA, verifies cross-Agent consistency and execution safety, and creates an explicit Export Gate.
 - Runtime ranks Project Memory, Resource manifests, and Project Workflow manifests against the current Requirement and active Theme.
 - Project Workflow manifests can override built-in Workflows and declare executable `agents`.
 - Workflow schema v1 remains readable through the legacy `manager` mapping.
@@ -58,7 +59,7 @@ User Requirement
        -> Theme
        -> Resource
        -> Prompt
-       -> QA
+       -> Semantic QA
        -> Export
   -> persisted Task and Outputs
 ```
@@ -81,6 +82,7 @@ print(task.state["direction"])
 print(task.state["theme_contract"])
 print(task.state["resource_contracts"])
 print(task.state["prompt_ir"])
+print(task.state["qa_report"])
 ```
 
 Equivalent CLI command:
@@ -106,7 +108,8 @@ Workflow schema v2 contains human-readable steps and an executable Agent sequenc
     "Review art direction and resource reuse",
     "Resolve theme constraints",
     "Resolve production resource contracts",
-    "Build model-neutral generation instructions"
+    "Build model-neutral generation instructions",
+    "Run semantic and technical QA"
   ],
   "agents": ["planner", "director", "theme", "resource", "prompt", "qa", "export"]
 }
@@ -158,7 +161,7 @@ ui-production-plan
 
 The Director creates page-specific composition zones, focal order, interaction hierarchy, relevant Memory constraints, Resource reuse decisions, blocking conflicts, approval points, and handoff instructions.
 
-Its status is `ready`, `needs-review`, or `blocked`.
+Status: `ready`, `needs-review`, or `blocked`.
 
 ```python
 task.state["direction"]
@@ -213,11 +216,11 @@ model-neutral-prompt-ir
 Prompt IR schema v1 contains:
 
 - provider binding fields, initially `provider_id: null` and `model_id: null`;
-- a global page, composition, Theme, and negative-constraint contract;
+- a global Page, Composition, Theme, and Negative Constraint contract;
 - one Effect Image job and zero or more Production Asset jobs;
-- structured instruction groups for objective, composition, visual direction, content, and technical constraints;
-- approved Resource references and exact output contracts;
-- per-job acceptance criteria;
+- structured Objective, Composition, Visual, Content, and Technical instructions;
+- approved Resource references and exact Output Contracts;
+- per-job Acceptance Criteria;
 - required capabilities such as `image-generation`, `image-editing`, `protected-region-editing`, or `transparent-output`;
 - Approval Points, Blockers, Handoff, and full Provenance.
 
@@ -232,6 +235,44 @@ blocked
 Jobs are executable only when Prompt IR status is `ready`. A review-required or blocked IR remains inspectable and persisted, but a Provider Adapter must not execute it automatically.
 
 Prompt IR is not an OpenAI, image-model, or Figma payload. A later Provider Adapter may translate it, but must preserve instructions, negative constraints, references, output contracts, acceptance criteria, and provenance.
+
+### Semantic QA
+
+The alpha.15 QA Agent performs deterministic Contract QA before any Provider or Export step. It checks:
+
+- Prompt IR schema validity;
+- the complete upstream Output provenance chain;
+- Page type, orientation, and canvas consistency between Plan and Prompt IR;
+- preservation of Theme `must_include` and `avoid` constraints;
+- one-to-one coverage between Resource Manifest Candidate and Production Asset Job;
+- Resource Output Contract validity and equality;
+- approved-reference boundaries;
+- `review-before-execute` safety;
+- required Provider capabilities.
+
+```python
+task.state["qa_report"]
+```
+
+```text
+semantic-qa-report
+```
+
+QA status:
+
+```text
+passed
+review-required
+blocked
+```
+
+The report contains Checks, Findings, Revision Request, Artifact Review state, Provenance, Handoff, and an explicit:
+
+```python
+task.state["qa_report"]["export_gate"]
+```
+
+At alpha.15, no visual Semantic QA Adapter exists. When no generated Artifact is registered, the report records `artifact_review.status: "not-run"` and explicitly states that it does not claim visual quality results. Consequently, Export remains blocked even when Contract checks pass. This prevents contract-only reasoning from being presented as visual verification.
 
 ## Persisted Task Runs
 
@@ -264,7 +305,6 @@ guif run "Create a 1080x2340 portrait medieval harbor shop page for Unity" \
 
 guif run-list --project LeekParty
 guif run-show <task-id> --project LeekParty
-
 guif validate LeekParty
 ```
 
@@ -298,11 +338,13 @@ These JSON Sidecars are deterministic GUIF metadata, not native Engine-generated
 7. Runtime Runs must be inspectable, persisted, and recoverable.
 8. Inferred Theme and Resource proposals require review before Project files are changed.
 9. Prompt IR is provider-independent and requires approval before execution.
-10. Effect Images and Production Assets remain separate.
-11. Engine-specific behavior belongs in Adapters, not Framework Core.
-12. Local edits preserve non-target pixels through mask-based composition.
-13. A release is complete only when Feature, Test, CI, both READMEs, Version Metadata, and the Product Specification agree.
+10. Contract QA must not claim visual QA when no visual Artifact was inspected.
+11. Export requires a passing explicit Export Gate.
+12. Effect Images and Production Assets remain separate.
+13. Engine-specific behavior belongs in Adapters, not Framework Core.
+14. Local edits preserve non-target pixels through mask-based composition.
+15. A release is complete only when Feature, Test, CI, both READMEs, Version Metadata, and the Product Specification agree.
 
 ## Repository direction
 
-The next priority is a real Semantic QA Agent that evaluates Prompt IR and future Artifacts against Plan, composition, Theme, Resource contracts, and acceptance criteria. Generation Tool integration should remain Adapter-based and must not bypass Approval Points. Priorities and acceptance criteria are maintained in [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md).
+The next priority is an explicit Approval API and state transition contract. It must resolve Director, Theme, Resource, and Prompt approval points without mutating Project truth or enabling Provider execution implicitly. After that, GUIF can add Provider Adapters, Artifact registration, visual Semantic QA, Revision Loops, and a real Export Agent. Priorities and acceptance criteria are maintained in [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md).
