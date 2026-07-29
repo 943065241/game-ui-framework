@@ -20,11 +20,7 @@ class RuntimeContext:
     active_theme_ref: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialize Runtime Context without private Theme content.
-
-        The full Theme is hydrated from PrivateThemeStore at runtime. Persisted Task
-        files contain only an opaque ID/version/hash reference.
-        """
+        """Serialize Runtime Context without private Theme content."""
 
         payload = asdict(self)
         payload["active_theme"] = None
@@ -43,10 +39,17 @@ class RuntimeContext:
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "RuntimeContext":
+        # Hand-authored/in-memory fixtures may still supply active_theme. TaskStore
+        # persistence always calls to_dict(), which redacts it before writing.
+        transient_theme = (
+            dict(payload["active_theme"])
+            if isinstance(payload.get("active_theme"), dict)
+            else None
+        )
         return cls(
             project_root=str(payload["project_root"]),
             project_config=dict(payload.get("project_config", {})),
-            active_theme=None,
+            active_theme=transient_theme,
             active_theme_ref=(
                 dict(payload["active_theme_ref"])
                 if isinstance(payload.get("active_theme_ref"), dict)
