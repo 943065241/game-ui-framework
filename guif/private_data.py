@@ -58,6 +58,10 @@ class PrivateDataLayout:
         return self.root / "host-credentials"
 
     @property
+    def host_work(self) -> Path:
+        return self.root / "host-work"
+
+    @property
     def operation_audit(self) -> Path:
         return self.root / "operation-audit"
 
