@@ -171,7 +171,9 @@ def build_semantic_qa_report(task: Any) -> dict[str, Any]:
     negative_constraints = _normalize(_as_list(global_contract.get("negative_constraints")))
     visual_instructions = _normalize(_as_list(global_contract.get("visual_instructions")))
     missing_negative = [
-        value for value in _as_list(manifest.get("avoid")) if " ".join(str(value).split()).casefold() not in negative_constraints
+        value
+        for value in _as_list(manifest.get("avoid"))
+        if " ".join(str(value).split()).casefold() not in negative_constraints
     ]
     missing_positive = [
         value
@@ -286,7 +288,11 @@ def build_semantic_qa_report(task: Any) -> dict[str, Any]:
     executable_jobs = [str(job.get("id")) for job in jobs if job.get("executable") is True]
     expected_executable = prompt_status == "ready"
     unsafe_executable = executable_jobs if not expected_executable else []
-    unexpectedly_disabled = [str(job.get("id")) for job in jobs if expected_executable and job.get("executable") is not True]
+    unexpectedly_disabled = [
+        str(job.get("id"))
+        for job in jobs
+        if expected_executable and job.get("executable") is not True
+    ]
     execution_ok = not unsafe_executable and not unexpectedly_disabled
     _check(
         checks,
@@ -321,7 +327,11 @@ def build_semantic_qa_report(task: Any) -> dict[str, Any]:
 
     capabilities = set(str(value) for value in _as_list(prompt_ir.get("capability_requirements")))
     edit_jobs = [job for job in jobs if job.get("operation") == "edit"]
-    transparent_jobs = [job for job in jobs if _as_dict(job.get("output_contract")).get("alpha_required") is True]
+    transparent_jobs = [
+        job
+        for job in jobs
+        if _as_dict(job.get("output_contract")).get("alpha_required") is True
+    ]
     missing_capabilities: list[str] = []
     if edit_jobs:
         for required in ("image-editing", "protected-region-editing"):
@@ -347,7 +357,9 @@ def build_semantic_qa_report(task: Any) -> dict[str, Any]:
             evidence=missing_capabilities,
         )
 
-    upstream_blockers = [item for item in _as_list(prompt_ir.get("blockers")) if isinstance(item, dict)]
+    upstream_blockers = [
+        item for item in _as_list(prompt_ir.get("blockers")) if isinstance(item, dict)
+    ]
     for blocker in upstream_blockers:
         _finding(
             findings,
@@ -355,20 +367,85 @@ def build_semantic_qa_report(task: Any) -> dict[str, Any]:
             str(blocker.get("code") or "upstream-blocker"),
             str(blocker.get("message") or "Upstream production contract is blocked."),
             source=str(blocker.get("source") or "prompt"),
-            evidence=blocker.get("evidence"),
+            evidence=blocker.get("evidence") or {
+                "approval_id": blocker.get("approval_id"),
+                "actor": blocker.get("actor"),
+                "comment": blocker.get("comment"),
+            },
         )
 
-    approvals = [item for item in _as_list(prompt_ir.get("approval_points")) if isinstance(item, dict)]
-    for approval in approvals:
-        if approval.get("required") is False:
-            continue
+    approvals = [
+        item
+        for item in _as_list(prompt_ir.get("approval_points"))
+        if isinstance(item, dict) and item.get("required") is not False and item.get("id")
+    ]
+    approval_state = _as_dict(task.state.get("approval_state"))
+    required_approval_ids = {str(item.get("id")) for item in approvals}
+    pending_approval_ids = set(
+        str(value)
+        for value in _as_list(approval_state.get("pending_ids"))
+    )
+    if not approval_state:
+        pending_approval_ids = set(required_approval_ids)
+    approved_approval_ids = set(
+        str(value)
+        for value in _as_list(approval_state.get("approved_ids"))
+    )
+    rejected_approval_ids = set(
+        str(value)
+        for value in _as_list(approval_state.get("rejected_ids"))
+    )
+    changes_requested_ids = set(
+        str(value)
+        for value in _as_list(approval_state.get("changes_requested_ids"))
+    )
+
+    if upstream_blockers or rejected_approval_ids or changes_requested_ids:
+        expected_prompt_status = "blocked"
+    elif pending_approval_ids:
+        expected_prompt_status = "review-required"
+    else:
+        expected_prompt_status = "ready"
+    approval_gate_ok = prompt_status == expected_prompt_status
+    _check(
+        checks,
+        "approval-state-gate",
+        "approval",
+        approval_gate_ok,
+        "Prompt status matches persisted approval decisions." if approval_gate_ok else "Prompt status does not match persisted approval decisions.",
+        evidence={
+            "prompt_status": prompt_status,
+            "expected_prompt_status": expected_prompt_status,
+            "required_ids": sorted(required_approval_ids),
+            "approved_ids": sorted(approved_approval_ids),
+            "pending_ids": sorted(pending_approval_ids),
+            "rejected_ids": sorted(rejected_approval_ids),
+            "changes_requested_ids": sorted(changes_requested_ids),
+        },
+    )
+    if not approval_gate_ok:
+        _finding(
+            findings,
+            "blocking",
+            "approval-state-mismatch",
+            "Persisted approval decisions and Prompt execution state are inconsistent.",
+            source="qa",
+            evidence={
+                "prompt_status": prompt_status,
+                "expected_prompt_status": expected_prompt_status,
+            },
+        )
+
+    approvals_by_id = {str(item.get("id")): item for item in approvals}
+    for approval_id in sorted(pending_approval_ids):
+        approval = approvals_by_id.get(approval_id, {})
         _finding(
             findings,
             "review",
             "approval-required",
-            str(approval.get("question") or "Human approval is required."),
+            str(approval.get("question") or f"Approval {approval_id} is required."),
             source=str(approval.get("source") or "prompt"),
-            evidence={"approval_id": approval.get("id")},
+            evidence={"approval_id": approval_id},
         )
 
     artifacts = _artifact_outputs(task)
@@ -378,7 +455,7 @@ def build_semantic_qa_report(task: Any) -> dict[str, Any]:
         "reason": (
             "No generated visual Artifact is registered in this Task. Contract QA does not claim visual quality results."
             if not artifacts
-            else "Artifact metadata is registered, but no semantic image inspection Adapter is available in alpha.15."
+            else "Artifact metadata is registered, but no semantic image inspection Adapter is available in alpha.16."
         ),
         "checks": [
             "theme consistency",
@@ -401,7 +478,7 @@ def build_semantic_qa_report(task: Any) -> dict[str, Any]:
     contract_failed = any(check["status"] == "failed" for check in checks)
     if contract_failed or upstream_blockers or prompt_status == "blocked":
         status = "blocked"
-    elif prompt_status == "review-required" or any(item.get("required") is not False for item in approvals):
+    elif prompt_status == "review-required" or pending_approval_ids:
         status = "review-required"
     else:
         status = "passed"
@@ -440,12 +517,20 @@ def build_semantic_qa_report(task: Any) -> dict[str, Any]:
                 {item["code"] for item in findings if item["severity"] == "blocking"}
             ),
             "next_step": (
-                "Resolve blocking contract findings and rebuild Prompt IR before Provider execution."
+                "Resolve blocking contract or approval findings before Provider execution."
                 if status == "blocked"
                 else "Complete required approvals before Provider execution."
                 if status == "review-required"
                 else "Generate and register Artifacts, then run visual Semantic QA."
             ),
+        },
+        "approval_summary": {
+            "status": approval_state.get("status", "pending" if pending_approval_ids else "not-required"),
+            "required_ids": sorted(required_approval_ids),
+            "approved_ids": sorted(approved_approval_ids),
+            "pending_ids": sorted(pending_approval_ids),
+            "rejected_ids": sorted(rejected_approval_ids),
+            "changes_requested_ids": sorted(changes_requested_ids),
         },
         "provenance": {
             "plan_output": "ui-production-plan",
@@ -455,7 +540,7 @@ def build_semantic_qa_report(task: Any) -> dict[str, Any]:
             "prompt_output": "model-neutral-prompt-ir",
         },
         "handoff": {
-            "approval": "Resolve review findings before enabling Prompt jobs.",
+            "approval": "Persist approval decisions before enabling Prompt jobs.",
             "generation": "Execute only Prompt jobs whose executable flag remains true after approval.",
             "artifact_qa": "Register generated Artifacts and re-run QA with a visual inspection Adapter.",
             "export": "Export only when export_gate.allowed is true.",
@@ -489,13 +574,24 @@ def validate_semantic_qa_report(report: object) -> list[str]:
         errors.append(f"schema_version must be {SEMANTIC_QA_SCHEMA_VERSION}")
     if report.get("status") not in {"passed", "review-required", "blocked"}:
         errors.append("status must be passed, review-required, or blocked")
-    for field in ("summary", "artifact_review", "export_gate", "revision_request", "provenance", "handoff"):
+    for field in (
+        "summary",
+        "artifact_review",
+        "export_gate",
+        "revision_request",
+        "provenance",
+        "handoff",
+    ):
         if field in report and not isinstance(report[field], dict):
             errors.append(f"{field} must be an object")
+    if "approval_summary" in report and not isinstance(report["approval_summary"], dict):
+        errors.append("approval_summary must be an object")
     for field in ("checks", "findings"):
         if field in report and not isinstance(report[field], list):
             errors.append(f"{field} must be a list")
-    if isinstance(report.get("export_gate"), dict) and not isinstance(report["export_gate"].get("allowed"), bool):
+    if isinstance(report.get("export_gate"), dict) and not isinstance(
+        report["export_gate"].get("allowed"), bool
+    ):
         errors.append("export_gate.allowed must be a boolean")
     for index, check in enumerate(report.get("checks", [])):
         if not isinstance(check, dict):
