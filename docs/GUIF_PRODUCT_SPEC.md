@@ -1,7 +1,7 @@
 # GUIF Product Specification / GUIF 产品规格说明
 
 > Status / 状态: Living document / 持续迭代文档  
-> Baseline / 基线版本: `v1.0.0-alpha.22`  
+> Baseline / 基线版本: `v1.0.0-alpha.23`  
 > Last reviewed / 最近审阅: 2026-07-29
 
 ---
@@ -10,23 +10,25 @@
 
 ### 0. 文档目的
 
-本文件定义 GUIF 的产品定位、已验证能力、边界、风险与迭代基线。Feature、Test、CI、中英文 README、Version Metadata 和本文件必须在同一个 Release 中保持一致。
+本文件定义 GUIF 的产品定位、已验证能力、隐私边界、风险和下一阶段。Feature、Test、CI、中英文 README、Version Metadata 和本文件必须在同一个 Release 中保持一致。
 
 ### 1. 产品定义
 
-GUIF 是一个本地优先、以自然语言为主要入口、Host 与 Tool 均可配置、以 Project File 与 Git 作为长期事实来源、面向游戏 UI 全生产流程的可执行 AI 工作框架。
+GUIF 是一个本地优先、以自然语言为主要入口、Host 与 Tool 均可配置、面向游戏 UI 全生产流程的可执行 AI 工作框架。
 
 默认路径：
 
 ```text
 用户
   -> ChatGPT Host                         默认，可替换
+  -> Conversation Theme Resolution
+       -> 选择历史 Theme
+       -> 创建新 Theme
+       -> 派生 Theme Version
+       -> 明确暂不绑定
   -> GUIF Runtime
-       -> Project Context / Retrieval
-       -> Workflow / Pipeline
        -> Planner / Director / Theme / Resource / Prompt
-       -> Contract QA
-       -> Initial Approval
+       -> Approval
        -> Tool Discovery / Connection / Execution
        -> Artifact Registry
        -> Visual Review
@@ -37,218 +39,297 @@ GUIF 是一个本地优先、以自然语言为主要入口、Host 与 Tool 均�
 
 核心原则：
 
-- ChatGPT-first，但不把 ChatGPT 写死在 Core；
-- Tool 可配置，生产任务缺少 Tool 时 Fail Closed；
-- 先审批、后执行；先 Review、后 Supersession；
-- Artifact 与 Source 通过 SHA-256 保持身份；
-- Metadata Review 不冒充 Semantic Visual Review；
-- 未通过全部 Gate 的结果不得写入 Project Truth；
-- 生产变更必须可审计、可恢复，并避免覆盖后续修改。
+1. Theme 是用户拥有的私有长期数据，不属于框架工程；
+2. 新对话先确认 Theme，再开始依赖视觉方向的生产；
+3. Theme 通过对话维护，每次发布形成不可变 Version；
+4. 框架 Git 只保存 Contract、代码、测试和完全虚构的示例；
+5. Project Git 默认不保存 Theme 内容，只保存明确批准的生产事实；
+6. Runtime 持久化只保存 Theme ID、Version 和 Snapshot Hash；
+7. 真实 Theme 只在执行时从私有存储 Hydrate；
+8. 缺少 Theme 时 Fail Closed，不静默套用框架内置风格；
+9. 删除当前文件不等于删除 Git 历史；历史清理必须单独评估；
+10. Approval、Visual Review、Artifact Identity 与 Gated Export 规则保持不变。
 
-### 2. alpha.22 已验证能力
+### 2. alpha.23 已验证能力
 
-#### 2.1 Gated Export Plan
+#### 2.1 Private Theme Library
 
-`Runtime.prepare_gated_export()` 会读取持久化 Task 并生成可审阅 Export Record，不修改 Project 文件。
-
-检查项：
-
-1. Task 为 `completed`；
-2. Initial Approval 为 `approved` 或 `not-required`；
-3. Contract QA 为 `passed`；
-4. 聚合 `qa_report.export_gate.allowed` 为 true；
-5. 存在 Active `production-asset` Artifact；
-6. Artifact 不是 Simulation，包含真实视觉 Pixel，并且 Visual Review 为 `passed`；
-7. Artifact 文件仍位于 Run Directory 内，且 SHA-256 与登记记录一致；
-8. Artifact Output Contract 与已批准 Resource Manifest Candidate 一致；
-9. 同一个 Resource 只有一个 Active Artifact；
-10. 所有 Revision Plan 为 `resolved` 或 `rejected`；
-11. Resource Target 与 Export Target Engine 兼容。
-
-任一检查失败：
+`PrivateThemeStore` 将 Theme 保存到 Workspace 仓库之外：
 
 ```text
-Export.status = blocked
-Project Truth 不变
-Engine Output 不创建
+<private-data-root>/themes/<theme-id>/
+  index.json
+  versions/1.json
+  versions/2.json
 ```
 
-#### 2.2 Project Truth Materialization
+可通过 `GUIF_DATA_HOME` 指定私有数据父目录。未配置时使用 Workspace 外部的隐藏同级目录。
 
-Ready Export 将已批准生产资源写入：
+Theme Record 包含：
+
+- `theme_id`；
+- `version` 与 `parent_version`；
+- `name`、`status`、`privacy`；
+- Theme Content；
+- Conversation / Host 来源记录；
+- `snapshot_hash`；
+- 创建与更新时间。
+
+Theme Content 包含：
 
 ```text
-projects/<project>/production-assets/files/<output-name>
-projects/<project>/production-assets/<resource-id>.resource.json
+description
+palette
+materials
+lighting
+must_include
+avoid
 ```
 
-Materialized Manifest 的 `source` 指向由 GUIF 管理的生产文件。已有文件在覆盖前保存 Backup。
+每个 Version 都是不可变 Snapshot。`derive()` 创建新 Version，不覆盖旧版本。
 
-当前只 Materialize Active `production-asset` Artifact。Effect Image、Simulation、Receipt、Stale Artifact 和未完成 Review 的 Artifact 不进入生产集合。
+#### 2.2 Conversation-first Resolution
 
-#### 2.3 Engine-specific Export
-
-每次执行创建独立目录：
-
-```text
-projects/<project>/exports/<engine>/<export-id>/
-  approved assets
-  adapter metadata
-  export-manifest.json
-```
-
-继续支持 Generic、Unity、Godot 和 Unreal Adapter。Manifest 保存：
-
-- Export、Task、Project、Target Engine 和 Actor；
-- Gate Snapshot；
-- Artifact、Job、Review、Resource 与 SHA-256；
-- Project Truth Path；
-- Engine Output Path 与 Hash；
-- Adapter Result 和 Import Hint。
-
-#### 2.4 Transaction Audit
-
-每次完成的 Export 创建：
-
-```text
-projects/<project>/export-history/<export-id>/
-  transaction.json
-  backups/
-```
-
-Transaction 对每个生产变更保存：
-
-- Path；
-- 文件之前是否存在；
-- Before SHA-256；
-- Backup Path；
-- After SHA-256；
-- Actor 与时间；
-- Engine Output 与 Export Manifest。
-
-执行过程发生异常时，GUIF 自动恢复已经写入的 Project 文件并删除不完整 Engine Output。
-
-#### 2.5 Conflict-aware Rollback
-
-Rollback 会在恢复前比较当前文件 Hash 与 Export 写入时的 After Hash。
-
-```text
-文件未被后续修改
-  -> 安全恢复 Backup 或删除新建文件
-
-文件已被后续修改
-  -> 默认拒绝 Rollback
-  -> 只有明确 force + actor + reason 才允许继续
-```
-
-Rollback 的状态、Actor、Reason、Force 与冲突列表会进入 Task Event、Export Record 和 Transaction Audit。
-
-#### 2.6 Persistence 与 Runtime API
-
-Run Directory 新增：
-
-```text
-gated-exports.json
-```
-
-`run-list` 新增：
-
-```text
-gated_export_count
-completed_export_count
-latest_export_status
-```
-
-Runtime API：
+新对话调用：
 
 ```python
-prepare_gated_export(project, task_id, target_engine=None)
-execute_gated_export(project, task_id, target_engine=None, actor="host")
-list_gated_exports(project, task_id)
-get_gated_export(project, task_id, export_id)
-rollback_gated_export(project, task_id, export_id, actor=..., reason=..., force=False)
+runtime.prepare_conversation_theme(
+    conversation_id,
+    project="SampleGame",
+)
 ```
 
-CLI：
+状态：
 
 ```text
-run-export-plan
-run-export-execute
-run-export-list
-run-export-show
-run-export-rollback
+selected
+confirmation-required
 ```
+
+`confirmation-required` 提供：
+
+```text
+select-history
+create-theme
+derive-theme
+continue-unbound
+```
+
+当 `Runtime.run()` 收到 `conversation_id` 且对话尚未绑定 Theme 时，默认抛出 `ThemeResolutionRequired`。只有 Host 完成选择，或明确设置 `continue_unbound=True`，Task 才继续。
+
+#### 2.3 Theme Binding
+
+Conversation 与 Project Binding 均存放在私有目录：
+
+```text
+conversation-theme-bindings/<conversation-id>.json
+project-theme-bindings/<project>.json
+```
+
+解析优先级：
+
+```text
+Conversation Binding
+  -> Project Binding
+  -> Unbound
+```
+
+Binding 只保存：
+
+```json
+{
+  "theme_id": "theme-example",
+  "version": 2,
+  "snapshot_hash": "sha256...",
+  "privacy": "private"
+}
+```
+
+#### 2.4 Runtime Context Redaction
+
+执行中的 `RuntimeContext.active_theme` 可以包含完整 Theme，供 Planner、Director、Theme、Prompt 和 QA 使用。
+
+持久化时：
+
+```text
+active_theme = null
+active_theme_ref = opaque reference
+```
+
+Task 重新加载时，TaskStore 根据 ID、Version 与 Hash 从 PrivateThemeStore 重新 Hydrate。Hash 不一致时 Fail Closed。
+
+#### 2.5 Private Runtime Evidence
+
+新的 Task Run 与自然语言 Plan 均存放在私有目录：
+
+```text
+<private-data-root>/runs/<project>/<task-id>/
+<private-data-root>/plans/<project>/
+```
+
+原因：Task、Prompt IR、Theme Contract、Review Finding、Revision Plan 和用户决策可能包含私人内容。
+
+旧版 `projects/<project>/runs/` 暂时保持只读兼容，所有新写入均使用私有路径。
+
+#### 2.6 Explicit Theme Requirement
+
+GUIF 不再内置可能与真实用户项目相似的 Theme Preset，也不会仅根据 Task 文本静默推断完整 Theme。
+
+缺少明确选择的 Theme 时：
+
+```text
+Theme Contract.status = blocked
+source = unresolved
+approval_required = true
+```
+
+Theme Agent 的来源现在是：
+
+```text
+private-theme
+unresolved
+```
+
+#### 2.7 Legacy Migration
+
+```python
+runtime.migrate_legacy_project_themes(
+    "SampleGame",
+    actor="migration",
+)
+```
+
+迁移步骤：
+
+1. 读取旧 `projects/<project>/themes/*.json`；
+2. 导入 PrivateThemeStore；
+3. 在私有 Migration 目录保存 Archive 与 Report；
+4. 删除 Project-local Theme 文件；
+5. 删除 `project.json` 中的 `current_theme` 与 `theme_binding`；
+6. 将旧 Active Theme 转换成私有 Project Binding。
+
+#### 2.8 Privacy Audit
+
+```python
+runtime.audit_privacy(
+    sensitive_terms=("private phrase",),
+)
+```
+
+Working-tree Audit 检查：
+
+- Project-local Theme 文件；
+- Project-local Run、Context、Output 与 Plan；
+- Project Config Theme Binding；
+- 私有 Theme Snapshot 命名；
+- 调用方提供的敏感词。
+
+Report 保存在私有目录。该 Audit 只覆盖当前 Working Tree，不覆盖历史 Commit、PR Diff、Fork、缓存、Release 或外部 Clone。
+
+#### 2.9 Repository Guard
+
+`.gitignore` 阻止常见私有数据路径进入 Git。CI 还包含 Repository Privacy Test，防止已知用户 Theme Identifier 再次进入当前框架树。
+
+所有框架测试均使用完全虚构的 `SampleGame` 与抽象几何 Fixture。
 
 ### 3. 与既有能力的关系
 
-alpha.22 不替代以下能力：
+alpha.23 保留并继续使用：
 
-- alpha.16 Initial Approval；
-- alpha.17 Artifact Registry；
-- alpha.18 Visual Review 与 Revision Plan；
-- alpha.19 Configurable Host / Tool 与 ChatGPT Handoff；
-- alpha.20 Revision Job、独立 Revision Approval、Immutable Source 与 Gated Supersession；
-- alpha.21 Tool Discovery、Connection、Credential Reference、Health Retry 与 Contract Test。
+- Workflow-driven Agent Pipeline；
+- Initial Approval 与 Revision Approval；
+- Configurable Host / Tool 与 ChatGPT Handoff；
+- Artifact Registry 与 SHA-256 Identity；
+- Metadata / Semantic Visual Review；
+- Controlled Revision 与 Review-gated Supersession；
+- Gated Export、Engine Manifest、Transaction Audit 与 Conflict-aware Rollback。
 
-旧版 `guif export` 继续用于已经存在于 Project Truth 的 Resource。Task 产生的 AI Artifact 应通过 Gated Export 才能进入生产文件。
+区别是这些 Runtime Evidence 现在默认位于 Private Data Store。
 
-### 4. 当前边界
+### 4. 隐私边界
 
+#### 4.1 可以进入框架 Git
+
+- 数据结构与接口；
+- 通用算法；
+- 完全虚构、无法关联真实用户项目的 Fixture；
+- 不包含真实 Theme 内容的文档示例；
+- Privacy 与 Migration 工具本身。
+
+#### 4.2 不得进入框架 Git
+
+- 真实 Theme 名称与描述；
+- 用户配色、材质、角色、场景和构图规范；
+- 对话中的 Theme 决策与迭代；
+- 用户 Artifact、Prompt、Review Finding；
+- 私有 Theme Binding；
+- 含私人内容的 Task Run 与 Plan。
+
+#### 4.3 Project Git
+
+Project Git 只保存用户明确批准成为项目事实的数据，例如生产 Resource 与 Workflow。Theme 默认只通过私有引用解析，不复制完整内容。
+
+### 5. Git 历史事件响应
+
+当前分支清理不能撤回已经存在于：
+
+```text
+prior commits
+pull-request diffs
+forks
+caches
+release archives
+external clones
+```
+
+GUIF 不自动重写历史，因为 History Rewrite 是破坏性操作，可能影响 Clone、Fork、Open PR、Tag 与 Release。
+
+处理流程：
+
+1. 停止继续提交私人内容；
+2. 清理当前树并加入 CI Guard；
+3. 确定准确文件、Commit、PR、Tag 和 Release 范围；
+4. 备份 Repository；
+5. 决定是否需要 `git filter-repo` 等历史重写；
+6. 协调 Force Push、Tag/Release 替换和协作者重新 Clone；
+7. 申请清理平台缓存；
+8. 承认 Fork 和外部 Clone 无法保证收回。
+
+详细步骤见 `docs/PRIVACY_MIGRATION.md`。
+
+### 6. 当前边界
+
+- Private Data Store 为本地文件系统，尚无静态加密；
+- 没有跨设备私有 Theme 同步；
+- 没有 Retention Policy、Lease 或并发编辑锁；
+- Conversation / Approval Actor 尚未认证；
+- ChatGPT 产品侧自动 Handoff Callback 尚未接入；
 - 默认 Semantic Visual Inspector Registry 为空；
-- ChatGPT 产品侧尚未自动消费 Handoff 并提交结果；
-- Gated Export 尚未把 Approved Reuse Resource 与新 Artifact 合并为同一事务；
-- Actor 仍是字符串，没有认证和签名；
-- Rollback 尚未与 Git Branch、Commit 和 Revert 集成；
-- 没有 Remote Object Storage、Retention、Lease 或 Concurrent Export Lock；
-- Export Manifest 尚未签名；
-- Engine Adapter 仍生成导入 Metadata，不直接操作运行中的 Unity、Godot 或 Unreal Editor。
+- 当前 Tree Audit 无法证明历史或外部副本已清理；
+- Memory 仍属于 Project 数据，Theme 设计决策应写入 Theme Version 而非普通 Project Memory。
 
-### 5. 下一阶段
+### 7. 下一阶段
 
-#### alpha.23：Authenticated Host API 与 Git Change Management
+#### alpha.24：Authenticated Host API 与 Git Change Management
 
-- Stable Host Result Protocol；
 - Authenticated Host / Approval / Export Actor；
+- Stable Host Result Callback；
 - Optimistic Concurrency 与 Task Lease；
 - Git Change Set；
-- Branch、Commit、Diff、Revert；
+- Branch、Commit、Diff 与 Revert；
 - Export Transaction 与 Git Commit 关联；
-- Pause、Cancel、Timeout 和 Result Summary。
+- Pause、Cancel、Timeout 与 Result Summary。
 
-#### 后续候选
+### 8. 迭代记录
 
-- Approved Reuse Resource Packaging；
-- Multi-source 与 Mask Package Revision；
-- Signed Tool / Export Manifest；
-- Cost、Latency、Privacy 与 Quality-aware Tool Routing；
-- Remote Artifact Store 与 Retention；
-- Native Engine Editor Integration。
-
-### 6. 主要风险
-
-- Host Callback 仍依赖产品侧编排；
-- Semantic Inspection 的默认责任主体尚未确定；
-- 未认证 Actor 无法作为强审计身份；
-- 文件系统事务不能完全替代 Git 或数据库事务；
-- Force Rollback 可能覆盖后续工作，必须保持显式且可审计；
-- Framework 可能继续增加 Contract，而没有缩短真实用户生产路径。
-
-### 7. 迭代记录
-
-- `alpha.9`：Runtime、Task、Agent、Registry、Pipeline Contract。
-- `alpha.10`：Persistent Run、Checkpoint、Failure Resume。
-- `alpha.11`：Workflow-driven Pipeline 与 Structured Planner。
-- `alpha.12`：Structured Director 与 Context Retrieval。
-- `alpha.13`：Theme / Resource Agent 与 Review-before-write。
-- `alpha.14`：Model-neutral Prompt IR。
-- `alpha.15`：Semantic Contract QA。
-- `alpha.16`：Persistent Approval 与 Controlled State Transition。
-- `alpha.17`：Provider Adapter、Dry-run 与 Artifact Registry。
-- `alpha.18`：Visual Artifact Inspection、Revision Plan 与 Supersession。
-- `alpha.19`：Configurable Host / Tool、ChatGPT Bridge、Waiting State 与 External Submission。
-- `alpha.20`：Revision Job、Independent Approval、Immutable Source 与 Review-gated Supersession。
-- `alpha.21`：Host / Tool Discovery、Connection Request、Credential Reference 与 Contract Test。
-- `alpha.22`：Gated Export Plan、Project Truth Materialization、Engine Export Manifest、Transaction Audit 与 Conflict-aware Rollback。
+- `alpha.16`：Persistent Approval；
+- `alpha.17`：Provider Adapter 与 Artifact Registry；
+- `alpha.18`：Visual Review 与 Revision Plan；
+- `alpha.19`：Configurable Host / Tool 与 ChatGPT Handoff；
+- `alpha.20`：Controlled Revision Execution；
+- `alpha.21`：Tool Discovery 与 Connection Workflow；
+- `alpha.22`：Gated Export 与 Transaction Rollback；
+- `alpha.23`：Private Theme Library、Conversation Theme Resolution、Runtime Redaction 与 Privacy Migration。
 
 ---
 
@@ -256,87 +337,42 @@ alpha.22 不替代以下能力：
 
 ### 0. Purpose
 
-This file is GUIF's living product definition, verified capability review, boundary, risk register, and iteration baseline. Feature implementation, tests, CI, both READMEs, version metadata, and this specification must agree for a release to be complete.
+This file defines GUIF's product direction, verified capabilities, privacy boundary, risks, and next phase. Features, tests, CI, both READMEs, version metadata, and this specification must agree in the same release.
 
 ### 1. Product definition
 
-GUIF is a local-first executable AI work framework for end-to-end game UI production. Natural language is the primary interface, Hosts and Tools are configurable, and Project files plus Git are the long-term source of truth.
+GUIF is a local-first executable AI work framework for end-to-end game UI production. Hosts and Tools are configurable; ChatGPT remains the default Host.
 
-Default path:
+A Theme is private, user-owned, versioned long-term data. It does not belong to the framework repository. A new conversation resolves a Theme before visual production by selecting history, creating a Theme, deriving a version, or explicitly continuing unbound.
 
-```text
-User
-  -> ChatGPT Host by default
-  -> GUIF Runtime
-  -> deterministic production Agents
-  -> Contract QA and initial Approval
-  -> Tool discovery, connection, and execution
-  -> Artifact Registry
-  -> Visual Review
-  -> controlled Revision
-  -> Gated Export
-  -> Project truth, Engine output, and audit
-```
+### 2. Verified alpha.23 capabilities
 
-Core principles:
+- Versioned `PrivateThemeStore` outside workspace Git;
+- immutable Theme snapshots with parent versions and SHA-256 identity;
+- private Conversation and Project bindings;
+- conversation-first `confirmation-required` resolution;
+- `ThemeResolutionRequired` before an unbound conversation Task starts;
+- transient full Theme hydration and persisted opaque references only;
+- private Task Run and natural-language Plan storage;
+- explicit Theme requirement with no silent embedded preset inference;
+- legacy project Theme migration;
+- current-working-tree privacy audit and repository CI guard;
+- fictional, non-user-linked framework examples.
 
-- ChatGPT-first, not ChatGPT-hard-coded;
-- production fail-closed behavior;
-- approval before execution and review before supersession;
-- SHA-256 Artifact and source identity;
-- no false semantic visual claims;
-- no Project mutation before every required gate passes;
-- auditable and recoverable production changes;
-- rollback must not silently overwrite later work.
+### 3. Private data boundary
 
-### 2. Verified state at alpha.22
+Framework Git may contain contracts, algorithms, interfaces, privacy tooling, and wholly fictional fixtures. It must not contain real Theme names, visual direction, palette, materials, character or scene rules, conversation decisions, user Artifacts, Prompt data, review findings, or private bindings.
 
-#### 2.1 Gated Export Plan
+Project Git stores approved production truth. Complete Theme data remains private by default.
 
-`Runtime.prepare_gated_export()` evaluates persisted Task state without mutating Project files.
+### 4. History boundary
 
-It requires a completed Task, satisfied initial Approval, passing Contract QA, aggregate Visual Export Gate approval, at least one active production Artifact, real reviewed pixels, valid Run-local path and SHA-256 identity, an exact approved Resource Contract match, unique active Resource identity, resolved or rejected Revision Plans, and Engine compatibility.
+Deleting current files does not erase prior commits, PR diffs, forks, caches, releases, or external clones. GUIF does not automatically rewrite Git history. A destructive rewrite requires a scoped incident response, backup, collaborator coordination, force-push plan, tag/release replacement, and cache cleanup request.
 
-A failed check persists a blocked Export record and performs no production write.
+### 5. Current limitations
 
-#### 2.2 Project truth materialization
+Private storage is file-backed and lacks encryption-at-rest, cross-device synchronization, retention policies, and concurrent leases. Actors are not authenticated. Current-tree audit cannot prove removal from repository history or external copies.
 
-A ready Export writes managed assets and Resource manifests under `production-assets/`. Existing files are backed up before replacement. Only active reviewed `production-asset` Artifacts are selected.
+### 6. Next phase
 
-#### 2.3 Engine output
-
-Each execution creates `exports/<engine>/<export-id>/` with approved assets, Engine Adapter metadata, and `export-manifest.json`. The manifest captures gate, Artifact, Resource, review, SHA-256, path, actor, and Adapter provenance.
-
-#### 2.4 Audit and rollback
-
-`export-history/<export-id>/transaction.json` records every mutation and backup. Execution failures trigger automatic restoration. Explicit rollback compares current hashes with the hashes written by the Export and fails closed when later Project changes are detected. Force rollback requires an actor and reason and remains auditable.
-
-#### 2.5 APIs and persistence
-
-New Runtime APIs prepare, execute, list, show, and roll back gated Exports. `gated-exports.json` persists Task-bound state, and Run summaries expose Export counts and latest status.
-
-### 3. Compatibility
-
-Alpha.22 builds on persistent Approval, Artifact Registry, Visual Review, configurable Tools, ChatGPT external handoffs, controlled Revision Jobs, immutable source binding, Tool Discovery, Connection Requests, opaque Credential references, Health Retry, and Tool Contract Tests.
-
-The legacy `guif export` command remains available for Resources already present in Project truth. AI-produced Artifacts should use the gated Task-bound path.
-
-### 4. Remaining gaps
-
-- automatic ChatGPT product callback wiring;
-- a default semantic Visual Inspector;
-- authenticated and signed actors;
-- packaging approved reused Resources in the same Export transaction;
-- Git branch, commit, and revert integration;
-- concurrent Export locking and Task leases;
-- remote Artifact storage and retention;
-- signed Export manifests;
-- native live Engine editor integration.
-
-### 5. Next phase
-
-`alpha.23` will focus on an authenticated Host API and Git change management: stable result protocol, actor identity, optimistic concurrency, leases, Git change sets, branches, commits, diffs, reverts, transaction-to-commit linkage, cancellation, timeouts, and execution summaries.
-
-### 6. Main risks
-
-The main risks are product-side callback dependency, unresolved semantic inspection ownership, weak string actor identity, file transactions without Git or database atomicity, dangerous forced rollback, and interface growth that does not shorten the real user production path.
+**alpha.24: Authenticated Host API and Git Change Management** will add authenticated actors, stable result callbacks, optimistic concurrency, Task leases, Git change sets, branch/commit/diff/revert integration, and Export transaction linkage.
