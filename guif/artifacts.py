@@ -42,6 +42,17 @@ def _allowed_reference_root(task: Any, reference: dict[str, Any], project_root: 
     return project_root.resolve(), "project"
 
 
+def _normalize_private_run_source(task: Any, source_path: Path, storage_scope: str) -> Path:
+    if storage_scope != "private-run" or source_path.is_absolute():
+        return source_path
+    parts = source_path.parts
+    legacy_prefix = ("runs", task.task_id)
+    if tuple(parts[:2]) == legacy_prefix:
+        remaining = parts[2:]
+        return Path(*remaining) if remaining else Path(".")
+    return source_path
+
+
 def bind_references(task: Any, references: list[dict[str, Any]]) -> tuple[dict[str, Any], ...]:
     project_root = _project_root(task)
     bound: list[dict[str, Any]] = []
@@ -64,7 +75,7 @@ def bind_references(task: Any, references: list[dict[str, Any]]) -> tuple[dict[s
             "size_bytes": None,
         }
         if isinstance(source_value, str) and source_value.strip():
-            source_path = Path(source_value)
+            source_path = _normalize_private_run_source(task, Path(source_value), storage_scope)
             resolved = source_path if source_path.is_absolute() else allowed_root / source_path
             try:
                 resolved = resolved.resolve(strict=True)
