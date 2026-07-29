@@ -52,6 +52,23 @@ def _read_json_files(
     return tuple(_read_json(path) for path in sorted(paths) if path.is_file())
 
 
+def _read_memory_files(directory: Path, *, relative_to: Path) -> tuple[dict[str, Any], ...]:
+    if not directory.exists():
+        return ()
+    records: list[dict[str, Any]] = []
+    for path in sorted(directory.rglob("*.md")):
+        if not path.is_file():
+            continue
+        records.append(
+            {
+                "path": str(path.relative_to(relative_to)),
+                "type": path.parent.name,
+                "content": path.read_text(encoding="utf-8"),
+            }
+        )
+    return tuple(records)
+
+
 def load_runtime_context(workspace: Path, project: str) -> RuntimeContext:
     root = project_root(workspace, project)
     config_path = root / "project.json"
@@ -72,5 +89,5 @@ def load_runtime_context(workspace: Path, project: str) -> RuntimeContext:
         active_theme=active_theme,
         workflows=_read_json_files(root / "workflows"),
         resources=_read_json_files(root / "production-assets", "*.resource.json"),
-        memory=_read_json_files(root / "memory", recursive=True),
+        memory=_read_memory_files(root / "memory", relative_to=root),
     )
