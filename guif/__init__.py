@@ -1,3 +1,3 @@
 """Game UI Framework."""
 
-__version__ = "1.0.0a10"
+__version__ = "1.0.0a11"
