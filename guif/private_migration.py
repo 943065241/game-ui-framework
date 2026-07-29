@@ -76,10 +76,10 @@ def _secret_paths(value: Any, prefix: str = "") -> list[str]:
 class PrivateSchemaMigrator:
     """Detect and repair supported private records without silent upgrades.
 
-    Alpha.28 keeps Conversation Workflow schema version 1 compatible. The
-    migration fills fields introduced by the frozen MVP facade and records the
-    operation. Unknown future schemas and raw secret fields are blocked rather
-    than rewritten.
+    Alpha.28 keeps Conversation Workflow schema version 1 compatible. Current
+    alpha.27/28 records remain current. Older incomplete version-1 records can
+    be repaired explicitly and receive privacy, compatibility, and migration
+    evidence. Unknown future schemas and raw secret fields are blocked.
     """
 
     def __init__(self, workspace: Path, *, data_root: Path | None = None) -> None:
@@ -105,43 +105,53 @@ class PrivateSchemaMigrator:
             ("checkpoint", None),
             ("history", []),
         )
+        structural_repair = False
         for key, default in defaults:
             if key not in repaired:
                 repaired[key] = default
                 changes.append(f"add:{key}")
+                structural_repair = True
+
         privacy = repaired.get("privacy")
-        expected_privacy = {
-            "storage": "private-data-store",
-            "framework_git_mutated": False,
-            "project_git_mutated": False,
-            "raw_secrets_persisted": False,
-        }
-        if not isinstance(privacy, dict):
-            repaired["privacy"] = expected_privacy
-            changes.append("add:privacy")
-        else:
-            merged = dict(privacy)
-            for key, value in expected_privacy.items():
-                if key not in merged:
-                    merged[key] = value
-                    changes.append(f"add:privacy.{key}")
-            repaired["privacy"] = merged
         compatibility = repaired.get("compatibility")
-        expected_compatibility = {
-            "public_api_version": 1,
-            "conversation_schema": 1,
-            "migrated_by": "alpha.28-private-schema-migrator",
-        }
-        if not isinstance(compatibility, dict):
-            repaired["compatibility"] = expected_compatibility
-            changes.append("add:compatibility")
-        else:
-            merged = dict(compatibility)
-            for key, value in expected_compatibility.items():
-                if key not in merged:
-                    merged[key] = value
-                    changes.append(f"add:compatibility.{key}")
-            repaired["compatibility"] = merged
+        enrich_migration_record = (
+            structural_repair
+            or isinstance(privacy, dict)
+            or isinstance(compatibility, dict)
+        )
+        if enrich_migration_record:
+            expected_privacy = {
+                "storage": "private-data-store",
+                "framework_git_mutated": False,
+                "project_git_mutated": False,
+                "raw_secrets_persisted": False,
+            }
+            if not isinstance(privacy, dict):
+                repaired["privacy"] = expected_privacy
+                changes.append("add:privacy")
+            else:
+                merged_privacy = dict(privacy)
+                for key, value in expected_privacy.items():
+                    if key not in merged_privacy:
+                        merged_privacy[key] = value
+                        changes.append(f"add:privacy.{key}")
+                repaired["privacy"] = merged_privacy
+
+            expected_compatibility = {
+                "public_api_version": 1,
+                "conversation_schema": 1,
+                "migrated_by": "alpha.28-private-schema-migrator",
+            }
+            if not isinstance(compatibility, dict):
+                repaired["compatibility"] = expected_compatibility
+                changes.append("add:compatibility")
+            else:
+                merged_compatibility = dict(compatibility)
+                for key, value in expected_compatibility.items():
+                    if key not in merged_compatibility:
+                        merged_compatibility[key] = value
+                        changes.append(f"add:compatibility.{key}")
+                repaired["compatibility"] = merged_compatibility
         return repaired, changes
 
     def scan(self) -> dict[str, Any]:
