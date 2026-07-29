@@ -6,7 +6,7 @@ from guif.host_api import HostCallbackError
 from guif.host_work import HostWorkClaimError, HostWorkError
 from guif.operation_ledger import OperationLedgerError
 from guif.runtime.context import RuntimeContext, load_runtime_context
-from guif.runtime.host_loop import Runtime
+from guif.runtime.conversation_facade import Runtime
 from guif.runtime.pipeline import Pipeline
 from guif.runtime.private_theme import ThemeResolutionRequired
 from guif.runtime.registry import AgentRegistry
