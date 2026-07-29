@@ -12,10 +12,15 @@ from guif.backup_protection import BackupProtectionService, external_adapter_fro
 from guif.beta_readiness import BetaReadinessService, bootstrap_workspace
 from guif.compatibility import compatibility_contract
 from guif.fault_injection import FaultInjector
-from guif.hardening import HardeningService
+from guif.hardening import HardeningService, SOAK_PROFILES
 from guif.private_backup import PrivateBackupService
 from guif.private_data import PrivateDataLayout
 from guif.private_migration import PrivateSchemaMigrator
+from guif.release_provenance import (
+    DEFAULT_MANIFEST_NAME,
+    generate_hash_provenance,
+    verify_hash_provenance,
+)
 from guif.support_policy import support_contract
 from guif.upgrade_assurance import UpgradeAssuranceService
 
@@ -28,11 +33,15 @@ def _workspace(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--workspace", type=Path, default=Path.cwd())
 
 
+def _workspace_path(workspace: Path, value: Path) -> Path:
+    return value if value.is_absolute() else workspace / value
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="guif-ready",
         description=(
-            "Bootstrap, diagnose, migrate, back up, upgrade, and harden the GUIF beta.1 MVP"
+            "Bootstrap, diagnose, migrate, back up, upgrade, and harden the GUIF beta.2 MVP"
         ),
     )
     sub = parser.add_subparsers(dest="command", required=True)
@@ -97,7 +106,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     upgrade = sub.add_parser(
         "upgrade",
-        help="Plan or record a supported alpha.27/alpha.28 to beta.1 upgrade",
+        help="Plan or record a supported alpha.27/alpha.28 to beta.2 upgrade",
     )
     _workspace(upgrade)
     upgrade.add_argument("--source-release", required=True)
@@ -113,9 +122,21 @@ def build_parser() -> argparse.ArgumentParser:
     soak.add_argument("--project", required=True)
     soak.add_argument("--conversation")
     soak.add_argument("--backup", type=Path)
-    soak.add_argument("--iterations", type=int, default=100)
+    soak.add_argument("--profile", choices=tuple(SOAK_PROFILES), default="standard")
+    soak.add_argument("--iterations", type=int)
     soak.add_argument("--max-p95-ms", type=float)
+    soak.add_argument("--report", type=Path)
     soak.add_argument("--no-persist", action="store_true")
+
+    provenance = sub.add_parser(
+        "provenance",
+        help="Generate or verify hash-only wheel and sdist provenance",
+    )
+    _workspace(provenance)
+    provenance.add_argument("--dist", type=Path, default=Path("dist"))
+    provenance.add_argument("--manifest", type=Path)
+    provenance.add_argument("--git-commit")
+    provenance.add_argument("--verify", action="store_true")
 
     acceptance = sub.add_parser("acceptance", help="Check the end-to-end MVP acceptance gate")
     _workspace(acceptance)
@@ -123,10 +144,10 @@ def build_parser() -> argparse.ArgumentParser:
     acceptance.add_argument("--conversation", required=True)
     acceptance.add_argument("--require-completed", action="store_true")
 
-    contract = sub.add_parser("contract", help="Show the frozen beta.1 compatibility contract")
+    contract = sub.add_parser("contract", help="Show the frozen beta compatibility contract")
     _workspace(contract)
 
-    support = sub.add_parser("support", help="Show the beta.1 support and deprecation contract")
+    support = sub.add_parser("support", help="Show the beta support and deprecation contract")
     _workspace(support)
 
     return parser
@@ -203,6 +224,9 @@ def main(argv: list[str] | None = None) -> int:
                 actor=args.actor,
             )
         elif args.command == "soak":
+            report_path = (
+                _workspace_path(workspace, args.report) if args.report is not None else None
+            )
             result = HardeningService(
                 workspace,
                 bearer_token=token,
@@ -210,10 +234,33 @@ def main(argv: list[str] | None = None) -> int:
                 args.project,
                 conversation_id=args.conversation,
                 backup_path=args.backup,
+                profile=args.profile,
                 iterations=args.iterations,
                 max_p95_ms=args.max_p95_ms,
                 persist=not args.no_persist,
+                report_path=report_path,
             )
+        elif args.command == "provenance":
+            dist_dir = _workspace_path(workspace, args.dist).resolve()
+            manifest = (
+                _workspace_path(workspace, args.manifest).resolve()
+                if args.manifest is not None
+                else dist_dir / DEFAULT_MANIFEST_NAME
+            )
+            if args.verify:
+                result = verify_hash_provenance(
+                    manifest,
+                    dist_dir=dist_dir,
+                    expected_git_commit=args.git_commit,
+                )
+            else:
+                if not args.git_commit:
+                    raise ValueError("--git-commit is required when generating provenance")
+                result = generate_hash_provenance(
+                    dist_dir,
+                    git_commit=args.git_commit,
+                    output_path=manifest,
+                )
         elif args.command == "acceptance":
             result = BetaReadinessService(
                 workspace,
