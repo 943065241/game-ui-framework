@@ -13,9 +13,9 @@ from guif.core import create_plan, init_project, project_root, record_memory, va
 from guif.exporter import export_project_assets
 from guif.image_qa import compare_protected_pixels
 from guif.resource import create_resource_manifest, load_resource_manifest, validate_resource_file
+from guif.revision_review import RevisionReviewService
 from guif.runtime import Runtime
 from guif.theme import create_theme, validate_theme_file
-from guif.visual_review import VisualReviewService
 from guif.workflow import list_workflows, load_workflow, validate_workflow_file
 
 
@@ -23,6 +23,15 @@ def _approval_command(sub: argparse._SubParsersAction, name: str, help_text: str
     command = sub.add_parser(name, help=help_text)
     command.add_argument("task_id")
     command.add_argument("approval_id")
+    command.add_argument("--project", required=True)
+    command.add_argument("--actor", required=True)
+    command.add_argument("--comment")
+
+
+def _revision_decision_command(sub: argparse._SubParsersAction, name: str, help_text: str) -> None:
+    command = sub.add_parser(name, help=help_text)
+    command.add_argument("task_id")
+    command.add_argument("revision_id")
     command.add_argument("--project", required=True)
     command.add_argument("--actor", required=True)
     command.add_argument("--comment")
@@ -52,7 +61,7 @@ def build_parser() -> argparse.ArgumentParser:
     tool_scaffold_cmd = sub.add_parser("tool-scaffold", help="Create an unimplemented Tool Adapter scaffold"); tool_scaffold_cmd.add_argument("tool_id"); tool_scaffold_cmd.add_argument("capabilities", nargs="+"); tool_scaffold_cmd.add_argument("--execution-mode", choices=("direct", "external-callback"), default="external-callback")
 
     provider_list_cmd = sub.add_parser("provider-list", help="List legacy Provider adapters and capabilities")
-    execute_cmd = sub.add_parser("run-execute", help="Resolve and execute one approved Prompt job through a configured Tool"); execute_cmd.add_argument("task_id"); execute_cmd.add_argument("job_id"); execute_cmd.add_argument("--project", required=True); execute_cmd.add_argument("--tool"); execute_cmd.add_argument("--provider", help="Legacy explicit Provider path")
+    execute_cmd = sub.add_parser("run-execute", help="Resolve and execute one approved Prompt or Revision job through a configured Tool"); execute_cmd.add_argument("task_id"); execute_cmd.add_argument("job_id"); execute_cmd.add_argument("--project", required=True); execute_cmd.add_argument("--tool"); execute_cmd.add_argument("--provider", help="Legacy explicit Provider path")
     resolution_cmd = sub.add_parser("run-tool-resolution", help="Show persisted Tool resolution state"); resolution_cmd.add_argument("task_id"); resolution_cmd.add_argument("--project", required=True)
     handoff_list_cmd = sub.add_parser("run-tool-handoff-list", help="List persisted external Tool handoffs"); handoff_list_cmd.add_argument("task_id"); handoff_list_cmd.add_argument("--project", required=True)
     submit_cmd = sub.add_parser("run-tool-submit", help="Submit an external Host Tool result file"); submit_cmd.add_argument("task_id"); submit_cmd.add_argument("handoff_id"); submit_cmd.add_argument("file", type=Path); submit_cmd.add_argument("--project", required=True); submit_cmd.add_argument("--tool"); submit_cmd.add_argument("--mime-type"); submit_cmd.add_argument("--width", type=int); submit_cmd.add_argument("--height", type=int); submit_cmd.add_argument("--model-id")
@@ -64,7 +73,15 @@ def build_parser() -> argparse.ArgumentParser:
     review_cmd = sub.add_parser("run-artifact-review", help="Run eligibility, image metadata, and optional semantic Visual review"); review_cmd.add_argument("task_id"); review_cmd.add_argument("artifact_id"); review_cmd.add_argument("--project", required=True); review_cmd.add_argument("--inspector")
     review_list_cmd = sub.add_parser("run-visual-review-list", help="List persisted Visual Review records"); review_list_cmd.add_argument("task_id"); review_list_cmd.add_argument("--project", required=True)
     revision_list_cmd = sub.add_parser("run-revision-list", help="List persisted Revision Plans"); revision_list_cmd.add_argument("task_id"); revision_list_cmd.add_argument("--project", required=True)
-    supersede_cmd = sub.add_parser("run-artifact-supersede", help="Mark an older Artifact stale in favor of a newer Artifact from the same Prompt job"); supersede_cmd.add_argument("task_id"); supersede_cmd.add_argument("old_artifact_id"); supersede_cmd.add_argument("new_artifact_id"); supersede_cmd.add_argument("--project", required=True)
+    revision_create_cmd = sub.add_parser("run-revision-create", help="Construct a versioned edit Job from one Revision Plan"); revision_create_cmd.add_argument("task_id"); revision_create_cmd.add_argument("revision_id"); revision_create_cmd.add_argument("--project", required=True)
+    revision_job_list_cmd = sub.add_parser("run-revision-job-list", help="List constructed Revision Jobs"); revision_job_list_cmd.add_argument("task_id"); revision_job_list_cmd.add_argument("--project", required=True)
+    revision_approval_cmd = sub.add_parser("run-revision-approval", help="Show one Revision approval gate"); revision_approval_cmd.add_argument("task_id"); revision_approval_cmd.add_argument("revision_id"); revision_approval_cmd.add_argument("--project", required=True)
+    _revision_decision_command(sub, "run-revision-approve", "Approve one constructed Revision Job")
+    _revision_decision_command(sub, "run-revision-reject", "Reject one constructed Revision Job")
+    _revision_decision_command(sub, "run-revision-request-changes", "Request changes for one constructed Revision Job")
+    revision_execute_cmd = sub.add_parser("run-revision-execute", help="Execute an approved Revision Job through Tool routing"); revision_execute_cmd.add_argument("task_id"); revision_execute_cmd.add_argument("revision_id"); revision_execute_cmd.add_argument("--project", required=True); revision_execute_cmd.add_argument("--tool")
+    supersede_cmd = sub.add_parser("run-artifact-supersede", help="Explicitly supersede an older Artifact with a compatible replacement"); supersede_cmd.add_argument("task_id"); supersede_cmd.add_argument("old_artifact_id"); supersede_cmd.add_argument("new_artifact_id"); supersede_cmd.add_argument("--project", required=True)
+
     validate_cmd = sub.add_parser("validate", help="Validate a project workspace"); validate_cmd.add_argument("project")
     record_cmd = sub.add_parser("record", help="Record reusable project memory"); record_cmd.add_argument("memory_type", choices=("decision", "lesson", "mistake", "best-practice")); record_cmd.add_argument("message"); record_cmd.add_argument("--project", required=True)
     theme_cmd = sub.add_parser("theme-create", help="Create and activate a project theme"); theme_cmd.add_argument("name"); theme_cmd.add_argument("description"); theme_cmd.add_argument("--project", required=True)
@@ -98,23 +115,21 @@ def main(argv: list[str] | None = None) -> int:
                 projects_dir = workspace / "projects"; payload = {"version": __version__, "workspace": str(workspace), "projects": sorted(path.name for path in projects_dir.iterdir() if path.is_dir()) if projects_dir.exists() else [], "workflows": list_workflows(workspace)}
             print(json.dumps(payload, ensure_ascii=False, indent=2)); return 0
         if args.command == "plan": print(create_plan(workspace, args.project, args.requirement)); return 0
-        if args.command == "run":
-            task = Runtime(workspace).run(args.project, args.requirement, pipeline=args.pipeline); print(json.dumps(task.to_dict(), ensure_ascii=False, indent=2)); return 0
+        if args.command == "run": print(json.dumps(Runtime(workspace).run(args.project, args.requirement, pipeline=args.pipeline).to_dict(), ensure_ascii=False, indent=2)); return 0
         if args.command == "run-list": print(json.dumps(Runtime(workspace).list_runs(args.project), ensure_ascii=False, indent=2)); return 0
         if args.command == "run-show": print(json.dumps(Runtime(workspace).load_task(args.project, args.task_id).to_dict(), ensure_ascii=False, indent=2)); return 0
         if args.command == "run-resume": print(json.dumps(Runtime(workspace).resume(args.project, args.task_id).to_dict(), ensure_ascii=False, indent=2)); return 0
         if args.command == "run-approval-list": print(json.dumps(Runtime(workspace).get_approvals(args.project, args.task_id), ensure_ascii=False, indent=2)); return 0
         if args.command in {"run-approve", "run-reject", "run-request-changes"}:
             runtime = Runtime(workspace); method = {"run-approve": runtime.approve, "run-reject": runtime.reject, "run-request-changes": runtime.request_changes}[args.command]
-            task = method(args.project, args.task_id, args.approval_id, actor=args.actor, comment=args.comment); print(json.dumps(task.to_dict(), ensure_ascii=False, indent=2)); return 0
+            print(json.dumps(method(args.project, args.task_id, args.approval_id, actor=args.actor, comment=args.comment).to_dict(), ensure_ascii=False, indent=2)); return 0
         if args.command == "host-show": print(json.dumps(Runtime(workspace).get_host_profile(), ensure_ascii=False, indent=2)); return 0
         if args.command == "tool-list": print(json.dumps(Runtime(workspace).list_tools(), ensure_ascii=False, indent=2)); return 0
         if args.command == "tool-health": print(json.dumps(Runtime(workspace).tool_health(args.tool_id, project=args.project, mode=args.mode, explicit=args.explicit), ensure_ascii=False, indent=2)); return 0
         if args.command == "tool-bind": print(Runtime(workspace).bind_project_tool(args.project, args.capability, args.tool_id)); return 0
         if args.command == "tool-scaffold": print(Runtime(workspace).scaffold_tool(args.tool_id, tuple(args.capabilities), execution_mode=args.execution_mode)); return 0
         if args.command == "provider-list": print(json.dumps(Runtime(workspace).list_providers(), ensure_ascii=False, indent=2)); return 0
-        if args.command == "run-execute":
-            task = Runtime(workspace).execute_job(args.project, args.task_id, args.job_id, tool_id=args.tool, provider_id=args.provider); print(json.dumps(task.to_dict(), ensure_ascii=False, indent=2)); return 0
+        if args.command == "run-execute": print(json.dumps(Runtime(workspace).execute_job(args.project, args.task_id, args.job_id, tool_id=args.tool, provider_id=args.provider).to_dict(), ensure_ascii=False, indent=2)); return 0
         if args.command == "run-tool-resolution": print(json.dumps(Runtime(workspace).get_tool_resolution(args.project, args.task_id), ensure_ascii=False, indent=2)); return 0
         if args.command == "run-tool-handoff-list": print(json.dumps(Runtime(workspace).list_tool_handoffs(args.project, args.task_id), ensure_ascii=False, indent=2)); return 0
         if args.command == "run-tool-submit":
@@ -125,11 +140,18 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "run-tool-cancel": print(json.dumps(Runtime(workspace).cancel_tool_wait(args.project, args.task_id, reason=args.reason).to_dict(), ensure_ascii=False, indent=2)); return 0
         if args.command == "run-artifact-list": print(json.dumps(Runtime(workspace).list_artifacts(args.project, args.task_id), ensure_ascii=False, indent=2)); return 0
         if args.command == "run-artifact-show": print(json.dumps(Runtime(workspace).get_artifact(args.project, args.task_id, args.artifact_id), ensure_ascii=False, indent=2)); return 0
-        if args.command == "visual-inspector-list": print(json.dumps(VisualReviewService(workspace).list_inspectors(), ensure_ascii=False, indent=2)); return 0
-        if args.command == "run-artifact-review": print(json.dumps(VisualReviewService(workspace).review(args.project, args.task_id, args.artifact_id, inspector_id=args.inspector).to_dict(), ensure_ascii=False, indent=2)); return 0
-        if args.command == "run-visual-review-list": print(json.dumps(VisualReviewService(workspace).list_reviews(args.project, args.task_id), ensure_ascii=False, indent=2)); return 0
-        if args.command == "run-revision-list": print(json.dumps(VisualReviewService(workspace).list_revision_plans(args.project, args.task_id), ensure_ascii=False, indent=2)); return 0
-        if args.command == "run-artifact-supersede": print(json.dumps(VisualReviewService(workspace).supersede(args.project, args.task_id, args.old_artifact_id, args.new_artifact_id).to_dict(), ensure_ascii=False, indent=2)); return 0
+        if args.command == "visual-inspector-list": print(json.dumps(RevisionReviewService(workspace).list_inspectors(), ensure_ascii=False, indent=2)); return 0
+        if args.command == "run-artifact-review": print(json.dumps(RevisionReviewService(workspace).review(args.project, args.task_id, args.artifact_id, inspector_id=args.inspector).to_dict(), ensure_ascii=False, indent=2)); return 0
+        if args.command == "run-visual-review-list": print(json.dumps(RevisionReviewService(workspace).list_reviews(args.project, args.task_id), ensure_ascii=False, indent=2)); return 0
+        if args.command == "run-revision-list": print(json.dumps(RevisionReviewService(workspace).list_revision_plans(args.project, args.task_id), ensure_ascii=False, indent=2)); return 0
+        if args.command == "run-revision-create": print(json.dumps(Runtime(workspace).create_revision_job(args.project, args.task_id, args.revision_id).to_dict(), ensure_ascii=False, indent=2)); return 0
+        if args.command == "run-revision-job-list": print(json.dumps(Runtime(workspace).list_revision_jobs(args.project, args.task_id), ensure_ascii=False, indent=2)); return 0
+        if args.command == "run-revision-approval": print(json.dumps(Runtime(workspace).get_revision_approval(args.project, args.task_id, args.revision_id), ensure_ascii=False, indent=2)); return 0
+        if args.command in {"run-revision-approve", "run-revision-reject", "run-revision-request-changes"}:
+            runtime = Runtime(workspace); method = {"run-revision-approve": runtime.approve_revision, "run-revision-reject": runtime.reject_revision, "run-revision-request-changes": runtime.request_revision_changes}[args.command]
+            print(json.dumps(method(args.project, args.task_id, args.revision_id, actor=args.actor, comment=args.comment).to_dict(), ensure_ascii=False, indent=2)); return 0
+        if args.command == "run-revision-execute": print(json.dumps(Runtime(workspace).execute_revision(args.project, args.task_id, args.revision_id, tool_id=args.tool).to_dict(), ensure_ascii=False, indent=2)); return 0
+        if args.command == "run-artifact-supersede": print(json.dumps(RevisionReviewService(workspace).supersede(args.project, args.task_id, args.old_artifact_id, args.new_artifact_id).to_dict(), ensure_ascii=False, indent=2)); return 0
         if args.command == "validate":
             errors = validate_project(workspace, args.project)
             if errors:
