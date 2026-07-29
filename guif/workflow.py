@@ -3,15 +3,50 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 REQUIRED_FIELDS = ("schema_version", "id", "name", "manager", "steps")
+SUPPORTED_SCHEMA_VERSIONS = {1, 2}
+
+LEGACY_MANAGER_AGENTS: dict[str, tuple[str, ...]] = {
+    "UI Director": ("planner", "director", "theme", "prompt", "qa"),
+    "Theme Manager": ("planner", "director", "theme", "qa"),
+    "Resource Manager": ("planner", "director", "theme", "resource", "prompt", "qa", "export"),
+    "QA Manager": ("planner", "qa"),
+    "Framework Manager": ("planner", "director", "qa"),
+}
 
 BUILTIN_WORKFLOWS: dict[str, dict[str, object]] = {
+    "ui-production": {
+        "schema_version": 2,
+        "id": "ui-production",
+        "name": "Complete UI Production",
+        "manager": "UI Director",
+        "agents": ["planner", "director", "theme", "resource", "prompt", "qa", "export"],
+        "steps": [
+            "Create a structured UI production plan",
+            "Review art direction and resource reuse",
+            "Resolve theme constraints",
+            "Resolve production resource contracts",
+            "Build model-neutral generation instructions",
+            "Run semantic and technical QA",
+            "Export validated production assets",
+        ],
+    },
+    "planning": {
+        "schema_version": 2,
+        "id": "planning",
+        "name": "Structured UI Planning",
+        "manager": "UI Director",
+        "agents": ["planner"],
+        "steps": ["Convert the requirement and project context into a structured production plan"],
+    },
     "effect-image": {
-        "schema_version": 1,
+        "schema_version": 2,
         "id": "effect-image",
         "name": "Effect Image Production",
         "manager": "UI Director",
+        "agents": ["planner", "director", "theme", "prompt", "qa"],
         "steps": [
             "Load project context, active theme, and confirmed decisions",
             "Define composition, hierarchy, interaction intent, and visual constraints",
@@ -21,10 +56,11 @@ BUILTIN_WORKFLOWS: dict[str, dict[str, object]] = {
         ],
     },
     "theme-direction": {
-        "schema_version": 1,
+        "schema_version": 2,
         "id": "theme-direction",
         "name": "Theme Direction",
         "manager": "Theme Manager",
+        "agents": ["planner", "director", "theme", "qa"],
         "steps": [
             "Load project context and existing themes",
             "Define palette, lighting, materials, motifs, required elements, and exclusions",
@@ -34,10 +70,11 @@ BUILTIN_WORKFLOWS: dict[str, dict[str, object]] = {
         ],
     },
     "resource-production": {
-        "schema_version": 1,
+        "schema_version": 2,
         "id": "resource-production",
         "name": "Production Resource Export",
         "manager": "Resource Manager",
+        "agents": ["planner", "director", "theme", "resource", "prompt", "qa", "export"],
         "steps": [
             "Confirm target engine, dimensions, naming, and transparency requirements",
             "Separate effect-image references from production assets",
@@ -47,10 +84,11 @@ BUILTIN_WORKFLOWS: dict[str, dict[str, object]] = {
         ],
     },
     "quality-assurance": {
-        "schema_version": 1,
+        "schema_version": 2,
         "id": "quality-assurance",
         "name": "Quality Assurance",
         "manager": "QA Manager",
+        "agents": ["planner", "qa"],
         "steps": [
             "Identify protected regions and acceptance criteria",
             "Run structural, visual, and pixel-protection checks",
@@ -60,10 +98,11 @@ BUILTIN_WORKFLOWS: dict[str, dict[str, object]] = {
         ],
     },
     "framework-evolution": {
-        "schema_version": 1,
+        "schema_version": 2,
         "id": "framework-evolution",
         "name": "Framework Evolution",
         "manager": "Framework Manager",
+        "agents": ["planner", "director", "qa"],
         "steps": [
             "Collect the triggering project experience and evidence",
             "Classify it as memory, rule, skill, schema, or workflow change",
@@ -77,20 +116,43 @@ BUILTIN_WORKFLOWS: dict[str, dict[str, object]] = {
 
 @dataclass(frozen=True)
 class WorkflowManifest:
+    schema_version: int
     workflow_id: str
     name: str
     manager: str
     steps: tuple[str, ...]
+    agents: tuple[str, ...]
     source: str
 
     def to_dict(self) -> dict[str, object]:
         return {
+            "schema_version": self.schema_version,
             "id": self.workflow_id,
             "name": self.name,
             "manager": self.manager,
             "steps": list(self.steps),
+            "agents": list(self.agents),
             "source": self.source,
         }
+
+
+def _validate_string_list(
+    data: dict[str, Any],
+    field: str,
+    *,
+    required: bool,
+    unique: bool = False,
+) -> list[str]:
+    value = data.get(field)
+    if value is None and not required:
+        return []
+    if not isinstance(value, list) or not value:
+        return [f"{field} must be a non-empty list"]
+    if any(not isinstance(item, str) or not item.strip() for item in value):
+        return [f"every {field[:-1] if field.endswith('s') else field} must be a non-empty string"]
+    if unique and len(set(value)) != len(value):
+        return [f"{field} must not contain duplicates"]
+    return []
 
 
 def validate_workflow_data(data: object) -> list[str]:
@@ -100,17 +162,15 @@ def validate_workflow_data(data: object) -> list[str]:
     for field in REQUIRED_FIELDS:
         if field not in data:
             errors.append(f"Missing field: {field}")
-    if data.get("schema_version") != 1:
-        errors.append("schema_version must be 1")
+    schema_version = data.get("schema_version")
+    if schema_version not in SUPPORTED_SCHEMA_VERSIONS:
+        errors.append("schema_version must be 1 or 2")
     for field in ("id", "name", "manager"):
         value = data.get(field)
         if not isinstance(value, str) or not value.strip():
             errors.append(f"{field} must be a non-empty string")
-    steps = data.get("steps")
-    if not isinstance(steps, list) or not steps:
-        errors.append("steps must be a non-empty list")
-    elif any(not isinstance(step, str) or not step.strip() for step in steps):
-        errors.append("every step must be a non-empty string")
+    errors.extend(_validate_string_list(data, "steps", required=True))
+    errors.extend(_validate_string_list(data, "agents", required=schema_version == 2, unique=True))
     return errors
 
 
@@ -124,15 +184,25 @@ def validate_workflow_file(path: Path) -> list[str]:
     return validate_workflow_data(data)
 
 
+def _resolve_agents(data: dict[str, object]) -> tuple[str, ...]:
+    configured = data.get("agents")
+    if isinstance(configured, list) and configured:
+        return tuple(str(agent) for agent in configured)
+    manager = str(data.get("manager") or "")
+    return LEGACY_MANAGER_AGENTS.get(manager, ("planner", "director", "qa"))
+
+
 def _to_manifest(data: dict[str, object], source: str) -> WorkflowManifest:
     errors = validate_workflow_data(data)
     if errors:
         raise ValueError("Invalid workflow manifest: " + "; ".join(errors))
     return WorkflowManifest(
+        schema_version=int(data["schema_version"]),
         workflow_id=str(data["id"]),
         name=str(data["name"]),
         manager=str(data["manager"]),
         steps=tuple(str(step) for step in data["steps"]),
+        agents=_resolve_agents(data),
         source=source,
     )
 
@@ -149,25 +219,34 @@ def load_workflow(workspace: Path, project: str, workflow_id: str) -> WorkflowMa
     return _to_manifest(data, "builtin")
 
 
-def list_workflows(workspace: Path, project: str | None = None) -> list[dict[str, str]]:
-    items = [
-        {"id": workflow_id, "name": str(data["name"]), "manager": str(data["manager"]), "source": "builtin"}
+def list_workflows(workspace: Path, project: str | None = None) -> list[dict[str, object]]:
+    items: list[dict[str, object]] = [
+        {
+            "id": workflow_id,
+            "name": str(data["name"]),
+            "manager": str(data["manager"]),
+            "schema_version": int(data["schema_version"]),
+            "agents": list(_resolve_agents(data)),
+            "source": "builtin",
+        }
         for workflow_id, data in sorted(BUILTIN_WORKFLOWS.items())
     ]
     if project:
         workflows_dir = workspace / "projects" / project / "workflows"
         if workflows_dir.is_dir():
-            by_id = {item["id"]: item for item in items}
+            by_id = {str(item["id"]): item for item in items}
             for path in sorted(workflows_dir.glob("*.json")):
                 data = json.loads(path.read_text(encoding="utf-8"))
                 errors = validate_workflow_data(data)
                 if not errors:
-                    workflow_id = str(data["id"])
-                    by_id[workflow_id] = {
-                        "id": workflow_id,
-                        "name": str(data["name"]),
-                        "manager": str(data["manager"]),
-                        "source": str(path),
+                    manifest = _to_manifest(data, str(path))
+                    by_id[manifest.workflow_id] = {
+                        "id": manifest.workflow_id,
+                        "name": manifest.name,
+                        "manager": manifest.manager,
+                        "schema_version": manifest.schema_version,
+                        "agents": list(manifest.agents),
+                        "source": manifest.source,
                     }
-            items = sorted(by_id.values(), key=lambda item: item["id"])
+            items = sorted(by_id.values(), key=lambda item: str(item["id"]))
     return items
