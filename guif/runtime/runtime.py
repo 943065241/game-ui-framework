@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from guif.agents.builtin import build_default_agents
+from guif.retrieval import select_relevant_context
 from guif.runtime.context import load_runtime_context
 from guif.runtime.pipeline import Pipeline
 from guif.runtime.registry import AgentRegistry
@@ -61,21 +62,28 @@ class Runtime:
         return task
 
     def run(self, project: str, requirement: str, *, pipeline: str = "ui-production") -> Task:
-        if not requirement.strip():
+        normalized_requirement = requirement.strip()
+        if not normalized_requirement:
             raise ValueError("Requirement must not be empty")
         resolved_pipeline = self._resolve_pipeline(project, pipeline)
         context = load_runtime_context(self.workspace, project)
+        context_selection = select_relevant_context(context, normalized_requirement)
         task = Task(
             project=project,
-            requirement=requirement.strip(),
+            requirement=normalized_requirement,
             pipeline=resolved_pipeline.name,
             context=context,
         )
         task.state["pipeline"] = resolved_pipeline.to_dict()
+        task.state["context_selection"] = context_selection
+        selected_counts = {
+            key: len(context_selection[key])
+            for key in ("memory", "resources", "workflows")
+        }
         task.record(
             "runtime",
             "started",
-            f"Loaded project context and workflow {resolved_pipeline.name} for {project}",
+            f"Loaded project context, selected {selected_counts}, and resolved workflow {resolved_pipeline.name} for {project}",
         )
         return self._execute(task, resolved_pipeline, start_index=0)
 
@@ -94,7 +102,7 @@ class Runtime:
         task.record(
             "runtime",
             "resumed",
-            f"Resuming pipeline at agent index {task.next_agent_index}",
+            f"Resuming pipeline at agent index {task.next_agent_index} with the persisted Context selection",
         )
         return self._execute(task, resolved_pipeline, start_index=task.next_agent_index)
 
