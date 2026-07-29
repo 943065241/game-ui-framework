@@ -6,7 +6,7 @@ GUIF 是一个本地优先、模型无关的游戏 UI 工作框架，用于规�
 
 ## 当前状态
 
-`v1.0.0-alpha.11` — 已具备由 Workflow 驱动的 Runtime Pipeline、第一个真实可工作的 Structured Planner Agent、可持久化和恢复的 Task Run、Checkpoint 执行、Project Context 加载、Engine Adapter 导出、确定性校验、保护性编辑，以及 Memory、Project、Theme 和 Resource Contract 等基础能力。
+`v1.0.0-alpha.12` — 已具备由 Workflow 驱动的 Runtime Pipeline、真实可工作的确定性 Planner 与 Director Agent、基于相关性的 Context Selection、可持久化和恢复的 Task Run、Checkpoint 执行、Engine Adapter 导出、确定性校验、保护性编辑，以及 Git-friendly 的 Project Knowledge。
 
 ## 产品规格
 
@@ -18,8 +18,10 @@ GUIF 是一个本地优先、模型无关的游戏 UI 工作框架，用于规�
 
 - `guif init <project>` 创建相互隔离的 Project Workspace。
 - `guif inspect [project]` 查看 Framework 或 Project 状态摘要，包括已持久化的 Run 数量。
-- `guif run "<requirement>" --project <project>` 将 Workflow 解析为 Runtime Pipeline，执行并保存 Checkpoint。
-- 内置 `planner` 已经是一个真实的确定性 Agent，会把结构化 UI Production Plan 写入 Task 和 Output Index。
+- `guif run "<requirement>" --project <project>` 将 Workflow 解析为 Runtime Pipeline，选择相关 Context，执行 Agent，并保存 Checkpoint。
+- 内置 `planner` 会生成经过校验的结构化 UI Production Plan。
+- 内置 `director` 会审阅 Composition、Hierarchy、Theme Constraint、Resource Reuse、Memory Constraint、Conflict 和 Approval Point。
+- Runtime 会根据当前 Requirement 和 Active Theme，对 Project Memory、Resource Manifest 和 Project Workflow Manifest 进行相关性排序。
 - Project Workflow Manifest 可以覆盖内置 Workflow，并通过 `agents` 声明 Runtime 的执行顺序。
 - Workflow schema v1 仍可读取；GUIF 会根据旧版 `manager` 字段推导兼容的 Agent 顺序。
 - `guif run-list --project <project>` 列出已持久化的 Task Run。
@@ -51,10 +53,11 @@ pytest -q
 GUIF 的预期主要入口，是通过 ChatGPT 或其他 Agent Host 接收自然语言任务：
 
 ```text
-用户需求
+用户 Requirement
   -> ChatGPT / Agent Host
   -> GUIF Runtime
   -> Project Context Snapshot
+  -> 基于相关性的 Context Selection
   -> 已解析的 Workflow Manifest
   -> Runtime Pipeline
   -> 已注册的 Agent
@@ -70,18 +73,19 @@ from guif.runtime import Runtime
 runtime = Runtime(Path.cwd())
 task = runtime.run(
     "LeekParty",
-    "制作 1080x2340 竖屏中世纪港口商店页面并导出 Unity",
-    pipeline="planning",
+    "制作 1080x2340 竖屏中世纪港口商店页面，复用 purchase button，并导出 Unity",
+    pipeline="ui-production",
 )
 print(task.state["plan"])
+print(task.state["direction"])
 ```
 
 对应的 CLI 命令：
 
 ```bash
-guif run "制作 1080x2340 竖屏中世纪港口商店页面并导出 Unity" \
+guif run "制作 1080x2340 竖屏中世纪港口商店页面，复用 purchase button，并导出 Unity" \
   --project LeekParty \
-  --pipeline planning
+  --pipeline ui-production
 ```
 
 ## Workflow 驱动的 Pipeline
@@ -91,13 +95,14 @@ Workflow schema v2 同时包含供人审阅的步骤和可执行的 Agent 顺序
 ```json
 {
   "schema_version": 2,
-  "id": "planning",
-  "name": "Structured UI Planning",
+  "id": "ui-production",
+  "name": "Complete UI Production",
   "manager": "UI Director",
   "steps": [
-    "Convert the requirement and project context into a structured production plan"
+    "Create a structured UI production plan",
+    "Review art direction and resource reuse"
   ],
-  "agents": ["planner"]
+  "agents": ["planner", "director", "theme", "resource", "prompt", "qa", "export"]
 }
 ```
 
@@ -115,20 +120,51 @@ Runtime 会优先解析 Project Workflow；若不存在，则回退到同 ID 的
 - `quality-assurance`
 - `framework-evolution`
 
+## 基于相关性的 Context Selection
+
+Runtime 会先加载完整的 Project Context Snapshot，再针对当前 Requirement 创建一个确定性、受预算控制的相关 Context Selection。
+
+当前会排序：
+
+- `memory/**/*.md` 中的 Markdown Memory Record；
+- Production Resource Manifest；
+- Project Workflow Manifest。
+
+排序同时使用 Requirement 词项与 Active Theme 中的语义值。支持英文 Token 与中文字符 n-gram。常见英文停用词会被过滤，无关记录不会因为类型权重而被强行选中。
+
+结果保存在：
+
+```python
+task.state["context_selection"]
+```
+
+其中包含：
+
+- Selected Record；
+- Relevance Score；
+- Matched Term；
+- Budget；
+- Total Count；
+- Omitted Count。
+
+Resume 会继续使用已持久化的 Context Selection，而不是在用户不知情的情况下，让失败 Task 自动读取新的 Project Knowledge。
+
+完整 Context 仍保存在 `context.json`；Selected Subset 的作用是让 Agent Input 更聚焦、更可审计。
+
 ## Structured Planner Agent
 
-alpha.11 的 Planner 保持模型无关并采用确定性规则执行，不会调用 LLM。它会把自然语言 Requirement 和当前 Project Context 转换为经过校验的 Plan Schema，其中包括：
+Planner 保持模型无关并采用确定性规则执行，不会调用 LLM。它会把 Requirement 和 Project Context 转换为经过校验的 Plan Schema，其中包括：
 
-- 识别出的 Page Type、Orientation 和 Canvas Dimension；
+- Page Type、Orientation 和 Canvas Dimension；
 - Target Engine；
-- 当前 Theme Contract、正向要求与排除项；
-- 带有原因和评分的可复用 Resource Candidate；
+- Active Theme Contract、正向要求与排除项；
+- 带原因和评分的可复用 Resource Candidate；
 - 建议创建的缺失 Resource Contract；
 - Deliverable 和 QA Criteria；
 - 有依赖关系的执行步骤；
 - Risk、Open Question 和 Context Summary。
 
-Plan 同时存在于：
+Plan 保存在：
 
 ```python
 task.state["plan"]
@@ -140,7 +176,39 @@ task.state["plan"]
 ui-production-plan
 ```
 
-这是 GUIF 第一个真正执行领域工作的内置 Agent。`director`、`theme`、`resource`、`prompt`、`qa` 和 `export` 目前仍是 Contract Agent，尚不能自动完成各自预期的生产职责。
+## Structured Director Agent
+
+Director 会消费 Planner Output，并生成经过校验的 Art Direction Review。当前能够提供：
+
+- 针对不同 Page Type 和 Orientation 的 Composition Zone；
+- Focal Order 和 Interaction Hierarchy；
+- Active Theme 的 Palette、Material、Lighting、Must Include 和 Avoid；
+- 从相关 Memory 中提取的 `must`、`avoid`、`不要`、`必须` 等约束；
+- 对 Resource Reuse 给出 `approve`、`review` 或 `weak-match` 决策；
+- Blocking Conflict 与 Human Approval Point；
+- 面向 Theme、Resource、Prompt 和 QA 的结构化 Handoff。
+
+Director 会返回以下状态之一：
+
+```text
+ready
+needs-review
+blocked
+```
+
+Review 保存在：
+
+```python
+task.state["direction"]
+```
+
+以及已持久化的 Output Index 中：
+
+```text
+art-direction-review
+```
+
+Planner 和 Director 现在都已经是真实执行领域工作的 Agent。`theme`、`resource`、`prompt`、`qa` 和 `export` 目前仍是 Contract Agent，尚不能自动完成各自预期的生产职责。
 
 ## 持久化 Task Run
 
@@ -167,6 +235,7 @@ Pipeline 会在每个 Agent 执行前后保存 Checkpoint。Agent 失败时，GU
 ```text
 Runtime
   -> Context Loader
+  -> Context Retriever
   -> Workflow Resolver
   -> Pipeline
   -> Task Store
@@ -194,16 +263,16 @@ Runtime Context 当前会加载：
 - 已配置的当前 Project Theme
 - Project Workflow Manifest
 - Production Resource Manifest
-- Project Memory 记录
+- Project Memory Record
 
 ## 快速开始
 
 ```bash
 guif init LeekParty
 
-guif run "规划 1080x2340 竖屏中世纪港口商店页面并面向 Unity" \
+guif run "制作 1080x2340 竖屏中世纪港口商店页面并面向 Unity" \
   --project LeekParty \
-  --pipeline planning
+  --pipeline ui-production
 
 guif run-list --project LeekParty
 guif run-show <task-id> --project LeekParty
@@ -247,13 +316,14 @@ Adapter Registry 位于 `guif/adapters/`。核心 Exporter 负责校验和暂存
 2. Git 与 Project File 是长期事实来源。
 3. Runtime 调度保持模型无关。
 4. Workflow Manifest 是 Pipeline 执行顺序的事实来源。
-5. Agent 不依赖或直接调用其他 Agent。
-6. Runtime Run 必须可检查、可持久化并可恢复。
-7. Effect Image 与 Production Asset 保持分离。
-8. 引擎相关行为属于 Adapter，而不是 Framework Core。
-9. 局部编辑通过基于 Mask 的合成保护非目标像素。
-10. 只有 Feature、Test、CI、英文 README、中文 README、Version Metadata 和 Product Specification 保持一致时，一次 Release 才算完成。
+5. Agent 接收聚焦且已持久化的 Context Selection，而不是无边界地依赖全部 Project Data。
+6. Agent 不依赖或直接调用其他 Agent。
+7. Runtime Run 必须可检查、可持久化并可恢复。
+8. Effect Image 与 Production Asset 保持分离。
+9. 引擎相关行为属于 Adapter，而不是 Framework Core。
+10. 局部编辑通过基于 Mask 的合成保护非目标像素。
+11. 只有 Feature、Test、CI、英文 README、中文 README、Version Metadata 和 Product Specification 保持一致时，一次 Release 才算完成。
 
 ## 仓库下一步方向
 
-下一优先级是将仅有 Contract 行为的 Director 替换为真实的 Art Direction 与 Resource Reuse Review Agent，然后加入基于相关性的 Context 和 Memory Retrieval。GUIF 后续应继续通过真实 Project Task 验证自然语言生产闭环，而不是扩充更多占位 Interface。具体优先级与验收标准维护在 [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md)。
+下一优先级是实现真实的 Theme Agent 与 Resource Agent，让已批准的 Plan 和 Director Review 转换为具体的 Production Contract。之后应先定义 Model-neutral Prompt IR，再接入 Generation Tool。具体优先级与验收标准维护在 [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md)。
