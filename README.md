@@ -6,7 +6,7 @@ GUIF is a local-first, AI-agnostic framework for planning, producing, reviewing,
 
 ## Status
 
-`v1.0.0-alpha.10` — persisted and resumable runtime task runs, checkpointed pipelines, composable agents, project-context loading, engine-adapter exports, deterministic validation, protected editing, memory, workflows, projects, and themes.
+`v1.0.0-alpha.11` — Workflow-driven Runtime Pipelines, the first real structured Planner Agent, persisted and resumable Task Runs, checkpointed execution, project Context loading, Engine Adapter exports, deterministic validation, protected editing, Memory, Project, Theme, and Resource contracts.
 
 ## Product specification
 
@@ -17,17 +17,20 @@ It defines GUIF's expected product, verified current state, missing capabilities
 ## What works now
 
 - `guif init <project>` creates an isolated project workspace.
-- `guif inspect [project]` summarizes framework or project state, including persisted run count.
-- `guif run "<requirement>" --project <project>` executes a runtime pipeline and persists checkpoints.
-- `guif run-list --project <project>` lists persisted task runs.
-- `guif run-show <task-id> --project <project>` loads a complete persisted task snapshot.
-- `guif run-resume <task-id> --project <project>` retries a failed or interrupted task from its next executable agent.
-- `guif plan "<requirement>"` creates the existing routed plan format.
-- `guif validate <project>` validates project semantics, themes, workflows, and resource manifests.
-- `guif record <type> "<message>"` stores reusable project knowledge.
-- `guif resource-create`, `resource-show`, and `resource-validate` manage production contracts.
-- `guif asset-validate <manifest> <asset>` checks dimensions, format, alpha, and naming.
-- `guif export <project> --target <engine>` validates, copies, and prepares assets through an engine adapter.
+- `guif inspect [project]` summarizes framework or project state, including persisted Run count.
+- `guif run "<requirement>" --project <project>` resolves a Workflow into a Runtime Pipeline, executes it, and persists checkpoints.
+- The built-in `planner` is a real deterministic Agent that writes a structured UI production plan into the Task and Output index.
+- Project Workflow manifests can override built-in Workflows and define the ordered `agents` executed by Runtime.
+- Workflow schema v1 remains readable; GUIF infers a compatible Agent sequence from the legacy `manager` field.
+- `guif run-list --project <project>` lists persisted Task Runs.
+- `guif run-show <task-id> --project <project>` loads a complete persisted Task snapshot.
+- `guif run-resume <task-id> --project <project>` retries a failed or interrupted Task from its next executable Agent.
+- `guif plan "<requirement>"` keeps the original routed Plan JSON workflow for backward compatibility.
+- `guif validate <project>` validates Project semantics, Themes, Workflows, and Resource manifests.
+- `guif record <type> "<message>"` stores reusable Project knowledge.
+- `guif resource-create`, `resource-show`, and `resource-validate` manage Production Resource contracts.
+- `guif asset-validate <manifest> <asset>` checks dimensions, format, Alpha, and naming.
+- `guif export <project> --target <engine>` validates, copies, and prepares assets through an Engine Adapter.
 - `guif compose-edit` and `guif qa-pixels` preserve and verify protected pixels.
 - The test suite targets Python 3.10, 3.11, and 3.12.
 
@@ -43,21 +46,22 @@ pip install -e .[dev]
 pytest -q
 ```
 
-## ChatGPT-oriented runtime flow
+## ChatGPT-oriented Runtime flow
 
-The intended entry point is natural-language work directed through ChatGPT or another agent host:
+The intended entry point is natural-language work directed through ChatGPT or another Agent Host:
 
 ```text
 User requirement
-  -> ChatGPT / agent host
+  -> ChatGPT / Agent Host
   -> GUIF Runtime
-  -> project context snapshot
-  -> selected pipeline
-  -> registered agents
-  -> persisted Task result
+  -> Project Context snapshot
+  -> resolved Workflow manifest
+  -> Runtime Pipeline
+  -> registered Agents
+  -> persisted Task and Outputs
 ```
 
-The runtime itself does not depend on OpenAI or any other model provider. A host can call it directly:
+Runtime itself does not depend on OpenAI or any other model provider. A Host can call it directly:
 
 ```python
 from pathlib import Path
@@ -66,53 +70,111 @@ from guif.runtime import Runtime
 runtime = Runtime(Path.cwd())
 task = runtime.run(
     "LeekParty",
-    "Create the medieval harbor shop page",
-    pipeline="ui-production",
+    "Create a 1080x2340 portrait medieval harbor shop page and export it for Unity",
+    pipeline="planning",
 )
-print(task.task_id)
-print(task.to_dict())
+print(task.state["plan"])
 ```
 
 The equivalent CLI command is:
 
 ```bash
-guif run "Create the medieval harbor shop page" \
+guif run "Create a 1080x2340 portrait medieval harbor shop page and export it for Unity" \
   --project LeekParty \
-  --pipeline ui-production
+  --pipeline planning
 ```
 
-## Persisted task runs
+## Workflow-driven Pipelines
 
-Each runtime execution is saved under:
+Workflow schema v2 contains both human-readable steps and an executable Agent sequence:
+
+```json
+{
+  "schema_version": 2,
+  "id": "planning",
+  "name": "Structured UI Planning",
+  "manager": "UI Director",
+  "steps": [
+    "Convert the requirement and project context into a structured production plan"
+  ],
+  "agents": ["planner"]
+}
+```
+
+Runtime resolves a Project Workflow first and falls back to the built-in Workflow with the same ID. The resolved Workflow becomes the Pipeline used for execution. Its source, manager, steps, and Agent order are saved in `Task.state["pipeline"]` for auditing.
+
+A failed Task is not resumed when its stored Agent sequence differs from the currently resolved Workflow, because continuing against a changed Pipeline would be unsafe.
+
+Built-in executable Workflows include:
+
+- `ui-production`
+- `planning`
+- `effect-image`
+- `theme-direction`
+- `resource-production`
+- `quality-assurance`
+- `framework-evolution`
+
+## Structured Planner Agent
+
+The alpha.11 Planner is model-neutral and deterministic. It does not call an LLM. It converts the requirement and current Project Context into a validated Plan schema containing:
+
+- detected page type, orientation, and canvas dimensions;
+- target Engine;
+- active Theme contract, positive requirements, and exclusions;
+- reusable Resource candidates with reasons and scores;
+- suggested missing Resource contracts;
+- deliverables and QA criteria;
+- ordered execution steps and dependencies;
+- risks, open questions, and Context summary.
+
+The Plan is available in both:
+
+```python
+task.state["plan"]
+```
+
+and the persisted Output index as:
+
+```text
+ui-production-plan
+```
+
+This is the first built-in Agent that performs real domain work. `director`, `theme`, `resource`, `prompt`, `qa`, and `export` are still Contract Agents and do not yet complete their intended production responsibilities automatically.
+
+## Persisted Task Runs
+
+Each Runtime execution is saved under:
 
 ```text
 projects/<project>/runs/<task-id>/
 ```
 
-A run contains:
+A Run contains:
 
 ```text
 task.json       complete Task snapshot and lifecycle state
-context.json    project-context snapshot used by the run
-events.jsonl    append-style audit event representation
-outputs.json    registered output index
+context.json    Project Context snapshot used by the Run
+events.jsonl    audit event representation
+outputs.json    registered Output index
 error.json      failure details, present only while failed
 ```
 
-Pipelines checkpoint the task before and after every Agent. When an Agent fails, GUIF records the failing Agent, exception type, message, and the index that should be retried. `run-resume` reloads the saved Task and continues from that index. Completed tasks cannot be resumed.
+Pipelines checkpoint the Task before and after every Agent. When an Agent fails, GUIF records the failing Agent, exception type, message, and retry index. `run-resume` reloads the saved Task and continues from that index. Completed Tasks cannot be resumed.
 
 ## Runtime contract
 
 ```text
 Runtime
   -> Context Loader
-  -> Task Store
+  -> Workflow Resolver
   -> Pipeline
+  -> Task Store
   -> Agent Registry
-  -> Task
+  -> Task + Outputs
 ```
 
-Default `ui-production` pipeline:
+Default `ui-production` Workflow:
 
 ```text
 planner
@@ -124,23 +186,25 @@ planner
   -> export
 ```
 
-Each Agent receives and returns the same mutable `Task`. Agents do not call one another. The Runtime alone resolves pipeline order through the Registry.
-
-The built-in Agents still execute contract-level behavior: they record lifecycle events, responsibilities, and state transitions. They do not yet perform real semantic planning, image generation, visual review, or automatic production work.
+Each Agent receives and returns the same mutable `Task`. Agents do not directly invoke one another. Runtime alone resolves and executes the Agent order declared by the Workflow.
 
 Runtime Context currently loads:
 
 - `project.json`
-- the active project Theme when configured
-- project Workflow manifests
+- the active Project Theme when configured
+- Project Workflow manifests
 - Production Resource manifests
-- project Memory records
+- Project Memory records
 
 ## Quick start
 
 ```bash
 guif init LeekParty
-guif run "Create a trade button" --project LeekParty
+
+guif run "Plan a 1080x2340 portrait medieval harbor shop page for Unity" \
+  --project LeekParty \
+  --pipeline planning
+
 guif run-list --project LeekParty
 guif run-show <task-id> --project LeekParty
 
@@ -154,9 +218,9 @@ guif export LeekParty --target unity
 guif validate LeekParty
 ```
 
-## Engine adapter layer
+## Engine Adapter layer
 
-The generic Exporter delegates engine-specific preparation to adapters:
+The generic Exporter delegates engine-specific preparation to Adapters:
 
 ```text
 Exporter
@@ -166,29 +230,30 @@ Exporter
   -> UnrealAdapter
 ```
 
-The Adapter Registry lives in `guif/adapters/`. The core Exporter validates and stages assets; adapters own engine-specific metadata generation.
+The Adapter Registry lives in `guif/adapters/`. The core Exporter validates and stages assets; Adapters own engine-specific metadata generation.
 
 Current behavior:
 
-- `generic`: copies the validated asset without a sidecar.
+- `generic`: copies the validated asset without a Sidecar.
 - `unity`: writes `<asset>.guif-unity.json` with Sprite and Mipmap import hints.
 - `godot`: writes `<asset>.guif-godot.json` with Texture import hints.
 - `unreal`: writes `<asset>.guif-unreal.json` with UI Texture Group and Mipmap hints.
 
-These JSON sidecars are deterministic GUIF metadata, not native engine-generated files.
+These JSON Sidecars are deterministic GUIF metadata, not native engine-generated files.
 
 ## Operating principles
 
 1. Natural language is the primary user interface; CLI remains an implementation, debugging, and CI interface.
-2. Git and project files are the long-term source of truth.
+2. Git and Project files are the long-term source of truth.
 3. Runtime orchestration stays model-agnostic.
-4. Agents do not depend on or directly invoke one another.
-5. Runtime runs must be inspectable, persisted, and recoverable.
-6. Effect images and production assets remain separate.
-7. Engine-specific behavior belongs in adapters, not the framework core.
-8. Local edits preserve non-target pixels through mask-based composition.
-9. A release is complete only when feature, tests, CI, the English README, the Chinese README, version metadata, and the product specification agree.
+4. Workflow manifests are the executable source of Pipeline order.
+5. Agents do not depend on or directly invoke one another.
+6. Runtime Runs must be inspectable, persisted, and recoverable.
+7. Effect Images and Production Assets remain separate.
+8. Engine-specific behavior belongs in Adapters, not the Framework Core.
+9. Local edits preserve non-target pixels through mask-based composition.
+10. A release is complete only when Feature, Test, CI, the English README, the Chinese README, Version Metadata, and the Product Specification agree.
 
 ## Repository direction
 
-The next priority is a real structured Planner Agent and a unified relationship between Runtime Pipeline and project Workflow manifests. GUIF must prove one complete natural-language UI production loop before adding more placeholder Agents. Priorities and acceptance criteria are maintained in [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md).
+The next priority is to replace the Contract-only Director with a real art-direction and reuse-review Agent, then add relevance-based Context and Memory retrieval. GUIF must continue proving the natural-language production loop with real Project tasks rather than expanding placeholder interfaces. Priorities and acceptance criteria are maintained in [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md).
