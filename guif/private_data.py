@@ -93,5 +93,13 @@ class PrivateDataLayout:
     def diagnostics(self) -> Path:
         return self.root / "diagnostics"
 
+    @property
+    def upgrade_reports(self) -> Path:
+        return self.root / "upgrade-reports"
+
+    @property
+    def hardening_reports(self) -> Path:
+        return self.root / "hardening-reports"
+
 
 __all__ = ["PrivateDataLayout", "default_private_data_root"]

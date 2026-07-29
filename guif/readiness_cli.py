@@ -8,11 +8,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from guif.backup_protection import BackupProtectionService, external_adapter_from_env
 from guif.beta_readiness import BetaReadinessService, bootstrap_workspace
 from guif.compatibility import compatibility_contract
+from guif.fault_injection import FaultInjector
+from guif.hardening import HardeningService
 from guif.private_backup import PrivateBackupService
 from guif.private_data import PrivateDataLayout
 from guif.private_migration import PrivateSchemaMigrator
+from guif.support_policy import support_contract
+from guif.upgrade_assurance import UpgradeAssuranceService
 
 
 def _print(value: Any) -> None:
@@ -27,7 +32,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="guif-ready",
         description=(
-            "Bootstrap, diagnose, migrate, back up, restore, and accept the frozen GUIF alpha.28 MVP"
+            "Bootstrap, diagnose, migrate, back up, upgrade, and harden the GUIF beta.1 MVP"
         ),
     )
     sub = parser.add_subparsers(dest="command", required=True)
@@ -67,16 +72,71 @@ def build_parser() -> argparse.ArgumentParser:
     restore.add_argument("--apply", action="store_true")
     restore.add_argument("--no-pre-restore-backup", action="store_true")
 
+    protect = sub.add_parser(
+        "backup-protect",
+        help="Protect a verified backup with a configured external encryption tool",
+    )
+    _workspace(protect)
+    protect.add_argument("archive", type=Path)
+    protect.add_argument("protected", type=Path)
+
+    protection_verify = sub.add_parser(
+        "backup-protection-verify",
+        help="Verify a protected backup and its secret-free receipt",
+    )
+    _workspace(protection_verify)
+    protection_verify.add_argument("protected", type=Path)
+
+    unprotect = sub.add_parser(
+        "backup-unprotect",
+        help="Recover a verified GUIF backup through the configured external tool",
+    )
+    _workspace(unprotect)
+    unprotect.add_argument("protected", type=Path)
+    unprotect.add_argument("archive", type=Path)
+
+    upgrade = sub.add_parser(
+        "upgrade",
+        help="Plan or record a supported alpha.27/alpha.28 to beta.1 upgrade",
+    )
+    _workspace(upgrade)
+    upgrade.add_argument("--source-release", required=True)
+    upgrade.add_argument("--apply", action="store_true")
+    upgrade.add_argument("--actor", default="upgrade-assurance")
+    upgrade.add_argument("--no-require-backup", action="store_true")
+
+    soak = sub.add_parser(
+        "soak",
+        help="Run bounded repeatability and latency checks over read-only contracts",
+    )
+    _workspace(soak)
+    soak.add_argument("--project", required=True)
+    soak.add_argument("--conversation")
+    soak.add_argument("--backup", type=Path)
+    soak.add_argument("--iterations", type=int, default=100)
+    soak.add_argument("--max-p95-ms", type=float)
+    soak.add_argument("--no-persist", action="store_true")
+
     acceptance = sub.add_parser("acceptance", help="Check the end-to-end MVP acceptance gate")
     _workspace(acceptance)
     acceptance.add_argument("--project", required=True)
     acceptance.add_argument("--conversation", required=True)
     acceptance.add_argument("--require-completed", action="store_true")
 
-    contract = sub.add_parser("contract", help="Show the frozen alpha.28 compatibility contract")
+    contract = sub.add_parser("contract", help="Show the frozen beta.1 compatibility contract")
     _workspace(contract)
 
+    support = sub.add_parser("support", help="Show the beta.1 support and deprecation contract")
+    _workspace(support)
+
     return parser
+
+
+def _protection_service() -> BackupProtectionService:
+    return BackupProtectionService(
+        external_adapter_from_env(),
+        fault_injector=FaultInjector.from_env(),
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -127,6 +187,33 @@ def main(argv: list[str] | None = None) -> int:
                 apply=args.apply,
                 create_pre_restore_backup=not args.no_pre_restore_backup,
             )
+        elif args.command == "backup-protect":
+            PrivateBackupService(workspace).verify(args.archive)
+            result = _protection_service().protect(args.archive, args.protected)
+        elif args.command == "backup-protection-verify":
+            result = _protection_service().verify(args.protected)
+        elif args.command == "backup-unprotect":
+            result = _protection_service().unprotect(args.protected, args.archive)
+            result["backup_verification"] = PrivateBackupService(workspace).verify(args.archive)
+        elif args.command == "upgrade":
+            result = UpgradeAssuranceService(workspace).run(
+                args.source_release,
+                apply=args.apply,
+                require_backup=not args.no_require_backup,
+                actor=args.actor,
+            )
+        elif args.command == "soak":
+            result = HardeningService(
+                workspace,
+                bearer_token=token,
+            ).soak(
+                args.project,
+                conversation_id=args.conversation,
+                backup_path=args.backup,
+                iterations=args.iterations,
+                max_p95_ms=args.max_p95_ms,
+                persist=not args.no_persist,
+            )
         elif args.command == "acceptance":
             result = BetaReadinessService(
                 workspace,
@@ -138,6 +225,8 @@ def main(argv: list[str] | None = None) -> int:
             )
         elif args.command == "contract":
             result = compatibility_contract()
+        elif args.command == "support":
+            result = support_contract()
         else:
             raise ValueError(f"Unknown command: {args.command}")
         _print(result)
