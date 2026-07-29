@@ -66,6 +66,8 @@ class TaskStore:
         _write_optional_json(run_dir / "executions.json", state.get("provider_executions"))
         _write_optional_json(run_dir / "visual-reviews.json", state.get("visual_reviews"))
         _write_optional_json(run_dir / "revision-plans.json", state.get("revision_plans"))
+        _write_optional_json(run_dir / "tool-resolution.json", state.get("tool_resolution"))
+        _write_optional_json(run_dir / "tool-handoffs.json", state.get("tool_handoffs"))
 
         return run_dir
 
@@ -90,6 +92,8 @@ class TaskStore:
             visual_review_state = state.get("visual_reviews", {}) if isinstance(state, dict) else {}
             revision_state = state.get("revision_plans", {}) if isinstance(state, dict) else {}
             qa_report = state.get("qa_report", {}) if isinstance(state, dict) else {}
+            tool_resolution = state.get("tool_resolution", {}) if isinstance(state, dict) else {}
+            handoff_state = state.get("tool_handoffs", {}) if isinstance(state, dict) else {}
             artifact_records = (
                 artifact_registry.get("records", []) if isinstance(artifact_registry, dict) else []
             )
@@ -102,6 +106,7 @@ class TaskStore:
             revision_plans = (
                 revision_state.get("records", []) if isinstance(revision_state, dict) else []
             )
+            handoffs = handoff_state.get("records", []) if isinstance(handoff_state, dict) else []
             artifact_review = (
                 qa_report.get("artifact_review", {}) if isinstance(qa_report, dict) else {}
             )
@@ -141,6 +146,10 @@ class TaskStore:
                     "artifact_review_status": artifact_review.get("status")
                     if isinstance(artifact_review, dict)
                     else None,
+                    "tool_resolution_status": tool_resolution.get("status")
+                    if isinstance(tool_resolution, dict)
+                    else None,
+                    "tool_handoff_count": len(handoffs) if isinstance(handoffs, list) else 0,
                 }
             )
         summaries.sort(

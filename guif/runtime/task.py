@@ -5,8 +5,17 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-TASK_SCHEMA_VERSION = 2
-TASK_STATUSES = ("pending", "running", "failed", "completed")
+TASK_SCHEMA_VERSION = 3
+SUPPORTED_TASK_SCHEMA_VERSIONS = {2, 3}
+TASK_STATUSES = (
+    "pending",
+    "running",
+    "waiting-for-tool",
+    "waiting-for-tool-result",
+    "failed",
+    "completed",
+    "cancelled",
+)
 
 
 def _now() -> str:
@@ -90,6 +99,32 @@ class Task:
         }
         self.record(agent, "failed", str(exc))
 
+    def wait_for_tool(self, message: str) -> None:
+        self.status = "waiting-for-tool"
+        self.current_agent = "tool-router"
+        self.error = None
+        self.record("tool-router", "waiting-for-tool", message)
+
+    def wait_for_tool_result(self, message: str) -> None:
+        self.status = "waiting-for-tool-result"
+        self.current_agent = "tool-router"
+        self.error = None
+        self.record("tool-router", "waiting-for-tool-result", message)
+
+    def restore_completed(self, message: str) -> None:
+        self.status = "completed"
+        self.current_agent = None
+        self.error = None
+        if self.completed_at is None:
+            self.completed_at = _now()
+        self.record("tool-router", "completed", message)
+
+    def cancel(self, message: str) -> None:
+        self.status = "cancelled"
+        self.current_agent = None
+        self.error = None
+        self.record("runtime", "cancelled", message)
+
     def complete(self) -> None:
         self.status = "completed"
         self.current_agent = None
@@ -122,6 +157,9 @@ class Task:
     def from_dict(cls, payload: dict[str, Any]) -> "Task":
         from guif.runtime.context import RuntimeContext
 
+        schema_version = int(payload.get("schema_version", 2))
+        if schema_version not in SUPPORTED_TASK_SCHEMA_VERSIONS:
+            raise ValueError(f"Unsupported task schema_version: {schema_version}")
         context_payload = payload.get("context")
         context = (
             RuntimeContext.from_dict(context_payload)

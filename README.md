@@ -2,254 +2,290 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-GUIF is a local-first, provider-independent framework for planning, directing, contracting, approving, executing, inspecting, revising, and exporting game UI production work.
+GUIF is a local-first game UI production framework with configurable Hosts and Tools. It plans, directs, contracts, approves, executes, inspects, revises, and exports game UI work while keeping Project files and Git as the long-term source of truth.
 
 ## Status
 
-`v1.0.0-alpha.18` adds the Visual Artifact Inspection Contract and Revision Planning layer. GUIF can now distinguish real visual images from simulation receipts, verify persisted file identity, inspect image metadata against Prompt Output Contracts, create provider-neutral Visual Inspection Requests, persist Visual Review records, create traceable Revision Plans, and mark superseded Artifacts as stale.
+`v1.0.0-alpha.19` makes Host and Tool selection configurable. ChatGPT is the default Host and `chatgpt-image` is the default production Tool for image generation and editing. Missing or unavailable Tools now fail closed into recoverable waiting states; GUIF never silently falls back to `dry-run` for production work.
 
-The built-in production flow currently contains deterministic Planner, Director, Theme, Resource, Prompt, and Semantic QA Agents, persistent Approval gates, Provider Adapter execution, a deterministic Dry-run Provider, Artifact Registry, Visual Review Service, resumable Task Runs, protected editing, and Engine Adapter metadata exports.
+The release also adds external Tool handoffs, Host result submission, layered Tool configuration, Tool manifests, health checks, Adapter scaffolding, and Task schema v3 waiting states.
 
 ## Product specification
 
 The bilingual living product specification is maintained at [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md). Product direction, architecture, capability status, compatibility, priorities, risks, and acceptance criteria must be updated there in the same release or pull request as implementation changes.
 
-## Current executable flow
+## Default product path
 
 ```text
-User Requirement
-  -> ChatGPT / Agent Host
+User
+  -> ChatGPT Host                         default, configurable
   -> GUIF Runtime
-       -> Project Context snapshot and relevance selection
+       -> Context selection
        -> Workflow -> Pipeline
-       -> Planner
-       -> Director
-       -> Theme Contract
-       -> Resource Contract Bundle
+       -> Planner / Director / Theme / Resource
        -> Model-neutral Prompt IR
-       -> Semantic Contract QA
+       -> Contract QA
        -> persistent Approval Gate
-       -> Provider Adapter
+       -> Tool Resolver
+            -> chatgpt-image              default production Tool
+            -> another registered Tool    Project / Workspace / Task override
+            -> dry-run                    explicit test-only selection
+       -> external Tool Handoff or direct execution
        -> Artifact Registry
-       -> Visual Review Service
-            -> eligibility and file-integrity checks
-            -> deterministic image metadata checks
-            -> optional Visual Inspection Adapter
-            -> Revision Plan
-       -> future Revision Execution
-       -> future gated Export Agent
+       -> Visual Review / Revision
+       -> gated Export
 ```
 
-Runtime and Prompt IR remain independent from OpenAI or any other model provider.
+ChatGPT has two separate architectural roles:
 
-## What works now
+- **ChatGPT Host** manages conversation, user confirmation, orchestration, and result presentation.
+- **`chatgpt-image` Tool** performs image generation or editing through an external-callback handoff.
 
-- `guif init <project>` creates an isolated Project workspace.
-- `guif run "<requirement>" --project <project>` resolves a Workflow, selects relevant Context, executes Agents, and persists checkpoints.
-- Planner, Director, Theme, Resource, Prompt, and Semantic QA perform real deterministic domain work.
-- Approval decisions are persisted and control whether Prompt jobs are executable.
-- Provider execution is rejected unless Task, Prompt, Approval, Contract QA, Capability, and Reference gates pass.
-- `dry-run` produces deterministic non-visual execution receipts without external calls or billing.
-- Successful execution registers Artifact identity, file, SHA-256, MIME, dimensions, provider metadata, references, Output Contract, Approval snapshot, and provenance.
-- Visual review distinguishes simulations from real image Artifacts.
-- Real image Artifacts are checked for supported MIME, safe persisted path, file existence, SHA-256 identity, dimensions, format, Alpha, and registered metadata.
-- A model-neutral `VisualInspectionRequest` carries visual instructions, negative constraints, Output Contract, references, and acceptance criteria to a compatible inspection Adapter.
-- Without an inspection Adapter, semantic visual status remains explicitly `not-run`; metadata validation is never presented as visual-quality approval.
-- Visual findings can create persisted Revision Plans linked to the original Prompt job and Artifact.
-- A newer Artifact from the same Prompt job can explicitly supersede an older Artifact, which becomes `stale` while provenance is retained.
-- Task Runs remain inspectable and resumable after Pipeline failures.
-- Tests target Python 3.10, 3.11, and 3.12.
+They are defaults, not hard-coded dependencies. A custom Host or Tool can replace either role independently.
 
-## Install for development
+## Host, Tool, and Adapter
 
-```bash
-python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# macOS / Linux
-source .venv/bin/activate
-pip install -e .[dev]
-pytest -q
+A **Host** declares the capabilities available in the current environment. The default Host profile is:
+
+```json
+{
+  "host_id": "chatgpt",
+  "capabilities": [
+    "image-generation",
+    "image-editing",
+    "protected-region-editing",
+    "transparent-output",
+    "visual-inspection",
+    "github-operation"
+  ]
+}
 ```
 
-Pillow is used for image metadata inspection and is included by the `dev` and `image` extras.
+A **Tool** declares a versioned Manifest:
 
-## Python API example
+```json
+{
+  "tool_id": "chatgpt-image",
+  "version": "1.0",
+  "execution_mode": "external-callback",
+  "capabilities": [
+    "image-generation",
+    "image-editing",
+    "protected-region-editing",
+    "transparent-output"
+  ],
+  "input_contract": "prompt-ir-job-v1",
+  "output_contract": "artifact-submission-v1",
+  "production_allowed": true
+}
+```
+
+A **Tool Adapter** translates GUIF's Tool Request into either:
+
+- a direct execution result; or
+- an external Host handoff that later receives a submitted result file.
+
+Legacy `ProviderAdapter` execution remains available when `provider_id` is supplied explicitly, but new product APIs use the broader Tool terminology.
+
+## Configuration precedence
+
+Tool selection is resolved in this order:
+
+```text
+explicit Tool on this execution
+  -> Task execution override
+  -> Project configuration
+  -> Workspace configuration
+  -> Framework default
+```
+
+New Projects include:
+
+```json
+{
+  "execution": {
+    "schema_version": 1,
+    "mode": "production",
+    "default_host": "chatgpt",
+    "tools": {
+      "image-generation": {
+        "primary": "chatgpt-image",
+        "fallback": []
+      },
+      "image-editing": {
+        "primary": "chatgpt-image",
+        "fallback": []
+      }
+    }
+  }
+}
+```
+
+Workspace configuration can be stored in `.guif/config.json`. Task-level overrides may be stored in `task.state["execution_overrides"]`.
+
+## Missing Tool behavior
+
+When a required capability is not configured, not registered, unhealthy, unsupported by the current Host, or missing required Reference files, GUIF does not execute a simulation automatically. It persists a resolution record and changes the Task to:
+
+```text
+waiting-for-tool
+```
+
+The record contains:
+
+- required capability and complete capability set;
+- selected Tool and configuration source;
+- Host and execution mode;
+- health result;
+- compatible registered candidates;
+- reason and recovery actions.
+
+The user or Host can then:
+
+1. bind a registered Tool;
+2. connect or install another Tool;
+3. create and implement an Adapter scaffold;
+4. explicitly select `dry-run` for contract testing;
+5. cancel the pending execution.
+
+After configuration, execute the same persisted Job again. Planning, Approval, and existing Context are not repeated.
+
+## ChatGPT external handoff
+
+Calling `Runtime.execute_job()` without `tool_id` or `provider_id` uses the configured Tool. With the default Project configuration, GUIF creates a `chatgpt-image` handoff and changes the Task to:
+
+```text
+waiting-for-tool-result
+```
 
 ```python
-from pathlib import Path
-
-from guif.runtime import Runtime
-from guif.visual_review import VisualReviewService
-
-workspace = Path.cwd()
-runtime = Runtime(workspace)
-
-task = runtime.run(
-    "LeekParty",
-    "Create a 1080x2340 portrait medieval harbor shop page for Unity",
-    pipeline="ui-production",
-)
-
-for approval_id in task.state["approval_state"]["required_ids"]:
-    task = runtime.approve(
-        "LeekParty",
-        task.task_id,
-        approval_id,
-        actor="reviewer@example.com",
-    )
-
 job_id = task.state["prompt_ir"]["jobs"][0]["id"]
+task = runtime.execute_job("LeekParty", task.task_id, job_id)
+
+handoff = runtime.list_tool_handoffs("LeekParty", task.task_id)[0]
+```
+
+The handoff contains the full Prompt Job, bound References, Approval snapshot, Host action, safety constraints, and expected submission contract.
+
+After ChatGPT generates or edits the image, the Host submits the real file:
+
+```python
+task = runtime.submit_tool_result(
+    "LeekParty",
+    task.task_id,
+    handoff["handoff_id"],
+    content=image_bytes,
+    filename="shop-page.png",
+    mime_type="image/png",
+    width=1080,
+    height=2340,
+    model_id="chatgpt-image",
+)
+```
+
+GUIF then verifies handoff identity, registers the Artifact, preserves the Approval and execution record, restores the Task to `completed`, and refreshes QA. Artifact registration still does not imply visual approval.
+
+## `dry-run` policy
+
+`dry-run` is a deterministic contract-testing Tool. It:
+
+- performs no external call;
+- generates no image pixels;
+- is not an automatic production candidate;
+- reports `simulation: true`, `visual: false`, and `billable: false`;
+- can be used in production mode only when selected explicitly.
+
+```python
 task = runtime.execute_job(
     "LeekParty",
     task.task_id,
     job_id,
-    provider_id="dry-run",
+    tool_id="dry-run",
 )
+```
 
-artifact = runtime.list_artifacts("LeekParty", task.task_id)[0]
-task = VisualReviewService(workspace).review(
-    "LeekParty",
-    task.task_id,
-    artifact["artifact_id"],
+A missing production Tool never silently becomes `dry-run`.
+
+## Tool health and Adapter scaffold
+
+```python
+runtime.get_host_profile()
+runtime.list_tools()
+runtime.tool_health("chatgpt-image", project="LeekParty")
+runtime.bind_project_tool("LeekParty", "image-generation", "chatgpt-image")
+runtime.scaffold_tool(
+    "custom-image",
+    ("image-generation", "transparent-output"),
 )
-
-print(task.state["qa_report"]["artifact_review"])
 ```
 
-Because `dry-run` produces `simulation: true` and `visual: false`, this review returns `not-applicable`, not a visual pass.
-
-## Approval and Provider gates
-
-A Prompt job can execute only when all of these conditions hold:
+A generated scaffold contains:
 
 ```text
-Task.status == completed
-Prompt IR.status == ready
-Job.executable == true
-Approval == approved or not-required
-Contract QA == passed
-Provider capabilities satisfy the Job
-required Reference files are bound
+tools/<tool-id>/
+  tool.json
+  adapter.py
+  config.schema.json
+  README.md
+  tests/test_contract.py
 ```
 
-Approval does not write inferred Theme or Resource proposals into Project truth and does not call a Provider by itself. Provider attempts are checkpointed before invocation; failures preserve the completed Task, Approval history, request snapshot, and error evidence.
+The scaffold is marked `adapter-required` and `implementation_ready: false`. It is not automatically registered or treated as usable.
 
-## Visual Artifact eligibility
+## Existing production contracts
 
-A visual review begins by checking the Artifact record:
+GUIF still provides:
 
-```text
-status is active, not stale
-simulation == false
-visual == true
-MIME is image/png, image/jpeg, or image/webp
-file path remains inside the Run directory
-file exists
-registered SHA-256 matches file bytes
-```
-
-Simulation receipts and non-visual files receive:
-
-```text
-status: not-applicable
-visual_conclusion_claimed: false
-```
-
-Ineligible or corrupted visual Artifacts receive a blocking integrity finding.
-
-## Deterministic image metadata review
-
-For eligible images, GUIF inspects:
-
-- actual width and height;
-- actual image format;
-- Alpha presence and image mode;
-- consistency with the Prompt job `canvas` and `output_contract`;
-- consistency with dimensions registered by the Provider result.
-
-A metadata mismatch blocks the Artifact and creates a Revision Plan. A metadata pass alone does not claim Theme, composition, content, readability, or usability quality.
-
-## Visual Inspection Adapter contract
-
-A Visual Inspection Adapter receives:
-
-```text
-VisualInspectionRequest
-  task and project identity
-  Artifact and Prompt job identity
-  file metadata
-  Output Contract
-  global page and Theme contract
-  visual and content instructions
-  negative constraints
-  acceptance criteria
-  required review dimensions
-```
-
-Adapters declare capabilities for:
-
-```text
-theme-consistency
-composition-and-hierarchy
-content-correctness
-readability
-usability
-resource-compliance
-```
-
-The default Visual Inspector Registry is intentionally empty. Without a selected capable Adapter, semantic review remains `not-run` and Export remains closed.
-
-## Revision Plans and supersession
-
-Blocking, review, or warning findings can create a persisted Revision Plan containing:
-
-```text
-revision_id
-source_job_id
-source_artifact_id
-finding_ids
-revision objectives
-preservation constraints
-next step
-```
-
-Revision Plans do not overwrite the source Artifact. When a reviewed replacement is available, it can explicitly supersede the old Artifact. The old record becomes `stale` and points to `superseded_by`; the new record retains a `supersedes` list.
+- deterministic Planner, Director, Theme, Resource, Prompt, and Semantic QA Agents;
+- relevance-based Project Context selection;
+- persistent Approval decisions and history;
+- Workflow-driven Pipelines and resumable Pipeline failures;
+- Artifact identity, SHA-256, MIME, dimensions, References, and provenance;
+- visual Artifact eligibility and deterministic image metadata review;
+- optional Visual Inspection Adapter contract;
+- persisted Revision Plans and Artifact supersession;
+- protected-pixel editing checks;
+- Generic, Unity, Godot, and Unreal export metadata Adapters.
 
 ## CLI
 
 ```bash
 guif init LeekParty
 
+guif host-show
+guif tool-list
+guif tool-health chatgpt-image --project LeekParty
+guif tool-bind image-generation chatgpt-image --project LeekParty
+
 guif run "Create a medieval harbor shop page for Unity" \
   --project LeekParty \
   --pipeline ui-production
 
-guif run-approval-list <task-id> --project LeekParty
 guif run-approve <task-id> <approval-id> \
   --project LeekParty \
   --actor reviewer@example.com
 
-guif provider-list
+# Default: resolve Project Tool and prepare a ChatGPT handoff
+guif run-execute <task-id> <job-id> --project LeekParty
+
+guif run-tool-resolution <task-id> --project LeekParty
+guif run-tool-handoff-list <task-id> --project LeekParty
+
+guif run-tool-submit <task-id> <handoff-id> output.png \
+  --project LeekParty \
+  --mime-type image/png \
+  --width 1080 \
+  --height 2340
+
+# Explicit simulation only
 guif run-execute <task-id> <job-id> \
   --project LeekParty \
-  --provider dry-run
+  --tool dry-run
 
-guif run-artifact-list <task-id> --project LeekParty
-guif run-artifact-show <task-id> <artifact-id> --project LeekParty
-
-guif visual-inspector-list
-guif run-artifact-review <task-id> <artifact-id> \
-  --project LeekParty
-
-guif run-visual-review-list <task-id> --project LeekParty
-guif run-revision-list <task-id> --project LeekParty
-
-guif run-artifact-supersede <task-id> <old-artifact-id> <new-artifact-id> \
-  --project LeekParty
+guif tool-scaffold custom-image image-generation transparent-output
 ```
 
-`--inspector <id>` can be supplied to `run-artifact-review` when a Host or Plugin has registered a compatible Visual Inspection Adapter. The default CLI process has no semantic inspector registered.
+Legacy Provider execution remains available through `--provider <id>`.
 
 ## Persisted Task Run
 
@@ -259,41 +295,43 @@ projects/<project>/runs/<task-id>/
   context.json
   events.jsonl
   outputs.json
-  approvals.json          when Prompt approval exists
-  executions.json         after Provider attempts
+  approvals.json
+  tool-resolution.json    after Tool resolution
+  tool-handoffs.json      after external-callback preparation
+  executions.json         after Tool or legacy Provider attempts
   artifacts.json          after Artifact registration
-  visual-reviews.json     after Artifact review
-  revision-plans.json     when revisions are proposed
-  artifacts/              persisted Artifact files
+  visual-reviews.json
+  revision-plans.json
+  artifacts/
   error.json              only while Pipeline execution is failed
 ```
 
-`run-list` includes Approval state, Artifact count, Provider execution count, Visual Review count, Revision Plan count, and aggregate Artifact Review status.
+`run-list` includes Tool resolution status, Tool handoff count, Approval status, Artifact count, execution count, Visual Review count, Revision Plan count, and aggregate Artifact Review status.
 
 ## Current limitations
 
-- `dry-run` remains the only built-in Provider and generates no image pixels.
-- The default Visual Inspector Registry is empty; no built-in model currently judges visual semantics.
-- Revision Plans are persisted, but Revision Prompt construction and execution are not automated yet.
+- `chatgpt-image` is an external Host bridge; GUIF Core cannot invoke ChatGPT image capabilities by itself.
+- The default CLI process can prepare a handoff, but the ChatGPT Host must generate or edit the image and submit the result.
+- Tool installation and credentials remain Host-managed; alpha.19 persists recovery actions but does not install third-party software automatically.
+- The default Visual Inspector Registry is empty.
+- Revision Plans are persisted, but automatic Revision Job construction is not implemented yet.
 - Artifact storage is file-based and has no remote object storage, database, or retention policy.
-- Approval actor identity is a string, not an authenticated Host identity.
-- Existing Approvals and reviews are not yet invalidated automatically by upstream Contract hash changes.
-- The built-in `export` Agent remains Contract-only and does not yet consume the final Artifact and Visual QA gate.
+- Approval actor identity is still an unauthenticated string.
+- The built-in `export` Agent remains Contract-only and does not yet consume the final visual QA gate.
 
 ## Operating principles
 
-1. Natural language is the primary interface; CLI is for implementation, debugging, and CI.
-2. Git and Project files are the long-term source of truth.
-3. Runtime, Prompt IR, Provider execution, and Visual Inspection contracts stay provider-independent.
-4. Inferred Theme and Resource proposals require review before Project mutation.
-5. Prompt jobs require explicit Approval and passing Contract QA before Provider execution.
-6. Provider Capability and Reference gates are enforced before invocation.
-7. Simulation receipts must never be described as visual Artifacts.
-8. Metadata validation must never be described as semantic visual approval.
-9. Visual findings and revisions must retain Artifact, Job, and Approval provenance.
-10. Export requires passing Contract QA and passing review for every active visual Artifact.
-11. A release is complete only when Feature, Tests, CI, both READMEs, Version Metadata, and the Product Specification agree.
+1. ChatGPT is the default Host, not a hard-coded dependency.
+2. Image generation, image editing, inspection, Git operations, and export are configurable Tools.
+3. Tool resolution uses explicit, Task, Project, Workspace, then Framework precedence.
+4. Production execution fails closed when a Tool is missing or unhealthy.
+5. `dry-run` is never an implicit production fallback.
+6. External Tool completion requires an explicit result submission.
+7. Simulation, metadata validation, and semantic visual approval remain distinct.
+8. Inferred Theme and Resource proposals require review before Project mutation.
+9. Artifact, Approval, execution, review, and revision provenance must be retained.
+10. A release is complete only when Feature, Tests, CI, both READMEs, Version Metadata, and the Product Specification agree.
 
 ## Repository direction
 
-The next priority is **alpha.19: Revision Job Construction and Controlled Revision Execution**. GUIF should convert approved Revision Plans into versioned edit Jobs, preserve the source Artifact as an immutable reference, enforce a new Approval gate, execute through a compatible editing Provider, and automatically link the replacement Artifact without losing the previous review history.
+The next priority is **alpha.20: Revision Job Construction and Controlled Revision Execution**. GUIF should convert an approved Revision Plan into a versioned edit Job, bind the source Artifact as an immutable Reference, create a new Approval gate, route the Job through the configured image-editing Tool, submit the replacement Artifact, and trigger automatic re-review without deleting prior provenance.

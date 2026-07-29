@@ -4,6 +4,8 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+from guif.tools.config import validate_execution_config
+
 REQUIRED_PROJECT_FIELDS = {
     "schema_version": int,
     "name": str,
@@ -55,6 +57,7 @@ def validate_project_config(config: object, *, project_root: Path | None = None)
         elif project_root is not None and not (project_root / "themes" / f"{current_theme}.json").is_file():
             errors.append(f"Current theme file does not exist: themes/{current_theme}.json")
 
+    errors.extend(validate_execution_config(config.get("execution")))
     return errors
 
 
