@@ -6,158 +6,299 @@ GUIF 是一个本地优先、Host 与 Tool 均可配置的游戏 UI 生产框架
 
 ## 当前状态
 
-`v1.0.0-alpha.23` 将用户 Theme 数据与框架 Git、项目 Git 分离。
-
-Theme 现在属于用户拥有的私有、可版本化长期数据。公开框架仓库只保存 Contract、存储接口、工作流代码、测试，以及完全虚构的 Fixture；真实 Theme 名称、视觉规则、配色、材质、对话决策和迭代历史均存放在仓库之外。
+`v1.0.0-alpha.24` 新增经过认证的 Host 操作、Task 乐观并发、独占 Task Lease、稳定 External Result Callback，以及与 Task 绑定的 Git Change Set。
 
 ```text
-开始新对话
-  -> 先确认 Theme
-       -> 从历史 Theme 中选择
-       -> 新建 Theme
-       -> 从旧版本派生新版本
-       -> 明确选择暂不绑定
-  -> 绑定 Theme ID + Version + Snapshot Hash
-  -> 开始规划与生产
-  -> 在对话中继续完善 Theme
-  -> 发布新的不可变 Theme Version
+选择私有 Theme
+  -> Prompt / Approval / Tool Handoff
+  -> Authenticated Host Actor
+  -> Optimistic Task Etag
+  -> Expiring Exclusive Task Lease
+  -> Authenticated Result Callback
+  -> Artifact / Review / Revision / Gated Export
+  -> Reviewable Git Change Set
+  -> Dedicated Branch + Commit
+  -> Optional Revert Commit
 ```
 
 中英文双语产品规格维护在 [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md)。隐私迁移和 Git 历史处理指引见 [`docs/PRIVACY_MIGRATION.md`](docs/PRIVACY_MIGRATION.md)。
 
-## 私有数据目录
+## Authenticated Host Actor
 
-可通过 `GUIF_DATA_HOME` 指定私有数据父目录。未配置时，GUIF 使用 Workspace 仓库外部的隐藏同级目录。
+Host Credential 是存放在框架 Git 和 Project Git 之外的私有本地记录。注册时只返回一次 Bearer Token。GUIF 只保存 PBKDF2-HMAC-SHA256 Verifier，不保存原始 Secret。
+
+```python
+from pathlib import Path
+from guif.runtime import Runtime
+
+runtime = Runtime(Path.cwd())
+issued = runtime.register_host_credential(
+    actor_id="production-host",
+    host_id="chatgpt",
+    capabilities=(
+        "task:lease",
+        "approval:decide",
+        "tool-result:submit",
+        "export:execute",
+        "export:rollback",
+        "git:prepare",
+        "git:commit",
+        "git:revert",
+    ),
+    roles=("operator",),
+    created_by="local-admin",
+)
+
+bearer_token = issued["bearer_token"]  # 只显示一次
+```
+
+Credential Metadata 会记录 Actor、Host、Role、Capability、Issuer、生命周期和可选过期时间。Credential 可以列出、吊销或轮换，但不会暴露 Secret Verifier。
+
+经过认证的操作会保存标准化 Actor Snapshot：
+
+```json
+{
+  "actor_id": "production-host",
+  "host_id": "chatgpt",
+  "credential_id": "cred-...",
+  "capabilities": ["task:lease", "tool-result:submit"],
+  "authenticated": true
+}
+```
+
+## Task 乐观并发
+
+每个持久化 Task 都有确定性的 Etag：
+
+```python
+etag = runtime.get_task_etag("SampleGame", task_id)
+```
+
+写操作发现 Etag 已过期时会拒绝执行，不会静默覆盖更新后的 Task State。
+
+执行独占操作前先获取有过期时间的 Lease：
+
+```python
+lease = runtime.acquire_task_lease(
+    "SampleGame",
+    task_id,
+    bearer_token=bearer_token,
+    expected_task_etag=etag,
+    ttl_seconds=300,
+    purpose="host-result-callback",
+)
+
+lease_token = lease["lease_token"]  # 只显示一次
+```
+
+Lease 会绑定：
+
+- Project 与 Task Identity；
+- Authenticated Actor 与 Credential；
+- Base Task Etag；
+- Operation Purpose；
+- Acquire 与 Expire 时间；
+- Consumed、Released 或 Expired 生命周期。
+
+同一 Task 的第二个 Active Lease 会被拒绝。写操作成功后会消费 Lease。Stale Task、Expired Lease、错误 Actor、错误 Credential 和被篡改的 Lease Token 都会 Fail Closed。
+
+## 稳定的 Authenticated Host Callback
+
+旧版 `submit_tool_result()` API 继续保留兼容性。生产 Host 集成应使用 `submit_authenticated_tool_result()`。
+
+```python
+content = Path("generated-screen.png").read_bytes()
+
+task = runtime.submit_authenticated_tool_result(
+    "SampleGame",
+    task_id,
+    handoff_id,
+    bearer_token=bearer_token,
+    lease_token=lease_token,
+    expected_task_etag=etag,
+    content=content,
+    filename="generated-screen.png",
+    mime_type="image/png",
+    width=1080,
+    height=2340,
+    model_id="image-model",
+)
+```
+
+Callback 会校验：
+
+- Host Credential 与 `tool-result:submit` Capability；
+- Host Identity 是否与持久化 Handoff 一致；
+- Tool 与 Execution Identity；
+- Active Lease Ownership；
+- Expected Task Etag；
+- Content SHA-256；
+- Handoff Status 与幂等 Callback Identity。
+
+完成后的 Callback Record 会写入 `host-callbacks.json`，并关联 Actor、Lease、Envelope、Execution、Handoff、Content Hash 和最终 Artifact。
+
+## Authenticated Approval 与 Export
+
+Approval 和生产写入可以使用同一套 Identity 与 Lease Boundary：
+
+```python
+task = runtime.decide_approval_authenticated(
+    "SampleGame",
+    task_id,
+    approval_id,
+    "approved",
+    bearer_token=bearer_token,
+    lease_token=lease_token,
+    expected_task_etag=etag,
+    comment="已根据批准的 Contract 完成审阅。",
+)
+```
+
+```python
+record = runtime.execute_gated_export_authenticated(
+    "SampleGame",
+    task_id,
+    bearer_token=bearer_token,
+    lease_token=lease_token,
+    expected_task_etag=etag,
+    target_engine="unity",
+)
+```
+
+Approval 与 Export Record 会附加 Authenticated Actor 和 Lease Evidence。原有仅接收字符串 Actor 的 API 继续作为兼容路径存在，但不具备 alpha.24 的认证保证。
+
+## Task-bound Git Change Set
+
+完成后的 Gated Export 可以转换为可审阅的 Git Change Set。Prepare 阶段不会创建 Branch 或 Commit。
+
+```python
+change = runtime.prepare_export_git_change(
+    "SampleGame",
+    task_id,
+    export_id,
+    bearer_token=bearer_token,
+    expected_task_etag=etag,
+    branch_name="guif/sample-game/export-001",
+)
+
+diff = runtime.diff_git_change(
+    "SampleGame",
+    task_id,
+    change["change_set_id"],
+)
+```
+
+Plan 会记录：
+
+- Repository Root 与 Project Root；
+- Source Task 与 Completed Export；
+- Export Transaction SHA-256；
+- Base Git HEAD 与 Branch；
+- 选中的 Project Truth、Engine Output 和 Transaction Path；
+- Proposed Branch 与 Commit Message；
+- Working Tree Status。
+
+审阅后，获取新的 Lease 并执行：
+
+```python
+committed = runtime.execute_git_change(
+    "SampleGame",
+    task_id,
+    change["change_set_id"],
+    bearer_token=bearer_token,
+    lease_token=lease_token,
+    expected_task_etag=etag,
+)
+```
+
+GUIF 会确认 Git HEAD 仍与 Plan 一致，创建独立 Branch，只 Stage 选中的 Path，生成 Commit，记录 Staged Diff Hash，并将 Commit 关联回 Gated Export。
+
+已提交的 Change Set 可以生成普通 Git Revert Commit：
+
+```python
+reverted = runtime.revert_git_change(
+    "SampleGame",
+    task_id,
+    change["change_set_id"],
+    bearer_token=bearer_token,
+    lease_token=lease_token,
+    expected_task_etag=etag,
+    reason="恢复之前批准的 Project State。",
+)
+```
+
+如果选中的 Path 存在更新的未提交修改，Revert 会 Fail Closed。
+
+## Operational CLI
+
+alpha.24 新增独立的 `guif-ops` 入口，让 Bearer Token 与 Lease Token 通过环境变量传递，避免直接进入命令历史。
+
+```bash
+pip install -e .[dev]
+
+guif-ops credential-create production-host chatgpt \
+  task:lease tool-result:submit approval:decide \
+  export:execute git:prepare git:commit git:revert
+
+export GUIF_HOST_TOKEN='guifh1....'
+
+guif-ops task-etag <task-id> --project SampleGame
+
+guif-ops lease-acquire <task-id> \
+  --project SampleGame \
+  --expected-etag 'task-sha256:...'
+
+export GUIF_TASK_LEASE='guifl1....'
+
+guif-ops callback-submit <task-id> <handoff-id> generated.png \
+  --project SampleGame \
+  --expected-etag 'task-sha256:...'
+```
+
+其他命令包括：
+
+```text
+credential-list / credential-revoke / credential-rotate
+lease-show / lease-renew / lease-release
+callback-list / callback-show
+approval-decide
+export-execute / export-rollback
+git-plan / git-list / git-show / git-diff / git-commit / git-revert
+summary
+```
+
+## 私有数据目录
 
 ```text
 <private-data-root>/
-  themes/<theme-id>/
-    index.json
-    versions/1.json
-    versions/2.json
-  conversation-theme-bindings/<conversation-id>.json
-  project-theme-bindings/<project>.json
+  themes/
+  conversation-theme-bindings/
+  project-theme-bindings/
+  host-credentials/
   runs/<project>/<task-id>/
-  plans/<project>/
+    task.json
+    task-lease.json
+    host-callbacks.json
+    git-changes.json
+  plans/
   migrations/
   privacy-reports/
 ```
 
-Project Git 不保存完整 Theme 内容。持久化 Task Context 只保存不透明引用：
+完整 Theme Content、Host Credential Verifier、Task Lease、Callback Evidence、自然语言 Plan 和 Runtime Evidence 默认都不会进入框架 Git 或 Project Git。
 
-```json
-{
-  "active_theme_ref": {
-    "theme_id": "theme-example",
-    "version": 2,
-    "snapshot_hash": "sha256...",
-    "privacy": "private"
-  }
-}
-```
+## 已有生产流程
 
-Runtime 执行时才会在经过批准的私有数据边界内加载完整 Theme。
+GUIF 继续提供：
 
-## 对话优先的 Theme Resolution
-
-```python
-from pathlib import Path
-from guif.runtime import Runtime, ThemeResolutionRequired
-
-runtime = Runtime(Path.cwd())
-resolution = runtime.prepare_conversation_theme(
-    "conversation-001",
-    project="SampleGame",
-)
-```
-
-新对话尚未绑定 Theme 时会返回 `confirmation-required`。视觉生产不会再根据任务文本静默套用框架内置风格。Host 必须让用户选择历史 Theme、新建 Theme、派生版本，或者明确选择暂不绑定。
-
-创建并绑定一个完全虚构的示例 Theme：
-
-```python
-record = runtime.create_private_theme(
-    "Geometric Arcade",
-    {
-        "description": "抽象几何形状和中性测试表面。",
-        "palette": ["test blue", "test gray"],
-        "materials": ["matte polymer"],
-        "lighting": "flat studio light",
-        "must_include": ["hexagonal navigation"],
-        "avoid": ["real brands"],
-    },
-    actor="host",
-    conversation_id="conversation-001",
-    project="SampleGame",
-)
-```
-
-根据对话反馈派生不可变新版本：
-
-```python
-revision = runtime.derive_private_theme(
-    record["theme_id"],
-    {"lighting": "soft top light"},
-    from_version=1,
-    actor="host",
-    conversation_id="conversation-001",
-)
-```
-
-Version 1 保持不变，对话绑定移动到经过确认的新版本。
-
-## 私有 Runtime Evidence
-
-Task Run 和自然语言 Plan 也可能包含 Prompt、Theme Contract、Review Finding 与用户决策，因此同样迁移到私有数据存储。
-
-```text
-公开 Project Tree
-  project.json
-  workflows/
-  production-assets/          仅存已批准生产事实
-  memory/                     用户明确选择由项目管理的记录
-
-私有数据目录
-  themes/
-  runs/
-  plans/
-  conversation bindings/
-```
-
-旧版 Project-local Run 暂时保持只读兼容，所有新 Run 只写入私有目录。
-
-## 迁移与隐私审计
-
-```python
-report = runtime.migrate_legacy_project_themes(
-    "SampleGame",
-    actor="migration",
-)
-
-audit = runtime.audit_privacy(
-    sensitive_terms=("private phrase",),
-)
-```
-
-迁移会将旧 Theme 文件导入私有库，删除 Project-local Theme 文件和绑定，并在私有目录中生成 Migration Report。Working-tree Audit 会检查常见私有数据路径，也可以检查调用方提供的敏感词。
-
-从当前分支删除文件，**不等于**删除历史 Commit、PR Diff、Fork、缓存、Release Archive 或外部 Clone。GUIF 不会自动执行破坏性的历史重写。应先确定准确暴露范围，再按照隐私迁移文档执行仓库事故响应。
-
-## 既有生产流程
-
-```text
-私有 Theme 选择
-  -> Planner / Director / Theme / Resource / Prompt
-  -> Approval
-  -> 配置的图片 Tool 或 ChatGPT Handoff
-  -> Artifact Registry
-  -> Metadata 与 Semantic Visual Review
-  -> Controlled Revision
-  -> Gated Export
-  -> Project Truth / Engine Output / Audit / Rollback
-```
-
-Gated Export 仍要求 Task 完成、Contract 已审批、Visual Review 通过、Artifact SHA-256 有效、Revision 已解决且 Engine 兼容，才允许写入生产文件。
+- 私有 Versioned Theme Library 与 Conversation-first Theme Selection；
+- Workflow-driven Planner、Director、Theme、Resource、Prompt 与 Semantic QA Agent；
+- 可配置 Host / Tool 路由与 ChatGPT 默认集成；
+- Artifact Identity、Immutable Reference、SHA-256、MIME 与 Dimension；
+- Deterministic Metadata Review 与可选 Semantic Visual Inspector；
+- Controlled Revision Execution 与 Review-gated Supersession；
+- Gated Export、Engine Manifest、Transaction Audit、Backup 与 Rollback；
+- Current-tree Privacy Audit 与 Legacy Theme Migration。
 
 ## 开发
 
@@ -173,13 +314,15 @@ pytest -q
 
 ## 当前限制
 
-- ChatGPT 产品侧仍需要自动消费 External Handoff 并提交文件；
-- 默认 Semantic Visual Inspector Registry 仍为空；
-- 私有存储目前基于文件，尚未提供静态加密、远程同步、Retention Policy 或并发 Lease；
-- Conversation、Approval 与 Export Actor 仍是字符串，不是认证身份；
-- 当前 Working-tree Audit 无法证明 Git 历史、Fork、缓存或外部 Clone 已被清理；
-- Git Change Set、Signed Manifest 与 Authenticated Host Callback 尚未完成。
+- Host Credential 是本地 Bearer Credential；尚未实现 OIDC、mTLS、Hardware-backed Key 和 Remote Identity Provider。
+- Task Lease 是 Private Store 中的逻辑 Lease，不是操作系统锁或分布式锁；旧版未认证 API 可以绕过它。
+- Git Change Set 依赖本地 Git、Named Current Branch 和已经配置的 Git Author Identity。
+- Git Execution 只创建本地 Branch 与 Commit；尚未自动 Push Remote、创建 PR、协商 Protected Branch 或等待 Server-side Check。
+- Callback Content 通过本地 Runtime API 或 CLI 提交；当前不包含 Network Callback Server。
+- Private Storage 仍为 File-backed，尚无静态加密、远程同步和 Retention Policy。
+- 默认 Semantic Visual Inspector Registry 为空。
+- Current-tree Privacy Audit 无法证明 Git History、Fork、Cache 或外部 Clone 已被清理。
 
 ## 下一阶段
 
-下一优先级是 **alpha.24：Authenticated Host API 与 Git Change Management**，包括 Authenticated Actor、Optimistic Concurrency、Task Lease、Stable Host Result Callback、Git Change Set、Branch、Commit、Diff、Revert，以及 Export Transaction 与 Git Commit 的关联。
+下一优先级是 **alpha.25：Production Host Gateway 与 Signed Operation Ledger**，包括 Network Callback Transport、OIDC 或可插拔 Identity Verification、Cross-process Lock、Signed Callback / Export Receipt、Remote Git Push / PR Integration、Protected Branch Check 和 Durable Operation Recovery。

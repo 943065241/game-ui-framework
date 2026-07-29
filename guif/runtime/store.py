@@ -87,7 +87,9 @@ class TaskStore:
         _write_optional_json(run_dir / "revision-execution.json", state.get("revision_execution"))
         _write_optional_json(run_dir / "tool-resolution.json", state.get("tool_resolution"))
         _write_optional_json(run_dir / "tool-handoffs.json", state.get("tool_handoffs"))
+        _write_optional_json(run_dir / "host-callbacks.json", state.get("host_callbacks"))
         _write_optional_json(run_dir / "gated-exports.json", state.get("gated_exports"))
+        _write_optional_json(run_dir / "git-changes.json", state.get("git_changes"))
         return run_dir
 
     def _task_path(self, project: str, task_id: str) -> Path:
@@ -152,7 +154,9 @@ class TaskStore:
             qa_report = state.get("qa_report", {}) if isinstance(state, dict) else {}
             tool_resolution = state.get("tool_resolution", {}) if isinstance(state, dict) else {}
             handoff_state = state.get("tool_handoffs", {}) if isinstance(state, dict) else {}
+            callback_state = state.get("host_callbacks", {}) if isinstance(state, dict) else {}
             gated_export_state = state.get("gated_exports", {}) if isinstance(state, dict) else {}
+            git_change_state = state.get("git_changes", {}) if isinstance(state, dict) else {}
             artifact_records = artifact_registry.get("records", []) if isinstance(artifact_registry, dict) else []
             execution_attempts = execution_state.get("attempts", []) if isinstance(execution_state, dict) else []
             visual_reviews = visual_review_state.get("records", []) if isinstance(visual_review_state, dict) else []
@@ -164,14 +168,28 @@ class TaskStore:
                 if isinstance(item, dict) and item.get("status") == "pending"
             ] if isinstance(revision_approvals, dict) else []
             handoffs = handoff_state.get("records", []) if isinstance(handoff_state, dict) else []
+            callbacks = callback_state.get("records", []) if isinstance(callback_state, dict) else []
             gated_exports = gated_export_state.get("records", []) if isinstance(gated_export_state, dict) else []
+            git_changes = git_change_state.get("records", []) if isinstance(git_change_state, dict) else []
             completed_exports = [
                 item for item in gated_exports
                 if isinstance(item, dict) and item.get("status") == "completed"
             ] if isinstance(gated_exports, list) else []
+            committed_changes = [
+                item for item in git_changes
+                if isinstance(item, dict) and item.get("status") == "committed"
+            ] if isinstance(git_changes, list) else []
             latest_export = gated_exports[-1] if isinstance(gated_exports, list) and gated_exports else {}
+            latest_git_change = git_changes[-1] if isinstance(git_changes, list) and git_changes else {}
             artifact_review = qa_report.get("artifact_review", {}) if isinstance(qa_report, dict) else {}
             context = payload.get("context", {}) if isinstance(payload.get("context"), dict) else {}
+            lease_path = task_path.parent / "task-lease.json"
+            lease = {}
+            if lease_path.is_file():
+                try:
+                    lease = json.loads(lease_path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    lease = {"status": "invalid"}
             summaries.append(
                 {
                     **{
@@ -194,9 +212,14 @@ class TaskStore:
                     "artifact_review_status": artifact_review.get("status") if isinstance(artifact_review, dict) else None,
                     "tool_resolution_status": tool_resolution.get("status") if isinstance(tool_resolution, dict) else None,
                     "tool_handoff_count": len(handoffs) if isinstance(handoffs, list) else 0,
+                    "authenticated_callback_count": len(callbacks) if isinstance(callbacks, list) else 0,
+                    "task_lease_status": lease.get("status") if isinstance(lease, dict) else None,
                     "gated_export_count": len(gated_exports) if isinstance(gated_exports, list) else 0,
                     "completed_export_count": len(completed_exports),
                     "latest_export_status": latest_export.get("status") if isinstance(latest_export, dict) else None,
+                    "git_change_count": len(git_changes) if isinstance(git_changes, list) else 0,
+                    "committed_git_change_count": len(committed_changes),
+                    "latest_git_change_status": latest_git_change.get("status") if isinstance(latest_git_change, dict) else None,
                 }
             )
         summaries.sort(key=lambda item: str(item.get("created_at") or ""), reverse=True)
