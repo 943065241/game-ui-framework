@@ -12,7 +12,7 @@ def test_runtime_context_loads_markdown_memory_records(tmp_path: Path) -> None:
         tmp_path,
         "Demo",
         "decision",
-        "Use warm sunset lighting for the medieval harbor theme.",
+        "Use a twelve-column layout grid for the fictional interface fixture.",
     )
 
     context = load_runtime_context(tmp_path, "Demo")
@@ -20,4 +20,4 @@ def test_runtime_context_loads_markdown_memory_records(tmp_path: Path) -> None:
     assert len(context.memory) == 1
     assert context.memory[0]["path"] == str(memory_path.relative_to(tmp_path / "projects" / "Demo"))
     assert context.memory[0]["type"] == "decisions"
-    assert "warm sunset lighting" in context.memory[0]["content"]
+    assert "twelve-column layout grid" in context.memory[0]["content"]
