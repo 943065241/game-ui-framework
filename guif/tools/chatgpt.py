@@ -21,12 +21,22 @@ class ChatGPTImageToolAdapter(ToolAdapter):
         requires_host_support=True,
         supported_hosts=("chatgpt",),
         requires_credentials=False,
+        permissions=(
+            "invoke-chatgpt-image-capability",
+            "submit-generated-artifact",
+        ),
+        data_scopes=(
+            "structured-prompt-job",
+            "approved-project-reference-images",
+            "generated-or-edited-image-result",
+        ),
         external_call=True,
         billable=None,
         description=(
             "Default GUIF production bridge. ChatGPT receives a structured handoff, "
             "uses its configured image generation or editing capability, and submits "
-            "the resulting file back to GUIF."
+            "the resulting file back to GUIF. Product-side usage or billing depends on "
+            "the active ChatGPT plan and Host environment."
         ),
     )
     requires_bound_references = True
@@ -85,6 +95,7 @@ def build_default_chatgpt_host() -> HostProfile:
         metadata={
             "default": True,
             "execution": "host-managed",
+            "discovery_protocol": "guif-host-capability-discovery-v1",
             "description": "Default GUIF conversational and visual production host.",
         },
     )
