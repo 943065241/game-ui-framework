@@ -75,11 +75,13 @@ class ChatGPTHostLoop:
         self,
         project: str,
         *,
+        task_id: str | None = None,
         image_executor: ImageExecutor | None = None,
         visual_inspector: VisualInspector | None = None,
         capabilities: Iterable[str] = (),
     ) -> dict[str, Any] | None:
         requested = tuple(str(item) for item in capabilities if str(item))
+        requested_task_id = task_id.strip() if isinstance(task_id, str) else None
         candidates = self.runtime.list_host_work(
             project,
             capabilities=requested,
@@ -90,22 +92,28 @@ class ChatGPTHostLoop:
             (
                 item
                 for item in candidates
-                if (
-                    item.get("kind") in {"image-generation", "image-editing"}
-                    and image_executor is not None
+                if (requested_task_id is None or item.get("task_id") == requested_task_id)
+                and (
+                    (
+                        item.get("kind") in {"image-generation", "image-editing"}
+                        and image_executor is not None
+                    )
+                    or (
+                        item.get("kind") == "visual-inspection"
+                        and visual_inspector is not None
+                    )
                 )
-                or (item.get("kind") == "visual-inspection" and visual_inspector is not None)
             ),
             None,
         )
         if not isinstance(work, dict):
             return None
 
-        task_id = str(work["task_id"])
-        etag = self.runtime.get_task_etag(project, task_id)
+        selected_task_id = str(work["task_id"])
+        etag = self.runtime.get_task_etag(project, selected_task_id)
         lease = self.runtime.acquire_task_lease(
             project,
-            task_id,
+            selected_task_id,
             bearer_token=self.bearer_token,
             expected_task_etag=etag,
             ttl_seconds=self.lease_ttl_seconds,
@@ -121,7 +129,7 @@ class ChatGPTHostLoop:
         except Exception:
             self.runtime.release_task_lease(
                 project,
-                task_id,
+                selected_task_id,
                 bearer_token=self.bearer_token,
                 lease_token=lease["lease_token"],
                 reason="Host work claim failed",
@@ -177,11 +185,11 @@ class ChatGPTHostLoop:
                 metadata=result.get("metadata") if isinstance(result.get("metadata"), dict) else None,
             )
         except Exception:
-            current = self.runtime.get_task_lease(project, task_id)
+            current = self.runtime.get_task_lease(project, selected_task_id)
             if current.get("status") == "active":
                 self.runtime.release_task_lease(
                     project,
-                    task_id,
+                    selected_task_id,
                     bearer_token=self.bearer_token,
                     lease_token=lease["lease_token"],
                     reason="ChatGPT Host work execution failed",
