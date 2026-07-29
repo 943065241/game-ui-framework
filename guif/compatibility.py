@@ -50,14 +50,15 @@ FROZEN_CONVERSATION_ACTIONS = (
 def compatibility_contract() -> dict[str, Any]:
     """Return the public beta.1 compatibility promise.
 
-    Beta.1 preserves the product-facing names frozen in alpha.28. Internal
-    persistence details remain free to evolve only through explicit, recorded
-    migrations.
+    The existing ``release`` field remains the alpha.28 freeze origin for
+    backward compatibility. ``current_release`` identifies the implementation
+    currently honoring that contract.
     """
 
     return {
         "schema_version": 1,
-        "release": MVP_RELEASE,
+        "release": MVP_ORIGIN_RELEASE,
+        "current_release": MVP_RELEASE,
         "origin_release": MVP_ORIGIN_RELEASE,
         "channel": "beta",
         "public_api_version": MVP_API_VERSION,
