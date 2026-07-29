@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from guif.agents.builtin import build_default_agents
+from guif.approval import approval_summary, decide_approval
 from guif.retrieval import select_relevant_context
 from guif.runtime.context import load_runtime_context
 from guif.runtime.pipeline import Pipeline
 from guif.runtime.registry import AgentRegistry
 from guif.runtime.store import TaskStore
 from guif.runtime.task import Task
+from guif.semantic_qa import build_semantic_qa_report, validate_semantic_qa_report
 from guif.workflow import load_workflow
 
 
@@ -61,6 +64,42 @@ class Runtime:
         self.store.save(task)
         return task
 
+    @staticmethod
+    def _replace_output(task: Task, output_type: str, value: Any, *, agent: str) -> None:
+        for output in reversed(task.outputs):
+            if isinstance(output, dict) and output.get("type") == output_type:
+                output["value"] = value
+                return
+        task.add_output(output_type, value, agent=agent)
+
+    def _refresh_qa_after_approval(self, task: Task) -> None:
+        required = ("plan", "direction", "theme_contract", "resource_contracts", "prompt_ir")
+        if not all(isinstance(task.state.get(name), dict) for name in required):
+            return
+        report = build_semantic_qa_report(task)
+        errors = validate_semantic_qa_report(report)
+        if errors:
+            raise ValueError("Approval produced invalid Semantic QA report: " + "; ".join(errors))
+        task.state["qa_report"] = report
+        self._replace_output(task, "semantic-qa-report", report, agent="qa")
+        task.state.setdefault("agents", {}).setdefault("qa", {}).update(
+            {
+                "status": "completed",
+                "implementation": "semantic-contract-qa",
+                "qa_schema_version": report["schema_version"],
+                "qa_status": report["status"],
+                "check_count": report["summary"]["check_count"],
+                "blocking_finding_count": report["summary"]["blocking_finding_count"],
+                "artifact_review_status": report["artifact_review"]["status"],
+                "export_allowed": report["export_gate"]["allowed"],
+            }
+        )
+        task.record(
+            "qa",
+            "refreshed",
+            f"Semantic QA refreshed after approval change with status {report['status']}.",
+        )
+
     def run(self, project: str, requirement: str, *, pipeline: str = "ui-production") -> Task:
         normalized_requirement = requirement.strip()
         if not normalized_requirement:
@@ -105,6 +144,88 @@ class Runtime:
             f"Resuming pipeline at agent index {task.next_agent_index} with the persisted Context selection",
         )
         return self._execute(task, resolved_pipeline, start_index=task.next_agent_index)
+
+    def get_approvals(self, project: str, task_id: str) -> dict[str, Any]:
+        task = self.store.load(project, task_id)
+        summary = approval_summary(task)
+        self.store.save(task)
+        return summary
+
+    def decide_approval(
+        self,
+        project: str,
+        task_id: str,
+        approval_id: str,
+        decision: str,
+        *,
+        actor: str,
+        comment: str | None = None,
+    ) -> Task:
+        task = self.store.load(project, task_id)
+        decide_approval(
+            task,
+            approval_id,
+            decision,
+            actor=actor,
+            comment=comment,
+        )
+        self._refresh_qa_after_approval(task)
+        self.store.save(task)
+        return task
+
+    def approve(
+        self,
+        project: str,
+        task_id: str,
+        approval_id: str,
+        *,
+        actor: str,
+        comment: str | None = None,
+    ) -> Task:
+        return self.decide_approval(
+            project,
+            task_id,
+            approval_id,
+            "approved",
+            actor=actor,
+            comment=comment,
+        )
+
+    def reject(
+        self,
+        project: str,
+        task_id: str,
+        approval_id: str,
+        *,
+        actor: str,
+        comment: str | None = None,
+    ) -> Task:
+        return self.decide_approval(
+            project,
+            task_id,
+            approval_id,
+            "rejected",
+            actor=actor,
+            comment=comment,
+        )
+
+    def request_changes(
+        self,
+        project: str,
+        task_id: str,
+        approval_id: str,
+        *,
+        actor: str,
+        comment: str | None = None,
+    ) -> Task:
+        return self.decide_approval(
+            project,
+            task_id,
+            approval_id,
+            "changes-requested",
+            actor=actor,
+            comment=comment,
+        )
 
     def load_task(self, project: str, task_id: str) -> Task:
         return self.store.load(project, task_id)
