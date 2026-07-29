@@ -66,6 +66,16 @@ def test_one_command_bootstrap_keeps_secret_out_of_private_conversation_record(t
     assert "claim_token" not in persisted
 
 
+def test_current_conversation_record_does_not_require_legacy_migration(tmp_path: Path) -> None:
+    _boot(tmp_path)
+
+    scan = PrivateSchemaMigrator(tmp_path).scan()
+
+    assert scan["status"] == "current"
+    assert scan["migration_required_count"] == 0
+    assert scan["blocked_count"] == 0
+
+
 def test_portable_backup_is_verified_and_excludes_authentication_material(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     runtime, conversation, token = _boot(workspace)
@@ -119,6 +129,24 @@ def test_restore_is_plan_first_and_preserves_verified_private_files(tmp_path: Pa
     assert tuple((target_root / "themes").glob("*/versions/1.json"))
 
 
+def test_restore_rejects_a_target_inside_framework_workspace(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    runtime, conversation, token = _boot(source)
+    conversation.create_theme(PROJECT, CONVERSATION, "Fictional Observatory", THEME)
+    archive = tmp_path / "portable.guif-private.zip"
+    PrivateBackupService(source).create(archive)
+
+    target_workspace = tmp_path / "target-workspace"
+    target_workspace.mkdir()
+    service = PrivateBackupService(target_workspace)
+
+    with pytest.raises(PrivateBackupError):
+        service.restore(
+            archive,
+            target_root=target_workspace / "private-data",
+        )
+
+
 def test_backup_verification_rejects_tampered_member(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     runtime, conversation, token = _boot(workspace)
@@ -143,6 +171,28 @@ def test_backup_verification_rejects_tampered_member(tmp_path: Path) -> None:
 
     with pytest.raises(PrivateBackupError):
         service.verify(tampered)
+
+
+def test_backup_verification_rejects_unmanifested_directory_member(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    runtime, conversation, token = _boot(workspace)
+    conversation.create_theme(PROJECT, CONVERSATION, "Fictional Observatory", THEME)
+    original = tmp_path / "original.guif-private.zip"
+    unexpected = tmp_path / "unexpected-directory.guif-private.zip"
+    service = PrivateBackupService(workspace)
+    service.create(original)
+
+    with zipfile.ZipFile(original, "r") as source, zipfile.ZipFile(
+        unexpected,
+        "w",
+        compression=zipfile.ZIP_DEFLATED,
+    ) as target:
+        for info in source.infolist():
+            target.writestr(info.filename, source.read(info.filename))
+        target.writestr("unexpected/", b"")
+
+    with pytest.raises(PrivateBackupError):
+        service.verify(unexpected)
 
 
 def test_private_schema_migration_repairs_v1_record_and_records_history(tmp_path: Path) -> None:
