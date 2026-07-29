@@ -6,184 +6,158 @@ GUIF is a local-first game UI production framework with configurable Hosts and T
 
 ## Status
 
-`v1.0.0-alpha.22` adds the first production **Gated Export Agent**.
+`v1.0.0-alpha.23` separates user Theme data from framework and project Git repositories.
 
-A generated file is no longer allowed to enter Project truth merely because a Tool returned it. GUIF now evaluates the persisted Task, initial Approval, Contract QA, aggregate Visual Review, active Artifact identity, approved Resource Contract, target Engine compatibility, and Revision resolution before any production file is written.
-
-```text
-Prompt / Revision Job
-  -> Tool execution or ChatGPT handoff
-  -> Artifact Registry
-  -> metadata and semantic Visual Review
-  -> active reviewed Artifact
-  -> Gated Export Plan                 no Project mutation
-  -> Gated Export Execute
-       -> Project truth materialization
-       -> Engine-specific export
-       -> Export Manifest
-       -> transaction audit and backups
-  -> optional conflict-aware rollback
-```
-
-The bilingual living product specification is maintained at [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md).
-
-## Export gate
-
-`Runtime.prepare_gated_export()` creates a persisted, reviewable plan and does not modify Project files.
-
-The plan checks:
-
-- Task status is `completed`;
-- initial Approval is `approved` or `not-required`;
-- Contract QA is `passed`;
-- aggregate `qa_report.export_gate.allowed` is true;
-- at least one active `production-asset` Artifact exists;
-- every selected Artifact is real, visual, reviewed, and not a simulation;
-- Artifact files remain inside the Run directory and match registered SHA-256 values;
-- every Artifact Output Contract exactly matches an approved Resource manifest candidate;
-- no duplicate active Artifact exists for the same Resource;
-- all Revision Plans are `resolved` or `rejected`;
-- the Resource target is compatible with the selected Engine.
-
-Any failed check produces a persisted `blocked` Export record. No production file is copied and no implicit fallback is used.
-
-## Project truth materialization
-
-A ready Export writes approved assets to:
+A Theme is now private, user-owned, versioned data. The public framework repository contains only contracts, storage interfaces, workflow code, tests, and fictional fixtures. Real Theme names, visual rules, palettes, materials, conversation decisions, and iteration history are stored outside the repository.
 
 ```text
-projects/<project>/production-assets/files/<output-name>
-projects/<project>/production-assets/<resource-id>.resource.json
+new conversation
+  -> confirm Theme
+       -> select a historical Theme
+       -> create a new Theme
+       -> derive a new version
+       -> explicitly continue unbound
+  -> bind Theme ID + version + snapshot hash
+  -> run planning and production
+  -> update Theme through conversation
+  -> publish another immutable Theme version
 ```
 
-The materialized Resource manifest points to the managed Project source file. Existing files are backed up before replacement.
+The bilingual living product specification is maintained at [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md). Privacy migration and repository-history guidance are in [`docs/PRIVACY_MIGRATION.md`](docs/PRIVACY_MIGRATION.md).
 
-Only active `production-asset` Artifacts are materialized. Effect images, simulations, receipts, stale Artifacts, and unreviewed results remain available for provenance but do not enter production truth.
+## Private data layout
 
-## Engine export
-
-Each execution creates an immutable output directory:
+Set `GUIF_DATA_HOME` to choose the private data parent. Without it, GUIF uses a hidden sibling directory outside the workspace repository.
 
 ```text
-projects/<project>/exports/<engine>/<export-id>/
-  <approved assets>
-  <engine adapter metadata>
-  export-manifest.json
+<private-data-root>/
+  themes/<theme-id>/
+    index.json
+    versions/1.json
+    versions/2.json
+  conversation-theme-bindings/<conversation-id>.json
+  project-theme-bindings/<project>.json
+  runs/<project>/<task-id>/
+  plans/<project>/
+  migrations/
+  privacy-reports/
 ```
 
-Unity, Godot, Unreal, and Generic adapters remain supported. The Export Manifest records:
+Project Git does not receive full Theme content. Persisted Task Context contains only:
 
-- Task and Export identity;
-- target Engine and actor;
-- gate snapshot;
-- source Artifact, Job, Review, and SHA-256;
-- materialized Project paths;
-- Engine output paths and SHA-256;
-- Adapter output and import hints.
-
-The older `guif export` command remains available for validating and exporting Resource files that already exist in Project truth. New AI production flows should use the Task-bound gated Export API.
-
-## Transaction audit and rollback
-
-Each completed Export stores:
-
-```text
-projects/<project>/export-history/<export-id>/
-  transaction.json
-  backups/
+```json
+{
+  "active_theme_ref": {
+    "theme_id": "theme-example",
+    "version": 2,
+    "snapshot_hash": "sha256...",
+    "privacy": "private"
+  }
+}
 ```
 
-The transaction records every Project truth mutation, whether a file previously existed, its prior hash, backup path, and exported hash.
+The full Theme is hydrated only while the Runtime is executing inside the approved private-data boundary.
 
-Rollback is conflict-aware. GUIF compares current Project files with the hashes written by the Export. If a file changed afterward, rollback fails closed instead of overwriting newer work. A force rollback requires an explicit actor and reason and is recorded in the audit.
-
-## Runtime API
+## Conversation-first Theme resolution
 
 ```python
-runtime = Runtime(workspace)
+from pathlib import Path
+from guif.runtime import Runtime, ThemeResolutionRequired
 
-plan = runtime.prepare_gated_export(
-    "LeekParty",
-    task_id,
-    target_engine="unity",
-)
-
-record = runtime.execute_gated_export(
-    "LeekParty",
-    task_id,
-    target_engine="unity",
-    actor="project-owner@example.com",
-)
-
-exports = runtime.list_gated_exports("LeekParty", task_id)
-record = runtime.get_gated_export("LeekParty", task_id, record["export_id"])
-
-rolled_back = runtime.rollback_gated_export(
-    "LeekParty",
-    task_id,
-    record["export_id"],
-    actor="project-owner@example.com",
-    reason="Restore the previous production asset set.",
+runtime = Runtime(Path.cwd())
+resolution = runtime.prepare_conversation_theme(
+    "conversation-001",
+    project="SampleGame",
 )
 ```
 
-## CLI
+An unbound new conversation returns `confirmation-required`. Visual production does not silently infer a framework preset. The Host must select, create, derive, or explicitly continue without a Theme.
 
-```bash
-guif run-export-plan <task-id> \
-  --project LeekParty \
-  --target unity
+Create and bind a fully fictional example Theme:
 
-guif run-export-execute <task-id> \
-  --project LeekParty \
-  --target unity \
-  --actor project-owner@example.com
-
-guif run-export-list <task-id> --project LeekParty
-guif run-export-show <task-id> <export-id> --project LeekParty
-
-guif run-export-rollback <task-id> <export-id> \
-  --project LeekParty \
-  --actor project-owner@example.com \
-  --reason "Restore the previous approved production set."
+```python
+record = runtime.create_private_theme(
+    "Geometric Arcade",
+    {
+        "description": "Abstract shapes and neutral test surfaces.",
+        "palette": ["test blue", "test gray"],
+        "materials": ["matte polymer"],
+        "lighting": "flat studio light",
+        "must_include": ["hexagonal navigation"],
+        "avoid": ["real brands"],
+    },
+    actor="host",
+    conversation_id="conversation-001",
+    project="SampleGame",
+)
 ```
 
-Use `--force` only after reviewing post-export conflicts.
+Derive a new immutable version from conversation feedback:
 
-## Persisted Run state
+```python
+revision = runtime.derive_private_theme(
+    record["theme_id"],
+    {"lighting": "soft top light"},
+    from_version=1,
+    actor="host",
+    conversation_id="conversation-001",
+)
+```
 
-Task Run directories may now include:
+Version 1 remains unchanged. The conversation binding moves to the approved new version.
+
+## Private Runtime evidence
+
+Task Runs and natural-language Plans are also private because they may include prompts, Theme contracts, review findings, and user decisions.
 
 ```text
-approvals.json
-artifacts.json
-executions.json
-tool-resolution.json
-tool-handoffs.json
-visual-reviews.json
-revision-plans.json
-revision-execution.json
-gated-exports.json
+public project tree
+  project.json
+  workflows/
+  production-assets/          approved production truth only
+  memory/                     explicitly project-owned records
+
+private data tree
+  themes/
+  runs/
+  plans/
+  conversation bindings/
 ```
 
-`run-list` includes `gated_export_count`, `completed_export_count`, and `latest_export_status`.
+Legacy project-local Runs remain readable for migration, but new Runs are written only to private storage.
 
-## Existing production capabilities
+## Migration and privacy audit
 
-GUIF also provides:
+```python
+report = runtime.migrate_legacy_project_themes(
+    "SampleGame",
+    actor="migration",
+)
 
-- Workflow-driven Planner, Director, Theme, Resource, Prompt, and Semantic QA Agents;
-- relevance-based Project Context selection;
-- persistent initial and Revision Approval gates;
-- configurable Host and Tool routing with ChatGPT defaults;
-- registered, available, and installable Tool discovery;
-- reviewable Tool connection requests and opaque Credential references;
-- external ChatGPT image generation and editing handoffs;
-- Artifact identity, provenance, SHA-256, MIME, dimensions, and References;
-- deterministic metadata review and optional semantic Visual Inspectors;
-- controlled Revision Jobs with immutable source binding and review-gated supersession;
-- protected-pixel composition checks;
-- deterministic legacy Resource export.
+audit = runtime.audit_privacy(
+    sensitive_terms=("private phrase",),
+)
+```
+
+Migration imports legacy Theme files into the private library, removes project-local Theme files and bindings, and writes a private migration report. The working-tree audit detects common private-data paths and optional caller-supplied sensitive terms.
+
+Removing a file from the current branch does **not** erase prior commits, pull-request diffs, forks, caches, release archives, or clones. GUIF does not perform an automatic destructive history rewrite. Follow the incident-response steps in the privacy migration guide after identifying the exact exposure scope.
+
+## Existing production flow
+
+```text
+private Theme selection
+  -> Planner / Director / Theme / Resource / Prompt
+  -> Approval
+  -> configured image Tool or ChatGPT handoff
+  -> Artifact Registry
+  -> metadata and semantic Visual Review
+  -> controlled Revision
+  -> Gated Export
+  -> Project truth / Engine output / audit / rollback
+```
+
+Gated Export continues to require completed Task state, approved contracts, passing visual review, valid Artifact SHA-256 identity, resolved Revisions, and Engine compatibility before any production file is written.
 
 ## Development
 
@@ -201,11 +175,11 @@ pytest -q
 
 - ChatGPT product-side orchestration must still consume external handoffs and submit files automatically.
 - The default semantic Visual Inspector Registry is empty.
-- Gated Export currently materializes generated `production-asset` Artifacts; packaging approved reused Resources into the same transaction is a later extension.
-- Rollback is file-based and does not yet create a Git branch or commit.
-- Export actors are strings rather than authenticated Host identities.
-- Remote object storage, retention policy, concurrent Export locking, and signed manifests are not implemented.
+- Private storage is file-backed and does not yet provide encryption-at-rest, remote synchronization, retention policy, or concurrent leases.
+- Conversation and approval actors are strings rather than authenticated identities.
+- Current-tree privacy audit cannot prove removal from Git history, forks, caches, or external clones.
+- Git change sets, signed manifests, and authenticated Host callbacks remain future work.
 
 ## Next phase
 
-The next priority is **alpha.23: Authenticated Host API and Git Change Management**: stable Host result protocol, authenticated actors, optimistic concurrency, Git change sets, branch and commit creation, rollback integration, cancellation, and execution summaries.
+The next priority is **alpha.24: Authenticated Host API and Git Change Management**: authenticated actors, optimistic concurrency and Task leases, stable Host result callbacks, Git change sets, branch/commit/diff/revert integration, and Export transaction linkage.

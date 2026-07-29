@@ -8,3 +8,13 @@ dist/
 *.egg-info/
 .DS_Store
 Thumbs.db
+
+# GUIF private user data must never enter framework or project Git.
+.guif-data/
+**/.guif-data/
+projects/*/themes/
+projects/*/runs/
+projects/*/plans/
+projects/*/tool-connections.json
+*.private-theme.json
+*.theme-snapshot.json

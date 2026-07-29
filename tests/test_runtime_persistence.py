@@ -25,12 +25,13 @@ class FlakyAgent(Agent):
 
 
 def test_runtime_persists_loads_and_lists_runs(tmp_path: Path) -> None:
-    init_project(tmp_path, "demo")
+    root = init_project(tmp_path, "demo")
     runtime = Runtime(tmp_path)
 
-    task = runtime.run("demo", "Create a medieval shop page")
-    run_dir = tmp_path / "projects" / "demo" / "runs" / task.task_id
+    task = runtime.run("demo", "Create a fictional abstract menu page")
+    run_dir = runtime.store.run_dir("demo", task.task_id)
 
+    assert not str(run_dir).startswith(str(root))
     assert {path.name for path in run_dir.iterdir()} == {
         "approvals.json",
         "context.json",
@@ -41,6 +42,7 @@ def test_runtime_persists_loads_and_lists_runs(tmp_path: Path) -> None:
     assert runtime.load_task("demo", task.task_id).to_dict() == task.to_dict()
     summary = runtime.list_runs("demo")[0]
     assert summary["status"] == "completed"
+    assert summary["private_storage"] is True
     assert summary["approval_status"] in {"pending", "rejected", "changes-requested"}
     assert summary["pending_approval_count"] >= 0
 
@@ -59,7 +61,7 @@ def test_runtime_persists_failure_and_resumes_from_failed_agent(tmp_path: Path) 
 
     task_id = runtime.list_runs("demo")[0]["task_id"]
     failed = runtime.load_task("demo", task_id)
-    run_dir = tmp_path / "projects" / "demo" / "runs" / task_id
+    run_dir = runtime.store.run_dir("demo", task_id)
 
     assert failed.status == "failed"
     assert failed.current_agent == "flaky"
@@ -79,7 +81,7 @@ def test_runtime_persists_failure_and_resumes_from_failed_agent(tmp_path: Path) 
 def test_runtime_rejects_resuming_completed_task(tmp_path: Path) -> None:
     init_project(tmp_path, "demo")
     runtime = Runtime(tmp_path)
-    task = runtime.run("demo", "Create UI")
+    task = runtime.run("demo", "Create a fictional UI fixture")
 
     with pytest.raises(ValueError, match="already completed"):
         runtime.resume("demo", task.task_id)

@@ -6,27 +6,23 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from guif.paths import project_root
+from guif.private_data import PrivateDataLayout
 from guif.project_schema import validate_project_config_file
 from guif.resource import validate_resource_file
-from guif.theme import validate_theme_file
 from guif.tools.config import DEFAULT_EXECUTION_CONFIG
 from guif.workflow import load_workflow, validate_workflow_file
 
 PROJECT_DIRS = (
     "requirements",
-    "themes",
     "workflows",
     "effect-images",
     "production-assets",
     "qa",
-    "plans",
     "memory/decisions",
     "memory/lessons",
     "memory/mistakes",
     "memory/best-practices",
 )
-
-RUNTIME_DIRS = ("runs",)
 
 
 @dataclass(frozen=True)
@@ -42,7 +38,7 @@ def route_requirement(requirement: str) -> Route:
         return Route("Resource Manager", "resource-production", "Production asset terms detected.")
     if any(word in text for word in ("qa", "检查", "像素", "噪点", "偏移", "mask", "遮罩")):
         return Route("QA Manager", "quality-assurance", "Quality or pixel-protection terms detected.")
-    if any(word in text for word in ("主题", "风格", "theme", "style", "中世纪", "medieval")):
+    if any(word in text for word in ("主题", "风格", "theme", "style", "art direction", "视觉方向")):
         return Route("Theme Manager", "theme-direction", "Theme or art-direction terms detected.")
     if any(word in text for word in ("框架", "skill", "规则", "framework", "governance")):
         return Route("Framework Manager", "framework-evolution", "Framework governance terms detected.")
@@ -53,14 +49,18 @@ def init_project(workspace: Path, project: str) -> Path:
     root = project_root(workspace, project)
     if root.exists():
         raise FileExistsError(f"Project already exists: {root}")
-    for relative in PROJECT_DIRS + RUNTIME_DIRS:
+    for relative in PROJECT_DIRS:
         (root / relative).mkdir(parents=True, exist_ok=True)
     config = {
         "schema_version": 1,
         "name": project,
         "status": "active",
-        "current_theme": None,
         "execution": json.loads(json.dumps(DEFAULT_EXECUTION_CONFIG)),
+        "privacy": {
+            "theme_storage": "private-data-store",
+            "runtime_storage": "private-data-store",
+            "theme_content_in_project_git": False,
+        },
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     (root / "project.json").write_text(
@@ -78,15 +78,17 @@ def create_plan(workspace: Path, project: str, requirement: str) -> Path:
     workflow = load_workflow(workspace, project, route.workflow)
     timestamp = datetime.now(timezone.utc)
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "project": project,
         "requirement": requirement,
         "route": asdict(route),
         "workflow": workflow.to_dict(),
         "steps": list(workflow.steps),
+        "privacy": {"storage": "private", "project_git_mutated": False},
         "created_at": timestamp.isoformat(),
     }
-    path = root / "plans" / f"{timestamp.strftime('%Y%m%dT%H%M%SZ')}.json"
+    path = PrivateDataLayout(workspace).plans(project) / f"{timestamp.strftime('%Y%m%dT%H%M%SZ')}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return path
 
@@ -100,11 +102,16 @@ def validate_project(workspace: Path, project: str) -> list[str]:
     for relative in PROJECT_DIRS:
         if not (root / relative).is_dir():
             errors.append(f"Missing directory: {relative}")
-    themes_dir = root / "themes"
-    if themes_dir.is_dir():
-        for path in sorted(themes_dir.glob("*.json")):
-            for error in validate_theme_file(path):
-                errors.append(f"{path.relative_to(root)}: {error}")
+    legacy_themes = root / "themes"
+    if legacy_themes.is_dir() and any(legacy_themes.glob("*.json")):
+        errors.append(
+            "Legacy project-local Theme files contain private user data; run theme-migrate-private before committing."
+        )
+    legacy_runs = root / "runs"
+    if legacy_runs.is_dir() and any(legacy_runs.glob("*/task.json")):
+        errors.append(
+            "Legacy project-local Runtime Runs may contain private prompts and Theme data; migrate or remove them before committing."
+        )
     workflows_dir = root / "workflows"
     if workflows_dir.is_dir():
         for path in sorted(workflows_dir.glob("*.json")):

@@ -4,17 +4,18 @@ from guif.core import create_plan, init_project, record_memory, route_requiremen
 
 
 def test_init_plan_validate_and_record(tmp_path: Path) -> None:
-    root = init_project(tmp_path, "LeekParty")
+    root = init_project(tmp_path, "SampleGame")
     assert (root / "project.json").is_file()
-    assert validate_project(tmp_path, "LeekParty") == []
+    assert validate_project(tmp_path, "SampleGame") == []
 
-    plan = create_plan(tmp_path, "LeekParty", "中世纪商城主题效果图")
+    plan = create_plan(tmp_path, "SampleGame", "Create a fictional geometric arcade menu style guide")
     assert plan.is_file()
-    assert route_requirement("中世纪商城主题效果图").manager == "Theme Manager"
+    assert not str(plan).startswith(str(root))
+    assert route_requirement("Create a fictional arcade theme direction").manager == "Theme Manager"
 
-    memory = record_memory(tmp_path, "LeekParty", "decision", "Use warm sunset lighting.")
+    memory = record_memory(tmp_path, "SampleGame", "decision", "Use a twelve-column layout grid.")
     assert memory.is_file()
-    assert "warm sunset" in memory.read_text(encoding="utf-8")
+    assert "twelve-column" in memory.read_text(encoding="utf-8")
 
 
 def test_resource_and_qa_routes() -> None:

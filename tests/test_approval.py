@@ -7,33 +7,31 @@ import pytest
 
 from guif.core import init_project
 from guif.resource import create_resource_manifest
-from guif.runtime import Runtime
-from guif.theme import create_theme
+from guif.runtime import Runtime, TaskStore
+
+
+PROJECT = "SampleGame"
 
 
 def _create_ready_project(tmp_path: Path) -> None:
-    init_project(tmp_path, "LeekParty")
-    theme_path = create_theme(
-        tmp_path,
-        "LeekParty",
-        "Medieval Harbor",
-        "Warm, readable medieval harbor UI direction.",
-    )
-    theme = json.loads(theme_path.read_text(encoding="utf-8"))
-    theme.update(
+    init_project(tmp_path, PROJECT)
+    Runtime(tmp_path).create_private_theme(
+        "Fictional Geometric Arcade",
         {
-            "palette": ["warm gold", "deep sea blue"],
-            "materials": ["weathered wood", "aged brass"],
-            "lighting": "warm sunset",
-            "must_include": ["harbor view", "gold coins"],
-            "avoid": ["pirate skulls", "dirty visual noise"],
-        }
+            "description": "A synthetic abstract menu fixture for framework tests.",
+            "palette": ["test blue", "test gray"],
+            "materials": ["matte polymer"],
+            "lighting": "flat studio light",
+            "must_include": ["hexagonal navigation"],
+            "avoid": ["real brands", "photoreal people"],
+        },
+        project=PROJECT,
+        actor="test-host",
     )
-    theme_path.write_text(json.dumps(theme), encoding="utf-8")
     create_resource_manifest(
         tmp_path,
-        "LeekParty",
-        "purchase-button",
+        PROJECT,
+        "action-button",
         "button",
         264,
         134,
@@ -44,20 +42,20 @@ def _create_ready_project(tmp_path: Path) -> None:
 
 def _run_review_task(tmp_path: Path):
     return Runtime(tmp_path).run(
-        "LeekParty",
-        "Create a 1080x2340 portrait medieval harbor shop page, reuse the purchase button, and export Unity",
+        PROJECT,
+        "Create a 1080x2340 fictional geometric arcade menu, reuse the action button, and export Unity",
         pipeline="ui-production",
     )
 
 
 def test_all_required_approvals_enable_prompt_jobs_without_side_effects(tmp_path: Path) -> None:
     _create_ready_project(tmp_path)
-    resources_dir = tmp_path / "projects" / "LeekParty" / "production-assets"
+    resources_dir = tmp_path / "projects" / PROJECT / "production-assets"
     before_files = sorted(path.name for path in resources_dir.iterdir())
 
     task = _run_review_task(tmp_path)
     runtime = Runtime(tmp_path)
-    summary = runtime.get_approvals("LeekParty", task.task_id)
+    summary = runtime.get_approvals(PROJECT, task.task_id)
 
     assert summary["status"] == "pending"
     assert summary["required_ids"]
@@ -67,10 +65,10 @@ def test_all_required_approvals_enable_prompt_jobs_without_side_effects(tmp_path
 
     for approval_id in summary["required_ids"]:
         task = runtime.approve(
-            "LeekParty",
+            PROJECT,
             task.task_id,
             approval_id,
-            actor="Eason",
+            actor="TestReviewer",
             comment=f"Approved {approval_id}",
         )
 
@@ -88,14 +86,7 @@ def test_all_required_approvals_enable_prompt_jobs_without_side_effects(tmp_path
     assert len([output for output in task.outputs if output["type"] == "semantic-qa-report"]) == 1
     assert sorted(path.name for path in resources_dir.iterdir()) == before_files
 
-    approval_path = (
-        tmp_path
-        / "projects"
-        / "LeekParty"
-        / "runs"
-        / task.task_id
-        / "approvals.json"
-    )
+    approval_path = TaskStore(tmp_path).run_dir(PROJECT, task.task_id) / "approvals.json"
     persisted = json.loads(approval_path.read_text(encoding="utf-8"))
     assert persisted["status"] == "approved"
     assert len(persisted["history"]) == len(summary["required_ids"])
@@ -109,19 +100,14 @@ def test_change_request_blocks_then_later_approval_recovers_gate(tmp_path: Path)
     target = required_ids[0]
 
     for approval_id in required_ids[1:]:
-        task = runtime.approve(
-            "LeekParty",
-            task.task_id,
-            approval_id,
-            actor="Reviewer",
-        )
+        task = runtime.approve(PROJECT, task.task_id, approval_id, actor="TestReviewer")
 
     task = runtime.request_changes(
-        "LeekParty",
+        PROJECT,
         task.task_id,
         target,
-        actor="Reviewer",
-        comment="Increase the primary purchase action hierarchy.",
+        actor="TestReviewer",
+        comment="Increase the primary action hierarchy.",
     )
     assert task.state["approval_state"]["status"] == "changes-requested"
     assert task.state["prompt_ir"]["status"] == "blocked"
@@ -133,10 +119,10 @@ def test_change_request_blocks_then_later_approval_recovers_gate(tmp_path: Path)
     assert task.state["qa_report"]["status"] == "blocked"
 
     task = runtime.approve(
-        "LeekParty",
+        PROJECT,
         task.task_id,
         target,
-        actor="Reviewer",
+        actor="TestReviewer",
         comment="Revised hierarchy accepted.",
     )
     assert task.state["approval_state"]["status"] == "approved"
@@ -158,17 +144,12 @@ def test_approval_rejects_unknown_or_non_prompt_task(tmp_path: Path) -> None:
     runtime = Runtime(tmp_path)
 
     with pytest.raises(ValueError, match="Unknown approval point"):
-        runtime.approve(
-            "LeekParty",
-            task.task_id,
-            "unknown",
-            actor="Reviewer",
-        )
+        runtime.approve(PROJECT, task.task_id, "unknown", actor="TestReviewer")
 
     planning_task = runtime.run(
-        "LeekParty",
-        "Plan a 1080x2340 portrait shop page",
+        PROJECT,
+        "Plan a 1080x2340 fictional menu page",
         pipeline="planning",
     )
     with pytest.raises(ValueError, match="does not contain a Prompt IR"):
-        runtime.get_approvals("LeekParty", planning_task.task_id)
+        runtime.get_approvals(PROJECT, planning_task.task_id)

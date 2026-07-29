@@ -1,48 +1,44 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from guif.core import init_project, record_memory
 from guif.prompt_ir import validate_prompt_ir
 from guif.resource import create_resource_manifest, validate_resource_data
 from guif.runtime import Runtime
-from guif.theme import create_theme
+
+PROJECT = "SampleGame"
 
 
 def _create_project_theme(tmp_path: Path) -> None:
-    theme_path = create_theme(
-        tmp_path,
-        "LeekParty",
-        "Medieval Harbor",
-        "Warm, readable medieval harbor UI direction.",
-    )
-    theme = json.loads(theme_path.read_text(encoding="utf-8"))
-    theme.update(
+    Runtime(tmp_path).create_private_theme(
+        "Fictional Geometric Arcade",
         {
-            "palette": ["warm gold", "deep sea blue"],
-            "materials": ["weathered wood", "aged brass"],
-            "lighting": "warm sunset",
-            "must_include": ["harbor view", "gold coins"],
-            "avoid": ["pirate skulls", "dirty visual noise"],
-        }
+            "description": "Synthetic abstract arcade UI direction for tests.",
+            "palette": ["test blue", "test gray"],
+            "materials": ["matte polymer", "brushed alloy"],
+            "lighting": "flat studio light",
+            "must_include": ["hexagonal navigation", "abstract tokens"],
+            "avoid": ["real brands", "photoreal people"],
+        },
+        project=PROJECT,
+        actor="test-host",
     )
-    theme_path.write_text(json.dumps(theme), encoding="utf-8")
 
 
 def test_prompt_agent_builds_provider_neutral_jobs_and_provenance(tmp_path: Path) -> None:
-    init_project(tmp_path, "LeekParty")
+    init_project(tmp_path, PROJECT)
     _create_project_theme(tmp_path)
     record_memory(
         tmp_path,
-        "LeekParty",
+        PROJECT,
         "decision",
-        "The shop page must keep the harbor view and must not include bottom tab navigation.",
+        "The fictional shop page must keep hexagonal navigation and must not include bottom tab navigation.",
     )
     create_resource_manifest(
         tmp_path,
-        "LeekParty",
-        "purchase-button",
+        PROJECT,
+        "action-button",
         "button",
         264,
         134,
@@ -51,8 +47,8 @@ def test_prompt_agent_builds_provider_neutral_jobs_and_provenance(tmp_path: Path
     )
 
     task = Runtime(tmp_path).run(
-        "LeekParty",
-        "Create a 1080x2340 portrait medieval harbor shop page, reuse the purchase button, and export Unity",
+        PROJECT,
+        "Create a 1080x2340 portrait fictional geometric arcade shop page, reuse the action button, and export Unity",
         pipeline="ui-production",
     )
 
@@ -80,7 +76,7 @@ def test_prompt_agent_builds_provider_neutral_jobs_and_provenance(tmp_path: Path
         "width": 1080,
         "height": 2340,
     }
-    assert "dirty visual noise" in prompt_ir["global_contract"]["negative_constraints"]
+    assert "photoreal people" in prompt_ir["global_contract"]["negative_constraints"]
     assert any(
         "bottom tab navigation" in value
         for value in prompt_ir["global_contract"]["negative_constraints"]
@@ -90,7 +86,7 @@ def test_prompt_agent_builds_provider_neutral_jobs_and_provenance(tmp_path: Path
     effect_job = jobs["shop-effect-image"]
     assert effect_job["operation"] == "generate"
     assert effect_job["canvas"]["width"] == 1080
-    assert effect_job["references"][0]["resource_id"] == "purchase-button"
+    assert effect_job["references"][0]["resource_id"] == "action-button"
     assert effect_job["executable"] is False
 
     background_job = jobs["shop-background"]
@@ -111,12 +107,12 @@ def test_prompt_agent_builds_provider_neutral_jobs_and_provenance(tmp_path: Path
 
 
 def test_prompt_agent_blocks_edit_without_approved_reference(tmp_path: Path) -> None:
-    init_project(tmp_path, "LeekParty")
+    init_project(tmp_path, PROJECT)
     _create_project_theme(tmp_path)
 
     task = Runtime(tmp_path).run(
-        "LeekParty",
-        "Edit the 1080x2340 portrait medieval harbor shop page and replace the product area",
+        PROJECT,
+        "Edit the 1080x2340 portrait fictional arcade shop page and replace the product area",
         pipeline="ui-production",
     )
 

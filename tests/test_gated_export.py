@@ -148,7 +148,7 @@ def test_export_plan_is_reviewable_and_does_not_mutate_project_truth(tmp_path: P
     assert plan["project_truth"]["mutated"] is False
     assert not (root / "production-assets" / "files" / "trade-icon.png").exists()
     assert not (root / "production-assets" / "trade-icon.resource.json").exists()
-    assert (root / "runs" / task.task_id / "gated-exports.json").is_file()
+    assert (runtime.store.run_dir("Demo", task.task_id) / "gated-exports.json").is_file()
 
 
 def test_execute_materializes_approved_asset_and_engine_manifest(tmp_path: Path) -> None:

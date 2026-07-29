@@ -1,7 +1,7 @@
 from guif.gated_export import GatedExportError
 from guif.runtime.context import RuntimeContext, load_runtime_context
-from guif.runtime.exportable import Runtime
 from guif.runtime.pipeline import Pipeline
+from guif.runtime.private_theme import Runtime, ThemeResolutionRequired
 from guif.runtime.registry import AgentRegistry
 from guif.runtime.runtime import ProviderExecutionError, RuntimeExecutionError
 from guif.runtime.store import TaskStore
@@ -19,6 +19,7 @@ __all__ = [
     "Task",
     "TaskEvent",
     "TaskStore",
+    "ThemeResolutionRequired",
     "ToolExecutionError",
     "load_runtime_context",
 ]

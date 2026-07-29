@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from guif.paths import project_root
+from guif.theme_store import PrivateThemeStore
 
 REQUIRED_THEME_FIELDS = (
     "name",
@@ -23,44 +23,72 @@ def validate_theme_data(data: dict[str, Any]) -> list[str]:
     for field in REQUIRED_THEME_FIELDS:
         if field not in data:
             errors.append(f"Missing theme field: {field}")
-    if "palette" in data and not isinstance(data["palette"], list):
-        errors.append("Theme palette must be a list")
-    for field in ("materials", "must_include", "avoid"):
-        if field in data and not isinstance(data[field], list):
-            errors.append(f"Theme {field} must be a list")
+    for field in ("name", "description", "lighting"):
+        if field in data and not isinstance(data[field], str):
+            errors.append(f"Theme {field} must be a string")
+    for field in ("palette", "materials", "must_include", "avoid"):
+        if field in data and (
+            not isinstance(data[field], list)
+            or any(not isinstance(item, str) for item in data[field])
+        ):
+            errors.append(f"Theme {field} must be a list of strings")
     return errors
 
 
+def create_theme_record(
+    workspace: Path,
+    name: str,
+    description: str,
+    *,
+    project: str | None = None,
+    conversation_id: str | None = None,
+    actor: str = "host",
+) -> dict[str, Any]:
+    """Create a private Theme and optionally bind it to a project/conversation.
+
+    Theme content is written only to GUIF's private data store. Project Git receives
+    no Theme name, description, palette, or other personal design content.
+    """
+
+    if project is not None:
+        root = project_root(workspace, project)
+        if not (root / "project.json").is_file():
+            raise FileNotFoundError(f"Unknown project: {project}")
+    store = PrivateThemeStore(workspace)
+    record = store.create(
+        name,
+        {
+            "description": description.strip(),
+            "palette": [],
+            "materials": [],
+            "lighting": "",
+            "must_include": [],
+            "avoid": [],
+        },
+        actor=actor,
+        source_conversation_id=conversation_id,
+    )
+    if project is not None:
+        store.bind_project(project, str(record["theme_id"]), version=int(record["version"]), actor=actor)
+    if conversation_id is not None:
+        store.bind_conversation(
+            conversation_id,
+            str(record["theme_id"]),
+            version=int(record["version"]),
+            actor=actor,
+        )
+    return record
+
+
 def create_theme(workspace: Path, project: str, name: str, description: str) -> Path:
-    root = project_root(workspace, project)
-    config_path = root / "project.json"
-    if not config_path.exists():
-        raise FileNotFoundError(f"Unknown project: {project}")
+    """Backward-compatible private Theme creation helper.
 
-    slug = "-".join(name.strip().lower().split())
-    if not slug:
-        raise ValueError("Theme name cannot be empty")
-    path = root / "themes" / f"{slug}.json"
-    if path.exists():
-        raise FileExistsError(f"Theme already exists: {path}")
+    The returned path is outside the framework/project repository.
+    """
 
-    payload = {
-        "schema_version": 1,
-        "name": name.strip(),
-        "description": description.strip(),
-        "palette": [],
-        "materials": [],
-        "lighting": "",
-        "must_include": [],
-        "avoid": [],
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
-    project_config = json.loads(config_path.read_text(encoding="utf-8"))
-    project_config["current_theme"] = slug
-    config_path.write_text(json.dumps(project_config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return path
+    record = create_theme_record(workspace, name, description, project=project)
+    store = PrivateThemeStore(workspace)
+    return store._version_path(str(record["theme_id"]), int(record["version"]))
 
 
 def validate_theme_file(path: Path) -> list[str]:
@@ -70,4 +98,10 @@ def validate_theme_file(path: Path) -> list[str]:
         return [f"Invalid theme file {path}: {exc}"]
     if not isinstance(data, dict):
         return [f"Theme root must be an object: {path}"]
+    if isinstance(data.get("content"), dict):
+        content = {"name": data.get("name"), **data["content"]}
+        return validate_theme_data(content)
     return validate_theme_data(data)
+
+
+__all__ = ["create_theme", "create_theme_record", "validate_theme_data", "validate_theme_file"]
