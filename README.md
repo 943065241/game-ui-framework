@@ -2,36 +2,63 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-GUIF is a local-first, AI-agnostic framework for planning, directing, contracting, prompting, approving, executing, reviewing, exporting, and evolving game UI production work.
+GUIF is a local-first, provider-independent framework for planning, directing, contracting, approving, executing, inspecting, revising, and exporting game UI production work.
 
 ## Status
 
-`v1.0.0-alpha.17` — Workflow-driven Runtime Pipelines, deterministic Planner, Director, Theme, Resource, Prompt, and Semantic QA Agents, persistent Approval decisions, Provider Adapter execution gates, a deterministic Dry-run Provider, persisted Artifact records, relevance-based Context selection, resumable Task Runs, Engine Adapter exports, deterministic validation, protected editing, and Git-friendly Project knowledge.
+`v1.0.0-alpha.18` adds the Visual Artifact Inspection Contract and Revision Planning layer. GUIF can now distinguish real visual images from simulation receipts, verify persisted file identity, inspect image metadata against Prompt Output Contracts, create provider-neutral Visual Inspection Requests, persist Visual Review records, create traceable Revision Plans, and mark superseded Artifacts as stale.
+
+The built-in production flow currently contains deterministic Planner, Director, Theme, Resource, Prompt, and Semantic QA Agents, persistent Approval gates, Provider Adapter execution, a deterministic Dry-run Provider, Artifact Registry, Visual Review Service, resumable Task Runs, protected editing, and Engine Adapter metadata exports.
 
 ## Product specification
 
-The bilingual living product specification is maintained at [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md).
+The bilingual living product specification is maintained at [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md). Product direction, architecture, capability status, compatibility, priorities, risks, and acceptance criteria must be updated there in the same release or pull request as implementation changes.
 
-Product direction, architecture, capability status, compatibility, priorities, risks, and acceptance criteria must be updated there in the same release or pull request as the implementation change.
+## Current executable flow
+
+```text
+User Requirement
+  -> ChatGPT / Agent Host
+  -> GUIF Runtime
+       -> Project Context snapshot and relevance selection
+       -> Workflow -> Pipeline
+       -> Planner
+       -> Director
+       -> Theme Contract
+       -> Resource Contract Bundle
+       -> Model-neutral Prompt IR
+       -> Semantic Contract QA
+       -> persistent Approval Gate
+       -> Provider Adapter
+       -> Artifact Registry
+       -> Visual Review Service
+            -> eligibility and file-integrity checks
+            -> deterministic image metadata checks
+            -> optional Visual Inspection Adapter
+            -> Revision Plan
+       -> future Revision Execution
+       -> future gated Export Agent
+```
+
+Runtime and Prompt IR remain independent from OpenAI or any other model provider.
 
 ## What works now
 
 - `guif init <project>` creates an isolated Project workspace.
 - `guif run "<requirement>" --project <project>` resolves a Workflow, selects relevant Context, executes Agents, and persists checkpoints.
-- `planner` creates a validated UI Production Plan.
-- `director` reviews composition, hierarchy, Theme constraints, Resource reuse, Memory constraints, conflicts, and approval points.
-- `theme` resolves an active Theme or creates a reviewable inferred Theme contract.
-- `resource` creates validated Resource Manifest candidates without silently modifying Project truth.
-- `prompt` creates a provider-independent Prompt IR with jobs, constraints, references, output contracts, blockers, approvals, capabilities, and provenance.
-- `qa` performs deterministic Contract QA and maintains an explicit Export Gate.
+- Planner, Director, Theme, Resource, Prompt, and Semantic QA perform real deterministic domain work.
 - Approval decisions are persisted and control whether Prompt jobs are executable.
-- Provider execution is rejected unless the Task is complete, Prompt IR is `ready`, required approvals are satisfied, Contract QA passes, and Provider capabilities match.
-- The built-in `dry-run` Provider produces deterministic non-visual execution receipts without making an external call.
-- Successful Provider execution registers an Artifact record with identity, path, SHA-256, MIME type, dimensions, provider metadata, references, output contract, approval snapshot, and QA state.
-- Provider failures are persisted without changing the completed Task lifecycle or deleting Approval history.
-- Task Runs are inspectable and resumable after Pipeline failures.
-- Project, Theme, Workflow, Resource, Image Asset, protected-pixel, and Engine Adapter validation are available.
-- The test suite targets Python 3.10, 3.11, and 3.12.
+- Provider execution is rejected unless Task, Prompt, Approval, Contract QA, Capability, and Reference gates pass.
+- `dry-run` produces deterministic non-visual execution receipts without external calls or billing.
+- Successful execution registers Artifact identity, file, SHA-256, MIME, dimensions, provider metadata, references, Output Contract, Approval snapshot, and provenance.
+- Visual review distinguishes simulations from real image Artifacts.
+- Real image Artifacts are checked for supported MIME, safe persisted path, file existence, SHA-256 identity, dimensions, format, Alpha, and registered metadata.
+- A model-neutral `VisualInspectionRequest` carries visual instructions, negative constraints, Output Contract, references, and acceptance criteria to a compatible inspection Adapter.
+- Without an inspection Adapter, semantic visual status remains explicitly `not-run`; metadata validation is never presented as visual-quality approval.
+- Visual findings can create persisted Revision Plans linked to the original Prompt job and Artifact.
+- A newer Artifact from the same Prompt job can explicitly supersede an older Artifact, which becomes `stale` while provenance is retained.
+- Task Runs remain inspectable and resumable after Pipeline failures.
+- Tests target Python 3.10, 3.11, and 3.12.
 
 ## Install for development
 
@@ -45,38 +72,22 @@ pip install -e .[dev]
 pytest -q
 ```
 
-## End-to-end contract flow
+Pillow is used for image metadata inspection and is included by the `dev` and `image` extras.
 
-```text
-User Requirement
-  -> ChatGPT / Agent Host
-  -> GUIF Runtime
-       -> complete Project Context snapshot
-       -> relevance-based Context selection
-       -> Workflow -> Pipeline
-       -> Planner
-       -> Director
-       -> Theme
-       -> Resource
-       -> Prompt IR
-       -> Semantic Contract QA
-       -> persistent Approval
-       -> Provider Adapter
-       -> Artifact Registry
-       -> future Visual QA / Revision
-       -> future gated Export Agent
-```
-
-Runtime remains independent from OpenAI and other model providers.
+## Python API example
 
 ```python
 from pathlib import Path
-from guif.runtime import Runtime
 
-runtime = Runtime(Path.cwd())
+from guif.runtime import Runtime
+from guif.visual_review import VisualReviewService
+
+workspace = Path.cwd()
+runtime = Runtime(workspace)
+
 task = runtime.run(
     "LeekParty",
-    "Create a 1080x2340 portrait medieval harbor shop page and export Unity",
+    "Create a 1080x2340 portrait medieval harbor shop page for Unity",
     pipeline="ui-production",
 )
 
@@ -96,158 +107,121 @@ task = runtime.execute_job(
     provider_id="dry-run",
 )
 
-print(runtime.list_artifacts("LeekParty", task.task_id))
+artifact = runtime.list_artifacts("LeekParty", task.task_id)[0]
+task = VisualReviewService(workspace).review(
+    "LeekParty",
+    task.task_id,
+    artifact["artifact_id"],
+)
+
+print(task.state["qa_report"]["artifact_review"])
 ```
 
-## Workflow-driven Pipelines
+Because `dry-run` produces `simulation: true` and `visual: false`, this review returns `not-applicable`, not a visual pass.
 
-Workflow schema v2 declares both human-readable steps and executable Agents:
+## Approval and Provider gates
 
-```json
-{
-  "schema_version": 2,
-  "id": "ui-production",
-  "name": "Complete UI Production",
-  "manager": "UI Director",
-  "steps": [
-    "Create a structured UI production plan",
-    "Review art direction and resource reuse",
-    "Resolve theme constraints",
-    "Resolve production resource contracts",
-    "Build model-neutral generation instructions",
-    "Run semantic and technical QA"
-  ],
-  "agents": ["planner", "director", "theme", "resource", "prompt", "qa", "export"]
-}
-```
-
-Project Workflows override built-in Workflows with the same ID. Runtime persists the resolved source, manager, steps, and Agent order. Resume is rejected when the current Agent order differs from the stored Pipeline.
-
-## Approval gate
-
-Approval decisions are stored in:
+A Prompt job can execute only when all of these conditions hold:
 
 ```text
-projects/<project>/runs/<task-id>/approvals.json
+Task.status == completed
+Prompt IR.status == ready
+Job.executable == true
+Approval == approved or not-required
+Contract QA == passed
+Provider capabilities satisfy the Job
+required Reference files are bound
 ```
 
-Supported decisions:
+Approval does not write inferred Theme or Resource proposals into Project truth and does not call a Provider by itself. Provider attempts are checkpointed before invocation; failures preserve the completed Task, Approval history, request snapshot, and error evidence.
+
+## Visual Artifact eligibility
+
+A visual review begins by checking the Artifact record:
 
 ```text
-approved
-rejected
-changes-requested
+status is active, not stale
+simulation == false
+visual == true
+MIME is image/png, image/jpeg, or image/webp
+file path remains inside the Run directory
+file exists
+registered SHA-256 matches file bytes
 ```
 
-Gate behavior:
+Simulation receipts and non-visual files receive:
 
 ```text
-pending approvals
-  -> Prompt IR: review-required
-  -> executable: false
-
-rejected or changes-requested
-  -> Prompt IR: blocked
-  -> executable: false
-
-all required approvals accepted and no other blockers
-  -> Prompt IR: ready
-  -> executable: true
+status: not-applicable
+visual_conclusion_claimed: false
 ```
 
-Approval never writes Theme or Resource proposals into Project truth and never calls a Provider by itself. Decision history is append-only; the latest decision controls the current gate.
+Ineligible or corrupted visual Artifacts receive a blocking integrity finding.
 
-## Provider Adapter contract
+## Deterministic image metadata review
 
-Provider Adapters implement a model-neutral execution boundary:
+For eligible images, GUIF inspects:
+
+- actual width and height;
+- actual image format;
+- Alpha presence and image mode;
+- consistency with the Prompt job `canvas` and `output_contract`;
+- consistency with dimensions registered by the Provider result.
+
+A metadata mismatch blocks the Artifact and creates a Revision Plan. A metadata pass alone does not claim Theme, composition, content, readability, or usability quality.
+
+## Visual Inspection Adapter contract
+
+A Visual Inspection Adapter receives:
 
 ```text
-ExecutionRequest
-  -> ProviderAdapter
-  -> ExecutionResult
-  -> Artifact Registry
+VisualInspectionRequest
+  task and project identity
+  Artifact and Prompt job identity
+  file metadata
+  Output Contract
+  global page and Theme contract
+  visual and content instructions
+  negative constraints
+  acceptance criteria
+  required review dimensions
 ```
 
-The default registry currently contains:
+Adapters declare capabilities for:
 
 ```text
-dry-run
+theme-consistency
+composition-and-hierarchy
+content-correctness
+readability
+usability
+resource-compliance
 ```
 
-The Dry-run Adapter supports the declared image capabilities for contract testing, but:
+The default Visual Inspector Registry is intentionally empty. Without a selected capable Adapter, semantic review remains `not-run` and Export remains closed.
 
-- performs no network or external Provider call;
-- generates no image pixels;
-- reports `simulation: true` and `visual: false`;
-- writes a deterministic JSON execution receipt;
-- reports `billable: false`.
+## Revision Plans and supersession
 
-A Provider cannot execute a Job unless:
-
-1. the Runtime Task is `completed`;
-2. Prompt IR is `ready`;
-3. the Job is `executable: true`;
-4. Approval status is `approved` or `not-required`;
-5. Contract QA status is `passed`;
-6. the Provider advertises every capability required by the Job;
-7. Providers that require real references receive successfully bound Project files.
-
-## Artifact Registry
-
-Successful execution creates a file under:
+Blocking, review, or warning findings can create a persisted Revision Plan containing:
 
 ```text
-projects/<project>/runs/<task-id>/artifacts/
+revision_id
+source_job_id
+source_artifact_id
+finding_ids
+revision objectives
+preservation constraints
+next step
 ```
 
-and persists registries in:
-
-```text
-artifacts.json
-executions.json
-```
-
-An Artifact record contains:
-
-```text
-artifact_id
-job_id and artifact_kind
-provider, model, and request metadata
-relative file path
-SHA-256 and byte size
-MIME type and dimensions
-simulation and visual flags
-Output Contract
-bound Reference records
-Approval snapshot
-Prompt provenance
-QA status
-```
-
-Artifact registration does not imply visual approval. The current Semantic QA Agent detects registered Artifact metadata but still records `artifact_review.status: "not-run"` because no visual inspection Adapter exists. Export therefore remains blocked.
-
-## Provider failure behavior
-
-Provider attempts are checkpointed before invocation. A failure records:
-
-```text
-execution_id
-job_id
-provider_id
-attempt number
-request snapshot
-exception type and message
-started_at and completed_at
-```
-
-The Task remains `completed`, Approval history remains intact, and no Artifact is registered for the failed attempt.
+Revision Plans do not overwrite the source Artifact. When a reviewed replacement is available, it can explicitly supersede the old Artifact. The old record becomes `stale` and points to `superseded_by`; the new record retains a `supersedes` list.
 
 ## CLI
 
 ```bash
 guif init LeekParty
 
-guif run "Create a 1080x2340 portrait medieval harbor shop page for Unity" \
+guif run "Create a medieval harbor shop page for Unity" \
   --project LeekParty \
   --pipeline ui-production
 
@@ -257,7 +231,6 @@ guif run-approve <task-id> <approval-id> \
   --actor reviewer@example.com
 
 guif provider-list
-
 guif run-execute <task-id> <job-id> \
   --project LeekParty \
   --provider dry-run
@@ -265,10 +238,18 @@ guif run-execute <task-id> <job-id> \
 guif run-artifact-list <task-id> --project LeekParty
 guif run-artifact-show <task-id> <artifact-id> --project LeekParty
 
-guif run-list --project LeekParty
-guif run-show <task-id> --project LeekParty
-guif validate LeekParty
+guif visual-inspector-list
+guif run-artifact-review <task-id> <artifact-id> \
+  --project LeekParty
+
+guif run-visual-review-list <task-id> --project LeekParty
+guif run-revision-list <task-id> --project LeekParty
+
+guif run-artifact-supersede <task-id> <old-artifact-id> <new-artifact-id> \
+  --project LeekParty
 ```
+
+`--inspector <id>` can be supplied to `run-artifact-review` when a Host or Plugin has registered a compatible Visual Inspection Adapter. The default CLI process has no semantic inspector registered.
 
 ## Persisted Task Run
 
@@ -278,40 +259,41 @@ projects/<project>/runs/<task-id>/
   context.json
   events.jsonl
   outputs.json
-  approvals.json        when Prompt approval exists
-  executions.json       after a Provider attempt
-  artifacts.json        after Artifact registration
-  artifacts/            Artifact files
-  error.json            only while Pipeline execution is failed
+  approvals.json          when Prompt approval exists
+  executions.json         after Provider attempts
+  artifacts.json          after Artifact registration
+  visual-reviews.json     after Artifact review
+  revision-plans.json     when revisions are proposed
+  artifacts/              persisted Artifact files
+  error.json              only while Pipeline execution is failed
 ```
 
-`run-list` includes Approval status, pending Approval count, Artifact count, and Provider execution count.
+`run-list` includes Approval state, Artifact count, Provider execution count, Visual Review count, Revision Plan count, and aggregate Artifact Review status.
 
 ## Current limitations
 
-- `dry-run` is the only built-in Provider; no real image model is called.
-- No visual Semantic QA Adapter exists.
-- Artifact records are file-based and have no database, remote object storage, or retention policy.
+- `dry-run` remains the only built-in Provider and generates no image pixels.
+- The default Visual Inspector Registry is empty; no built-in model currently judges visual semantics.
+- Revision Plans are persisted, but Revision Prompt construction and execution are not automated yet.
+- Artifact storage is file-based and has no remote object storage, database, or retention policy.
 - Approval actor identity is a string, not an authenticated Host identity.
-- Existing Approval is not yet automatically invalidated by an upstream Contract hash change.
-- The built-in `export` Agent remains Contract-only and does not yet consume Artifact and QA gates.
-- Engine Sidecars are deterministic GUIF metadata, not native engine-generated imports.
+- Existing Approvals and reviews are not yet invalidated automatically by upstream Contract hash changes.
+- The built-in `export` Agent remains Contract-only and does not yet consume the final Artifact and Visual QA gate.
 
 ## Operating principles
 
-1. Natural language is the primary user interface; CLI is for implementation, debugging, and CI.
-2. Git and Project files remain the long-term source of truth.
-3. Runtime and Prompt IR stay provider-independent.
-4. Workflow manifests are the executable source of Pipeline order.
-5. Agents do not directly invoke one another.
-6. Inferred Theme and Resource proposals require review before Project mutation.
-7. Prompt jobs require explicit Approval and passing Contract QA before Provider execution.
-8. Capability and Reference binding gates are enforced before Provider invocation.
-9. Provider failures must preserve Task, Approval, and execution evidence.
-10. Artifact registration does not imply visual QA.
-11. Export requires an explicit passing Artifact and QA gate.
-12. A release is complete only when Feature, Tests, CI, both READMEs, Version Metadata, and the Product Specification agree.
+1. Natural language is the primary interface; CLI is for implementation, debugging, and CI.
+2. Git and Project files are the long-term source of truth.
+3. Runtime, Prompt IR, Provider execution, and Visual Inspection contracts stay provider-independent.
+4. Inferred Theme and Resource proposals require review before Project mutation.
+5. Prompt jobs require explicit Approval and passing Contract QA before Provider execution.
+6. Provider Capability and Reference gates are enforced before invocation.
+7. Simulation receipts must never be described as visual Artifacts.
+8. Metadata validation must never be described as semantic visual approval.
+9. Visual findings and revisions must retain Artifact, Job, and Approval provenance.
+10. Export requires passing Contract QA and passing review for every active visual Artifact.
+11. A release is complete only when Feature, Tests, CI, both READMEs, Version Metadata, and the Product Specification agree.
 
 ## Repository direction
 
-The next priority is **alpha.18: Visual Artifact Inspection Contract and Revision Planning**. GUIF must distinguish real visual Artifacts from simulations, validate image metadata against Output Contracts, create structured visual-review requests, and preserve `not-run` whenever no capable inspection Adapter is available. Priorities and acceptance criteria are maintained in [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md).
+The next priority is **alpha.19: Revision Job Construction and Controlled Revision Execution**. GUIF should convert approved Revision Plans into versioned edit Jobs, preserve the source Artifact as an immutable reference, enforce a new Approval gate, execute through a compatible editing Provider, and automatically link the replacement Artifact without losing the previous review history.
