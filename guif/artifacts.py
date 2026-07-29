@@ -32,10 +32,14 @@ def bind_references(task: Any, references: list[dict[str, Any]]) -> tuple[dict[s
     for reference in references:
         manifest = reference.get("manifest") if isinstance(reference.get("manifest"), dict) else {}
         source_value = manifest.get("source")
+        expected_sha256 = reference.get("expected_sha256")
         item: dict[str, Any] = {
             "resource_id": reference.get("resource_id"),
+            "artifact_id": reference.get("artifact_id"),
             "role": reference.get("role"),
             "source": source_value,
+            "immutable": reference.get("immutable") is True,
+            "expected_sha256": expected_sha256,
             "status": "unbound",
             "path": None,
             "sha256": None,
@@ -52,11 +56,15 @@ def bind_references(task: Any, references: list[dict[str, Any]]) -> tuple[dict[s
             else:
                 if resolved.is_file():
                     content = resolved.read_bytes()
+                    actual_sha256 = _sha256_bytes(content)
+                    status = "bound"
+                    if isinstance(expected_sha256, str) and expected_sha256 and expected_sha256 != actual_sha256:
+                        status = "hash-mismatch"
                     item.update(
                         {
-                            "status": "bound",
+                            "status": status,
                             "path": str(resolved.relative_to(project_root.resolve())),
-                            "sha256": _sha256_bytes(content),
+                            "sha256": actual_sha256,
                             "size_bytes": len(content),
                         }
                     )
