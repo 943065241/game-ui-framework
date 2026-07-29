@@ -7,61 +7,6 @@ from guif.theme import validate_theme_data
 
 THEME_CONTRACT_SCHEMA_VERSION = 1
 
-THEME_PRESETS: tuple[dict[str, Any], ...] = (
-    {
-        "id": "medieval-harbor",
-        "terms": ("medieval harbor", "medieval port", "中世纪港口", "中世纪海港", "中世纪"),
-        "manifest": {
-            "name": "Medieval Harbor",
-            "description": "Warm, readable medieval harbor UI direction with maritime trade motifs.",
-            "palette": ["warm gold", "deep sea blue", "weathered wood brown", "muted parchment"],
-            "materials": ["weathered wood", "aged brass", "parchment", "stone"],
-            "lighting": "warm sunset or candlelit ambient lighting with controlled highlights",
-            "must_include": ["harbor or maritime trade cues", "clear UI hierarchy", "warm metallic accents"],
-            "avoid": ["pirate skulls", "casino styling", "dirty visual noise", "overexposed highlights"],
-        },
-    },
-    {
-        "id": "natural-trading",
-        "terms": ("natural trading", "自然交易", "田园", "forest", "森林"),
-        "manifest": {
-            "name": "Natural Trading",
-            "description": "Calm natural UI direction that keeps trading information clear and restrained.",
-            "palette": ["deep ink green", "soft leaf green", "warm neutral", "muted amber"],
-            "materials": ["matte glass", "wood", "paper", "soft metal"],
-            "lighting": "soft low-contrast ambient lighting",
-            "must_include": ["clear data hierarchy", "restrained natural motifs"],
-            "avoid": ["casino styling", "large neon fields", "busy illustration behind data"],
-        },
-    },
-    {
-        "id": "soft-neon-party",
-        "terms": ("soft neon", "party", "派对", "轻霓虹", "neon party"),
-        "manifest": {
-            "name": "Soft Neon Party",
-            "description": "Friendly social party direction with controlled neon accents and dark readable surfaces.",
-            "palette": ["deep violet", "soft cyan", "warm magenta", "dark navy"],
-            "materials": ["matte glass", "soft plastic", "brushed metal"],
-            "lighting": "low-key party lighting with localized neon accents",
-            "must_include": ["friendly social energy", "clear interactive states"],
-            "avoid": ["harsh cyberpunk glare", "casino styling", "excessive bloom"],
-        },
-    },
-    {
-        "id": "minimal-ui",
-        "terms": ("minimal", "minimalist", "极简", "简洁", "clean ui"),
-        "manifest": {
-            "name": "Minimal UI",
-            "description": "Minimal production direction focused on hierarchy, whitespace, and predictable interaction.",
-            "palette": ["charcoal", "off white", "single accent color"],
-            "materials": ["matte surface", "subtle glass"],
-            "lighting": "neutral and low contrast",
-            "must_include": ["strong hierarchy", "consistent spacing", "clear interaction states"],
-            "avoid": ["decorative clutter", "unnecessary glow", "low-contrast text"],
-        },
-    },
-)
-
 NEGATIVE_MARKERS = (
     "avoid",
     "must not",
@@ -79,7 +24,7 @@ POSITIVE_MARKERS = ("must", "keep", "should", "需要", "必须", "保持")
 
 def _slug(value: str) -> str:
     normalized = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
-    return normalized or "inferred-theme"
+    return normalized or "private-theme"
 
 
 def _dedupe(values: list[str]) -> list[str]:
@@ -93,14 +38,6 @@ def _dedupe(values: list[str]) -> list[str]:
         seen.add(key)
         result.append(normalized)
     return result
-
-
-def _infer_preset(requirement: str) -> dict[str, Any] | None:
-    lowered = requirement.lower()
-    for preset in THEME_PRESETS:
-        if any(term.lower() in lowered for term in preset["terms"]):
-            return preset
-    return None
 
 
 def _memory_constraints(direction: dict[str, Any]) -> tuple[list[str], list[str], list[str]]:
@@ -137,14 +74,13 @@ def build_theme_contract(task: Any) -> dict[str, Any]:
 
     plan_theme = plan.get("theme", {}) if isinstance(plan.get("theme"), dict) else {}
     positive_memory, negative_memory, memory_sources = _memory_constraints(direction)
-    source = "project-theme"
     approval_required = False
     confidence = 1.0
 
     if plan_theme.get("status") == "loaded":
         manifest = {
             "schema_version": 1,
-            "name": str(plan_theme.get("name") or "Project Theme"),
+            "name": str(plan_theme.get("name") or "Private Theme"),
             "description": str(plan_theme.get("description") or ""),
             "palette": list(plan_theme.get("palette", [])),
             "materials": list(plan_theme.get("materials", [])),
@@ -153,32 +89,27 @@ def build_theme_contract(task: Any) -> dict[str, Any]:
             "avoid": list(plan_theme.get("avoid", [])),
         }
         manifest_id = _slug(manifest["name"])
+        source = "private-theme"
         status = "ready"
     else:
-        preset = _infer_preset(str(task.requirement))
-        if preset is None:
-            manifest = {
-                "schema_version": 1,
-                "name": "Unresolved Theme",
-                "description": "Theme details must be supplied before visual production.",
-                "palette": [],
-                "materials": [],
-                "lighting": "",
-                "must_include": [],
-                "avoid": [],
-            }
-            manifest_id = "unresolved-theme"
-            source = "unresolved"
-            approval_required = True
-            confidence = 0.0
-            status = "blocked"
-        else:
-            manifest = {"schema_version": 1, **dict(preset["manifest"])}
-            manifest_id = str(preset["id"])
-            source = "inferred-preset"
-            approval_required = True
-            confidence = 0.7
-            status = "review-required"
+        # The framework no longer embeds user-like Theme presets or infers a Theme
+        # silently from task text. Theme resolution belongs to the conversation and
+        # private Theme Library before visual production begins.
+        manifest = {
+            "schema_version": 1,
+            "name": "Unresolved Theme",
+            "description": "Select, create, or derive a private Theme before visual production.",
+            "palette": [],
+            "materials": [],
+            "lighting": "",
+            "must_include": [],
+            "avoid": [],
+        }
+        manifest_id = "unresolved-theme"
+        source = "unresolved"
+        approval_required = True
+        confidence = 0.0
+        status = "blocked"
 
     visual = direction.get("visual_contract", {})
     if isinstance(visual, dict):
@@ -208,6 +139,7 @@ def build_theme_contract(task: Any) -> dict[str, Any]:
         status = "blocked"
         approval_required = True
 
+    theme_ref = getattr(task.context, "active_theme_ref", None)
     return {
         "schema_version": THEME_CONTRACT_SCHEMA_VERSION,
         "task_id": task.task_id,
@@ -223,9 +155,11 @@ def build_theme_contract(task: Any) -> dict[str, Any]:
             "plan_output": "ui-production-plan",
             "director_output": "art-direction-review",
             "memory_sources": memory_sources,
+            "private_theme_ref": dict(theme_ref) if isinstance(theme_ref, dict) else None,
+            "theme_content_in_framework_git": False,
         },
         "handoff": {
-            "resource": "Use this Theme contract when proposing production Resource manifests.",
+            "resource": "Use this explicitly selected private Theme contract when proposing production Resource manifests.",
             "prompt": "Preserve palette, materials, lighting, must_include, and avoid as explicit Prompt IR fields.",
             "qa": "Validate generated artifacts against every must_include and avoid constraint.",
         },
