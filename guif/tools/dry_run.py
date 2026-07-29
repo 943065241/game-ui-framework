@@ -30,6 +30,8 @@ class DryRunToolAdapter(ToolAdapter):
         production_allowed=False,
         requires_host_support=False,
         requires_credentials=False,
+        permissions=("write-run-receipt",),
+        data_scopes=("structured-prompt-job",),
         external_call=False,
         billable=False,
         description="Contract-testing Tool that creates a non-visual JSON receipt.",

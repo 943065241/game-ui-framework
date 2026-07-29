@@ -54,13 +54,21 @@ def build_parser() -> argparse.ArgumentParser:
     _approval_command(sub, "run-reject", "Reject one required task approval point")
     _approval_command(sub, "run-request-changes", "Request changes for one required task approval point")
 
-    sub.add_parser("host-show", help="Show the active Host capability declaration")
+    sub.add_parser("host-show", help="Show the active Host profile")
+    sub.add_parser("host-discover", help="Run the Host capability discovery protocol")
     sub.add_parser("tool-list", help="List registered Tools and manifests")
+    tool_discover_cmd = sub.add_parser("tool-discover", help="Discover registered, available, and installable Tools"); tool_discover_cmd.add_argument("--project"); tool_discover_cmd.add_argument("--mode", choices=("production", "development", "ci"))
     tool_health_cmd = sub.add_parser("tool-health", help="Run a Tool health check"); tool_health_cmd.add_argument("tool_id"); tool_health_cmd.add_argument("--project"); tool_health_cmd.add_argument("--mode", choices=("production", "development", "ci")); tool_health_cmd.add_argument("--explicit", action="store_true")
+    health_retry_cmd = sub.add_parser("tool-health-retry", help="Persist a Tool health retry and resume approved connections when ready"); health_retry_cmd.add_argument("tool_id"); health_retry_cmd.add_argument("--project", required=True)
+    contract_test_cmd = sub.add_parser("tool-contract-test", help="Run side-effect-free Tool Adapter contract tests"); contract_test_cmd.add_argument("tool_id"); contract_test_cmd.add_argument("--mode", choices=("production", "development", "ci"), default="production")
     tool_bind_cmd = sub.add_parser("tool-bind", help="Bind a registered Tool to one Project capability"); tool_bind_cmd.add_argument("capability"); tool_bind_cmd.add_argument("tool_id"); tool_bind_cmd.add_argument("--project", required=True)
     tool_scaffold_cmd = sub.add_parser("tool-scaffold", help="Create an unimplemented Tool Adapter scaffold"); tool_scaffold_cmd.add_argument("tool_id"); tool_scaffold_cmd.add_argument("capabilities", nargs="+"); tool_scaffold_cmd.add_argument("--execution-mode", choices=("direct", "external-callback"), default="external-callback")
+    connect_request_cmd = sub.add_parser("tool-connect-request", help="Create a reviewable Tool connection request"); connect_request_cmd.add_argument("capability"); connect_request_cmd.add_argument("tool_id", nargs="?"); connect_request_cmd.add_argument("--project", required=True); connect_request_cmd.add_argument("--requested-by", default="host"); connect_request_cmd.add_argument("--reason"); connect_request_cmd.add_argument("--requires", nargs="*", default=[])
+    connect_list_cmd = sub.add_parser("tool-connect-list", help="List persisted Tool connection requests"); connect_list_cmd.add_argument("--project", required=True)
+    connect_approve_cmd = sub.add_parser("tool-connect-approve", help="Approve a Tool connection after reviewing disclosures"); connect_approve_cmd.add_argument("request_id"); connect_approve_cmd.add_argument("--project", required=True); connect_approve_cmd.add_argument("--actor", required=True); connect_approve_cmd.add_argument("--comment"); connect_approve_cmd.add_argument("--credential-ref")
+    connect_reject_cmd = sub.add_parser("tool-connect-reject", help="Reject a Tool connection request"); connect_reject_cmd.add_argument("request_id"); connect_reject_cmd.add_argument("--project", required=True); connect_reject_cmd.add_argument("--actor", required=True); connect_reject_cmd.add_argument("--comment")
 
-    provider_list_cmd = sub.add_parser("provider-list", help="List legacy Provider adapters and capabilities")
+    sub.add_parser("provider-list", help="List legacy Provider adapters and capabilities")
     execute_cmd = sub.add_parser("run-execute", help="Resolve and execute one approved Prompt or Revision job through a configured Tool"); execute_cmd.add_argument("task_id"); execute_cmd.add_argument("job_id"); execute_cmd.add_argument("--project", required=True); execute_cmd.add_argument("--tool"); execute_cmd.add_argument("--provider", help="Legacy explicit Provider path")
     resolution_cmd = sub.add_parser("run-tool-resolution", help="Show persisted Tool resolution state"); resolution_cmd.add_argument("task_id"); resolution_cmd.add_argument("--project", required=True)
     handoff_list_cmd = sub.add_parser("run-tool-handoff-list", help="List persisted external Tool handoffs"); handoff_list_cmd.add_argument("task_id"); handoff_list_cmd.add_argument("--project", required=True)
@@ -124,10 +132,18 @@ def main(argv: list[str] | None = None) -> int:
             runtime = Runtime(workspace); method = {"run-approve": runtime.approve, "run-reject": runtime.reject, "run-request-changes": runtime.request_changes}[args.command]
             print(json.dumps(method(args.project, args.task_id, args.approval_id, actor=args.actor, comment=args.comment).to_dict(), ensure_ascii=False, indent=2)); return 0
         if args.command == "host-show": print(json.dumps(Runtime(workspace).get_host_profile(), ensure_ascii=False, indent=2)); return 0
+        if args.command == "host-discover": print(json.dumps(Runtime(workspace).discover_host(), ensure_ascii=False, indent=2)); return 0
         if args.command == "tool-list": print(json.dumps(Runtime(workspace).list_tools(), ensure_ascii=False, indent=2)); return 0
+        if args.command == "tool-discover": print(json.dumps(Runtime(workspace).discover_tools(project=args.project, mode=args.mode), ensure_ascii=False, indent=2)); return 0
         if args.command == "tool-health": print(json.dumps(Runtime(workspace).tool_health(args.tool_id, project=args.project, mode=args.mode, explicit=args.explicit), ensure_ascii=False, indent=2)); return 0
+        if args.command == "tool-health-retry": print(json.dumps(Runtime(workspace).retry_tool_health(args.project, args.tool_id), ensure_ascii=False, indent=2)); return 0
+        if args.command == "tool-contract-test": print(json.dumps(Runtime(workspace).run_tool_contract_tests(args.tool_id, mode=args.mode), ensure_ascii=False, indent=2)); return 0
         if args.command == "tool-bind": print(Runtime(workspace).bind_project_tool(args.project, args.capability, args.tool_id)); return 0
         if args.command == "tool-scaffold": print(Runtime(workspace).scaffold_tool(args.tool_id, tuple(args.capabilities), execution_mode=args.execution_mode)); return 0
+        if args.command == "tool-connect-request": print(json.dumps(Runtime(workspace).request_tool_connection(args.project, args.capability, args.tool_id, requested_by=args.requested_by, reason=args.reason, required_capabilities=tuple(args.requires)), ensure_ascii=False, indent=2)); return 0
+        if args.command == "tool-connect-list": print(json.dumps(Runtime(workspace).list_tool_connections(args.project), ensure_ascii=False, indent=2)); return 0
+        if args.command == "tool-connect-approve": print(json.dumps(Runtime(workspace).approve_tool_connection(args.project, args.request_id, actor=args.actor, comment=args.comment, credential_ref=args.credential_ref), ensure_ascii=False, indent=2)); return 0
+        if args.command == "tool-connect-reject": print(json.dumps(Runtime(workspace).reject_tool_connection(args.project, args.request_id, actor=args.actor, comment=args.comment), ensure_ascii=False, indent=2)); return 0
         if args.command == "provider-list": print(json.dumps(Runtime(workspace).list_providers(), ensure_ascii=False, indent=2)); return 0
         if args.command == "run-execute": print(json.dumps(Runtime(workspace).execute_job(args.project, args.task_id, args.job_id, tool_id=args.tool, provider_id=args.provider).to_dict(), ensure_ascii=False, indent=2)); return 0
         if args.command == "run-tool-resolution": print(json.dumps(Runtime(workspace).get_tool_resolution(args.project, args.task_id), ensure_ascii=False, indent=2)); return 0
