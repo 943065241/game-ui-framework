@@ -134,7 +134,7 @@ class Runtime(GatewayRuntime):
             raise HostWorkError("Image Host work is missing Task or Handoff identity")
 
         def execute() -> dict[str, Any]:
-            task = super(Runtime, self).submit_authenticated_tool_result(
+            super(Runtime, self).submit_authenticated_tool_result(
                 project,
                 task_id,
                 handoff_id,
@@ -159,6 +159,7 @@ class Runtime(GatewayRuntime):
             callbacks = self.list_host_callbacks(project, task_id)
             callback = callbacks[-1] if callbacks else {}
             artifact_id = callback.get("artifact_id")
+            visual_work = self.host_work.prepare_latest_visual_inspection(project, task_id)
             receipt = {
                 "schema_version": 1,
                 "status": "completed",
@@ -170,13 +171,12 @@ class Runtime(GatewayRuntime):
                 "callback_id": callback.get("callback_id"),
                 "artifact_id": artifact_id,
                 "content_sha256": hashlib.sha256(content).hexdigest(),
+                "visual_work_id": (
+                    visual_work.get("work_id") if isinstance(visual_work, dict) else None
+                ),
                 "task_etag": self.get_task_etag(project, task_id),
             }
             self.host_work.mark_completed(project, work_id, result=receipt)
-            visual_work = self.host_work.prepare_latest_visual_inspection(project, task_id)
-            receipt["visual_work_id"] = (
-                visual_work.get("work_id") if isinstance(visual_work, dict) else None
-            )
             return receipt
 
         return self._ledgered(
