@@ -221,7 +221,8 @@ def test_beta1_preserves_frozen_public_api_and_publishes_support_window() -> Non
     compatibility = compatibility_contract()
     support = support_contract()
 
-    assert compatibility["release"] == "1.0.0-beta.1"
+    assert compatibility["release"] == "1.0.0-alpha.28"
+    assert compatibility["current_release"] == "1.0.0-beta.1"
     assert compatibility["origin_release"] == "1.0.0-alpha.28"
     assert compatibility["public_api_version"] == 1
     assert compatibility["channel"] == "beta"
