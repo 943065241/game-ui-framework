@@ -1,7 +1,7 @@
 # GUIF Product Specification / GUIF 产品规格说明
 
 > Status / 状态: Living document / 持续迭代文档  
-> Baseline / 基线版本: `v1.0.0-alpha.14`  
+> Baseline / 基线版本: `v1.0.0-alpha.15`  
 > Last reviewed / 最近审阅: 2026-07-29
 
 ---
@@ -44,9 +44,10 @@ ChatGPT / Agent Host
   -> Theme Agent 生成 Resolved Theme Contract
   -> Resource Agent 生成 Resource Contract Bundle
   -> Prompt Agent 生成 Model-neutral Prompt IR
+  -> Semantic QA 检查 Contract 与执行安全
   -> Human / Host 审批 Approval Point
   -> Generation / Editing Adapter 产生 Artifact
-  -> QA Agent 检查并驱动 Revision Loop
+  -> Visual QA 检查并驱动 Revision Loop
   -> Export Agent 交付 Engine-ready Output
   -> 保存 Task、Output、Decision、Report 和 Git Change
 ```
@@ -57,12 +58,13 @@ CLI 保留用于开发、调试、自动化和 CI，但不应成为普通用户�
 
 - **自然语言优先**：用户描述目标，Framework 负责拆解、约束和执行。
 - **长期 Project Knowledge**：Theme、Decision、Lesson、Mistake 和 Best Practice 由 Project File 与 Git 追踪。
-- **可执行而非 Prompt Collection**：GUIF 必须产生结构化 Task、Plan、Review、Contract、Prompt IR、Artifact 和可验证结果。
-- **Model Agnostic**：Runtime 与 Prompt IR 不直接依赖单一模型或 Provider。
+- **可执行而非 Prompt Collection**：GUIF 必须产生结构化 Task、Plan、Review、Contract、Prompt IR、QA Report、Artifact 和可验证结果。
+- **Model Agnostic**：Runtime、Prompt IR 和 QA Contract 不直接依赖单一模型或 Provider。
 - **Project Isolation**：Framework Code 与具体游戏 Project 分离。
 - **Deterministic Production**：Naming、Dimension、Alpha、Validation、Export 和 Engine Adaptation 尽可能可重复。
 - **可审计、可恢复**：每个 Run 必须说明读取了什么、选择了什么、执行到哪里、产生了什么、为什么失败以及如何继续。
 - **Review Before Write / Execute**：推导结果未经批准，不得成为 Project Truth，也不得自动提交给 Provider 执行。
+- **No False Verification**：没有检查视觉 Artifact 时，不得声称完成视觉 QA。
 
 #### 1.4 目标架构
 
@@ -81,8 +83,9 @@ User
             -> Theme Agent
             -> Resource Agent
             -> Prompt Agent
+            -> Semantic QA Agent
             -> Generation / Editing Adapter
-            -> QA Agent
+            -> Visual QA Adapter / Agent
             -> Export Agent
        -> Outputs + Reports + Memory + Git Changes
 ```
@@ -98,7 +101,9 @@ User
 - **Task Store**：持久化 Task、Context、Event、Output 和 Error。
 - **Agent**：完成单一职责；Agent 不直接调用其他 Agent。
 - **Prompt IR**：Provider-independent 的 Generation / Editing Contract，不是任何具体 API Payload。
+- **Semantic QA Report**：验证上游 Contract、一致性、Approval 与 Execution Gate；没有视觉 Artifact 时只做 Contract QA。
 - **Provider Adapter**：将已批准 Prompt IR 转换为具体 Tool / Model 调用，并登记 Artifact。
+- **Export Gate**：只有 Contract、Artifact、QA 与 Approval 全部满足时才允许 Export。
 - **Git**：长期事实来源、变更记录和协作边界。
 
 #### 1.5 非目标
@@ -111,11 +116,12 @@ GUIF 不计划：
 - 成为任意行业的通用 Agent Framework；
 - 将全部 AI 与 Tool Logic 塞进 Runtime；
 - 用不可追踪的 Chat Memory 替代 Project File 与 Git；
-- 在没有明确 Review / Approval 的情况下把推导结果写入 Project 或提交给 Provider。
+- 在没有明确 Review / Approval 的情况下把推导结果写入 Project 或提交给 Provider；
+- 在没有实际检查 Artifact 时宣称视觉质量、构图或可用性已经通过。
 
 ### 2. GUIF 当前内容与进度
 
-以下结论基于 `v1.0.0-alpha.14` 仓库代码。
+以下结论基于 `v1.0.0-alpha.15` 仓库代码。
 
 状态定义：
 
@@ -135,17 +141,18 @@ GUIF 不计划：
 | Context Retrieval | 基础可用 | Requirement + Active Theme 的确定性排序；英文 Token、中文 n-gram、Stopword、Budget、Score、Matched Term | Embedding Retrieval、Index、Dedup、Threshold Tuning、History Retrieval |
 | Structured Planner | 基础可用 | Page、Dimension、Orientation、Engine、Theme、Reuse、Missing Resource、QA、Risk、Open Question | Typed Subtask、复杂 Component Tree、Interaction Flow、LLM Adapter |
 | Structured Director | 基础可用 | Composition Zone、Focal Order、Memory Constraint、Reuse Decision、Conflict、Approval Point、Handoff | Complex Layout Reasoning、Reference Image Review、Cross-page Comparison、LLM Adapter |
-| Structured Theme Agent | 基础可用 | Active Theme 解析；Preset 推导；Memory Constraint 合并；Conflict；`ready / review-required / blocked` | Visual Token、Inheritance、Version、Reference、Approval / Materialization API |
+| Structured Theme Agent | 基础可用 | Active Theme 解析；Preset 推导；Memory Constraint 合并；Conflict；状态管理 | Visual Token、Inheritance、Version、Reference、Approval / Materialization API |
 | Structured Resource Agent | 基础可用 | Existing Reuse、Manifest Candidate、Dimension Provenance、Engine Import Hint、Conflict、Approval Point | Variant、Dependency、Atlas、Nine-slice、Reference Tracking、Materialization API |
-| Structured Prompt Agent | 基础可用 | Provider-independent Prompt IR；Effect Image / Production Asset Job；Instruction Group；Negative Constraint；Reference；Output Contract；Capability；Approval；Blocker；Provenance | Provider Adapter、Prompt Version Migration、Reference File Binding、Provider Capability Negotiation |
+| Structured Prompt Agent | 基础可用 | Provider-independent Prompt IR；Effect Image / Production Asset Job；Instruction；Constraint；Reference；Output Contract；Capability；Approval；Blocker；Provenance | Provider Adapter、Prompt Migration、Reference File Binding、Capability Negotiation |
+| Structured Semantic QA Agent | 基础可用 | Prompt Schema、Provenance、Page、Theme、Resource Job、Reference、Execution Gate、Capability 检查；Finding、Revision Request、Artifact Review State 和 Export Gate | 尚无视觉 Artifact Inspection；缺少 Approval State、Artifact Binding、Cross-page / Usability QA 和 Revision Execution |
 | Theme File Management | 基础可用 | 创建、激活和校验 Theme File | Migration、Inheritance、Version、Conflict Resolution |
 | Resource Manifest | 可用 | Dimension、Format、Alpha、Naming、Target Engine、Import Hint | Variant、Atlas、Nine-slice、Dependency Graph |
 | Memory | 基础可用 | Markdown Decision、Lesson、Mistake、Best Practice；Runtime 可读取和检索 | Auto Capture、Dedup、Priority、Expiry、Approval State |
-| Asset QA | 可用 | 校验真实图片的 Dimension、Format、Alpha 和 Naming | Semantic、Art Consistency、Layout、Readability、Multi-resolution QA |
+| Asset QA | 可用 | 校验真实图片的 Dimension、Format、Alpha 和 Naming | Art Consistency、Layout、Readability、Multi-resolution QA |
 | Protected Editing | 可用 | Mask Composition 并验证非目标像素 | 尚未进入 Runtime Revision Loop |
 | Generation / Editing | 未开发 | Prompt IR 已准备，但 Runtime 尚未调用 Provider | Tool Adapter、Artifact Store、Reference Binding、Revision、Approval |
-| Semantic QA | 未开发 | QA Agent 仍为 Contract | Theme、Composition、Usability、Cross-page Consistency、Prompt IR / Artifact Review |
-| Export | 基础可用 | Generic / Unity / Godot / Unreal Adapter Metadata | Export Agent 仍是 Contract；Sidecar 不等于 Native Import |
+| Visual Semantic QA | 未开发 | 当前仅 Contract QA；Artifact Review 明确标记为 `not-run` | Image Inspection Adapter、Theme / Composition / Content / Usability Review |
+| Export | 基础可用 | Generic / Unity / Godot / Unreal Adapter Metadata | Export Agent 仍是 Contract；Sidecar 不等于 Native Import；尚未消费 Export Gate |
 | Host Integration | 未开发 | README 提供调用示例 | Stable Result Protocol、Pause、Approval、Streaming、Host Guide |
 | Git Change Management | 未开发 | Git 是原则但 Runtime 不管理 Commit Lifecycle | Change Set、Branch / Commit、Rollback、Approval、Audit |
 
@@ -163,8 +170,8 @@ Project Init
 -> Theme Agent 生成 Resolved Theme Contract
 -> Resource Agent 生成 Resource Contract Bundle
 -> Prompt Agent 生成 Model-neutral Prompt IR
+-> Semantic QA 检查 Contract Consistency 与 Execution Gate
 -> Task / Context / Selection / Event / Output 持久化
--> 可选 Asset Validation、Protected Edit 与手工 Export
 ```
 
 针对《韭菜派对》中世纪港口商店页，当前可以自动输出：
@@ -178,6 +185,9 @@ Project Init
 - Dimension Source 与 Engine Import Hint；
 - Provider-independent Effect Image / Production Asset Job；
 - Instruction、Negative Constraint、Reference、Output Contract 与 Acceptance Criteria；
+- Prompt IR Contract Check；
+- Blocking / Review / Info Finding；
+- Revision Request、Artifact Review State 和 Export Gate；
 - Approval Point、Blocker、Capability Requirement、Handoff、Risk 和 Provenance。
 
 #### 2.2 当前尚不能完成的关键闭环
@@ -189,7 +199,7 @@ Project Init
 复用已有金币和按钮，生成缺失资源，检查后导出 Unity。”
 ```
 
-GUIF 已能自动完成 Context Selection、Plan、Director Review、Theme Contract、Resource Contract Bundle 和 Prompt IR，但仍缺少 Approval API、Generation / Editing Adapter、Artifact Registration、Semantic QA、Revision Loop 和真实 Export Agent，因此尚不能自动产生视觉 Artifact 并交付完整 Engine-ready Output。
+GUIF 已能自动完成 Context Selection、Plan、Director Review、Theme Contract、Resource Contract Bundle、Prompt IR 和 Contract QA，但仍缺少 Approval API、Generation / Editing Adapter、Artifact Registration、视觉 Semantic QA、Revision Loop 和真实 Export Agent，因此尚不能自动产生视觉 Artifact 并交付完整 Engine-ready Output。
 
 ### 3. GUIF 预期待开发的内容
 
@@ -221,22 +231,49 @@ alpha.13 已完成第一版：Active Theme 解析、Preset 推导、Memory Const
 
 #### Phase 5：Model-neutral Prompt IR
 
-alpha.14 已完成第一版：
-
-- Prompt IR schema v1；
-- Provider Binding Placeholder；
-- Global Page / Composition / Theme Contract；
-- Effect Image Job 与 Production Asset Job；
-- Structured Instruction Group；
-- Negative Constraint、Reference 和 Output Contract；
-- Capability Requirement；
-- Approval Point、Blocker、Handoff 和 Provenance；
-- `ready / review-required / blocked`；
-- 非 `ready` Job 禁止自动执行。
+alpha.14 已完成第一版：Prompt IR schema v1、Global Contract、Effect Image / Production Asset Job、Structured Instruction、Negative Constraint、Reference、Output Contract、Capability Requirement、Approval Point、Blocker、Handoff 和 Provenance。
 
 仍待开发：Provider Adapter、Prompt IR Migration、File / Image Reference Binding、Capability Negotiation、Provider-specific Rendering 和 Prompt Evaluation。
 
-#### Phase 6：Generation / Editing Adapter
+#### Phase 6：Semantic Contract QA
+
+alpha.15 已完成第一版：
+
+- Prompt IR Schema 检查；
+- Upstream Output Provenance 检查；
+- Page / Canvas / Orientation 一致性；
+- Theme Must Include / Avoid 保留；
+- Resource Candidate 与 Production Job 一一对应；
+- Resource Output Contract 校验；
+- Approved Reference Boundary；
+- Review-before-execute Safety；
+- Provider Capability Requirement；
+- Finding、Revision Request、Artifact Review State 和 Export Gate；
+- 没有视觉 Artifact 时明确记录 `not-run`，不产生虚假的视觉结论。
+
+仍待开发：Artifact Registration、Visual Inspection Adapter、Cross-page Comparison、Readability、Usability、Artifact / Contract Binding 和 Revision Execution。
+
+#### Phase 7：Approval API + State Transition
+
+下一优先级。
+
+目标：让 Human 或 Agent Host 能显式批准、拒绝或请求修改 Director、Theme、Resource 和 Prompt Approval Point。
+
+需要包含：
+
+- Stable Approval Record Schema；
+- Approval ID、Decision、Actor、Reason 和 Timestamp；
+- Approved Contract Hash / Snapshot；
+- `review-required -> ready` 的受控转换；
+- 拒绝后生成 Revision Request；
+- Theme / Resource Materialization 仍需独立权限；
+- Approval 不得自动调用 Provider；
+- Resume 时使用已持久化 Approval State；
+- CLI / Host API 用于 List、Show、Approve、Reject。
+
+**验收标准**：同一个 LeekParty Task 可以列出全部 Required Approval，逐项持久化 Decision，并在全部满足后重新生成 `ready` Prompt IR；未批准内容不可执行。
+
+#### Phase 8：Generation / Editing Adapter
 
 目标：只执行已经批准且 `executable: true` 的 Prompt Job。
 
@@ -247,22 +284,21 @@ alpha.14 已完成第一版：
 - Protected Edit Integration；
 - Retry、Alternative、Cost / Quota Metadata 和 Human Approval。
 
-#### Phase 7：Semantic QA 与 Revision Loop
+#### Phase 9：Visual Semantic QA 与 Revision Loop
 
-下一优先级：
-
-- Prompt IR Contract QA；
-- Theme、Composition、Content 和 UI Usability Review；
+- Artifact / Prompt Job 双向引用；
+- Theme、Composition、Content、Readability 和 UI Usability Review；
 - Resource Output Contract Compliance；
 - Cross-page Consistency；
 - QA Finding -> Revision Task -> Recheck Loop；
-- 无视觉 Artifact 时，QA 只审阅 Contract，不虚构视觉结论。
+- 所有视觉结论必须关联实际检查的 Artifact。
 
-#### Phase 8：Production Export 与 Host Integration
+#### Phase 10：Production Export、Host 与 Git Integration
 
+- Export Agent 消费 Passing Export Gate；
 - Stable Host API / Result Protocol；
-- Human Approval / Pause / Resume；
-- Native Engine Import Integration；
+- Pause、Resume、Approval 与 Streaming；
+- Native Engine Import；
 - Git Change Set、Commit、Rollback 和 Audit；
 - End-to-end Acceptance Test。
 
@@ -272,40 +308,74 @@ alpha.14 已完成第一版：
 
 1. 是否直接服务 GUIF 产品定义？
 2. 是否属于 Target Architecture 中明确职责？
-3. 是否填补 Current State 的真实缺口？
-4. 是否推进可验证的 End-to-end Loop，而不是只增加 Contract？
+3. 是否填补 Current State 中真实缺口？
+4. 是否推进可验证的 End-to-end Loop，而不是增加空 Contract？
 5. 是否定义 Test、Failure Behavior、Persistence、Approval 和 Acceptance Criteria？
-6. 是否同步更新中英文 README、Version Metadata 和本文件？
+6. 是否区分 Contract Verification 与 Artifact Verification？
+7. 是否同步更新中英文 README、本文件和 Version Metadata？
+
+答案不完整时，应先补 Product Decision，再写 Code。
 
 ### 5. 主要风险与待验证假设
 
-- Rule-based Agent 能否保持为稳定 Fallback，而不是演变为难维护的 Keyword Collection；
-- Mutable `Task` 是否需要 Typed Subtask；
-- Agent Granularity 应固定还是允许 Project 定义；
-- Prompt IR schema v1 是否能覆盖 Image Generation、Image Editing、Figma 与未来 Tool；
-- Approval 应修改原 Task、创建新 Task，还是产生独立 Decision Record；
-- Provider Adapter 如何声明 Idempotency、Cost、Quota、Safety 与 Capability；
-- Reference 应保存 File、Hash、URI 还是 Artifact ID；
-- Context Snapshot 与 Prompt IR 的 Source Hash 如何保证 Resume / Replay 可重复；
+- Rule-based Planner / Director / Theme 能否作为可维护的确定性 Fallback；
+- Mutable Task 是否需要 Typed Subtask；
+- Agent Granularity 应固定还是由 Project 定义；
+- Workflow 是否应承担 Approval / Retry Policy；
+- Project Workflow 变化后失败 Run 应迁移、冻结旧 Workflow 还是拒绝 Resume；
+- Approval 应绑定 Contract Hash、完整 Snapshot 还是 Logical ID；
+- Theme / Resource Approval 是否同时授权 Materialization；
+- Prompt IR 的 `ready` 是否应由重建产生，还是允许原地修改；
+- Provider Adapter 如何证明没有丢失 Negative Constraint、Output Contract 和 Provenance；
+- Artifact 是否使用 File Store、Content-addressed Store 或外部 Connector；
+- Visual QA 如何避免仅凭文字 Contract 推测视觉结果；
+- Export Gate 如何与 Native Engine Import、Git Change 和 Human Approval 组合；
 - 何时引入 Database，而不是继续使用 Git-friendly File Store；
-- 如何避免接口持续增加但真实视觉生产闭环仍不可用。
+- 如何避免 Framework 拥有大量 Schema，却没有完成真实生产闭环。
 
 ### 6. 迭代记录
 
-- `alpha.9`：Runtime、Task、Agent Registry、Pipeline 与 Context Contract。
-- `alpha.10`：Task schema v2、Run Store、Checkpoint、Failure、Load / List / Resume。
-- `alpha.11`：Workflow-driven Pipeline 与第一个真实 Structured Planner Agent。
-- `alpha.12`：Context Retrieval 与真实 Structured Director Agent。
-- `alpha.13`：真实 Structured Theme / Resource Agent 与 Review-before-write。
-- `alpha.14`：真实 Structured Prompt Agent、Prompt IR schema v1、Provider-independent Job、Approval / Blocker / Capability / Provenance，以及非 `ready` Job 禁止执行。
+#### `v1.0.0-alpha.9`
+
+- 建立 Runtime、Task、Agent、Registry、Pipeline 和 Context Contract。
+
+#### `v1.0.0-alpha.10`
+
+- Task Schema v2；Task Store；Checkpoint；Structured Failure；Load、List 和 Resume。
+
+#### `v1.0.0-alpha.11`
+
+- Workflow schema v2；Workflow-driven Pipeline；第一个真实 Structured Planner Agent。
+
+#### `v1.0.0-alpha.12`
+
+- Relevance-based Context Selection；真实 Structured Director Agent。
+
+#### `v1.0.0-alpha.13`
+
+- 真实 Structured Theme 与 Resource Agent；Review-before-write。
+
+#### `v1.0.0-alpha.14`
+
+- Model-neutral Prompt IR schema v1；真实 Structured Prompt Agent；Review-before-execute。
+
+#### `v1.0.0-alpha.15`
+
+- 真实 Structured Semantic QA Agent；
+- Prompt、Provenance、Page、Theme、Resource、Reference、Execution 和 Capability Contract 检查；
+- Findings、Revision Request、Artifact Review State 和 Export Gate；
+- 没有视觉 Artifact 时明确记录 `not-run`，不声称视觉 QA 已通过；
+- 下一重点调整为 Approval API 与受控 State Transition。
 
 ---
 
 ## English Version
 
-### 0. Purpose and maintenance
+### 0. Purpose and maintenance rule
 
-This living specification defines GUIF's product, verified state, capability gaps, and iteration priorities. It must change in the same release or pull request whenever product scope, architecture, compatibility, capability status, risk, or priority changes.
+This file is GUIF's product definition, verified capability review, and iteration baseline. It is a living specification, not a one-time roadmap or marketing document.
+
+It must be updated in the same release or pull request whenever product scope, architecture, core capability status, compatibility, priorities, risks, or open assumptions change.
 
 A release is complete only when Feature, Test, CI, both READMEs, Version Metadata, and this specification agree.
 
@@ -316,57 +386,73 @@ GUIF is an executable AI work framework for end-to-end game UI production. Natur
 Expected flow:
 
 ```text
-User
-  -> Agent Host
-  -> Runtime
-  -> Context Load and Retrieval
+Requirement
+  -> Context snapshot and retrieval
   -> Workflow and Pipeline
-  -> Planner
-  -> Director
+  -> Plan
+  -> Art Direction Review
   -> Theme Contract
   -> Resource Contract Bundle
   -> Model-neutral Prompt IR
-  -> Approval
-  -> Generation / Editing Adapter
-  -> Semantic QA and Revision
-  -> Export, Memory, and Git Changes
+  -> Semantic Contract QA
+  -> Human Approval
+  -> Provider Adapter and Artifact
+  -> Visual QA and Revision
+  -> Export Gate and Engine-ready Output
 ```
 
-Prompt IR is a provider-independent contract, not an OpenAI, image-model, or Figma payload. Inferred results require review before Project mutation or Provider execution.
+Core principles:
 
-GUIF does not replace design tools or game engines, manage complete game code, train foundation models, or become a general-purpose Agent Framework.
+- natural-language first;
+- executable results rather than a Prompt Collection;
+- model-agnostic Runtime and Prompt IR;
+- isolated Project knowledge;
+- deterministic production contracts;
+- inspectable and recoverable Task Runs;
+- review before write or execute;
+- no visual-quality claim without an inspected visual Artifact;
+- Git-backed long-term truth.
 
-### 2. Verified state at alpha.14
+GUIF does not replace design tools or game engines, manage complete game code, train foundation models, become a general-purpose Agent Framework, or silently turn inferred values into approved production truth.
 
-GUIF can initialize Projects, load and retrieve Project Context, resolve Workflow-driven Pipelines, persist and resume Runs, and execute real deterministic Planner, Director, Theme, Resource, and Prompt Agents.
+### 2. Verified state at alpha.15
 
-Prompt IR schema v1 now records global composition and Theme contracts, Effect Image and Production Asset jobs, structured instruction groups, negative constraints, approved references, exact output contracts, acceptance criteria, capability requirements, approval points, blockers, handoff instructions, and provenance. Provider and model IDs remain unbound. Jobs are executable only when IR status is `ready`.
+GUIF can initialize Projects, load and retrieve Context, resolve Workflow-driven Pipelines, persist and resume Runs, and execute real deterministic Planner, Director, Theme, Resource, Prompt, and Semantic QA Agents.
 
-The main remaining gap is execution and evaluation: GUIF still lacks an Approval API, Provider Adapter, Artifact Store, Semantic QA, Revision Loop, and real Export Agent.
+The Prompt Agent creates a provider-independent Prompt IR with Effect Image and Production Asset jobs, instructions, negative constraints, references, output contracts, capabilities, approval points, blockers, and provenance.
+
+The Semantic QA Agent validates Prompt IR schema, upstream provenance, Page consistency, Theme constraint preservation, Resource job coverage, Resource output contracts, approved references, execution gates, and capability requirements. It produces structured Checks, Findings, a Revision Request, an Artifact Review state, and an explicit Export Gate.
+
+Alpha.15 does not inspect visual Artifacts. When no Artifact exists, QA records `artifact_review.status: "not-run"` and keeps Export blocked. Contract QA therefore cannot be misrepresented as visual QA.
+
+The main missing loop is now Approval -> Provider Adapter -> Artifact Registration -> Visual QA -> Revision -> Export.
 
 ### 3. Expected development
 
-1. Add Approval, pause, cancel, and capability policies to Runtime.
-2. Implement Provider Adapters that translate approved Prompt IR without losing structured contracts.
-3. Register generated or edited Artifacts with references, hashes, Resource links, and provenance.
-4. Implement Semantic QA for Prompt IR and Artifacts, then a Revision Loop.
-5. Complete native Engine export, Host Result Protocol, and Git change management.
+1. Implement an explicit Approval API and persisted Approval state transitions.
+2. Rebuild review-required contracts into ready Prompt IR only after required approvals are satisfied.
+3. Integrate Generation and Editing through Provider Adapters.
+4. Register Artifacts with Prompt Job and Resource Contract provenance.
+5. Add visual Semantic QA and Revision Loops.
+6. Make the real Export Agent consume a passing Export Gate.
+7. Add stable Host and Git change-management contracts.
 
-The immediate next target is a real QA Agent. Before visual Artifacts exist, it must review Prompt IR contracts only and must not invent visual conclusions.
+The immediate acceptance target is a LeekParty Task whose required approvals can be listed, approved or rejected, persisted, audited, and used to produce a ready Prompt IR without implicitly modifying Project truth or calling a Provider.
 
 ### 4. Iteration gate
 
-A Feature should not be implemented unless it serves the product definition, belongs to the target architecture, closes a verified gap, advances an end-to-end loop, defines Tests and Failure Behavior, respects Approval and Persistence, and updates all living documentation.
+A Feature should not be implemented unless it serves the product definition, belongs to the target architecture, closes a verified capability gap, advances an end-to-end loop, defines Tests and Failure Behavior, separates Contract verification from Artifact verification, and updates all living documentation.
 
-### 5. Main risks
+### 5. Main risks and open assumptions
 
-Key unresolved questions include deterministic-rule maintainability, Task typing, Agent granularity, Prompt IR coverage, Approval state modeling, Provider capability and idempotency contracts, reference identity, reproducible Resume / Replay, file-store scalability, and the risk of accumulating interfaces without proving real visual production.
+Key unresolved questions include Task typing, Agent granularity, Workflow policy boundaries, approval identity and hash binding, materialization permissions, Prompt IR rebuild semantics, Provider constraint preservation, Artifact storage, visual-QA trust boundaries, Export Gate composition, file-store scalability, and the risk of accumulating schemas without proving a usable production loop.
 
 ### 6. Iteration history
 
-- `alpha.9`: Runtime and Agent contracts.
-- `alpha.10`: persistent and resumable Runs.
-- `alpha.11`: Workflow-driven Pipelines and Structured Planner.
-- `alpha.12`: Context Retrieval and Structured Director.
-- `alpha.13`: Structured Theme and Resource contracts with review-before-write.
-- `alpha.14`: model-neutral Prompt IR, structured generation jobs, Provider placeholders, capability requirements, Approval Points, Blockers, Provenance, and non-ready execution gating.
+- `alpha.9`: Runtime Contract, shared Task, Agent Registry, static Pipelines, and Context loading.
+- `alpha.10`: Task schema v2, persistent Run Store, Agent checkpoints, structured failures, and resume APIs.
+- `alpha.11`: Workflow-driven Pipelines and the first real Structured Planner Agent.
+- `alpha.12`: relevance-based Context selection and the real Structured Director Agent.
+- `alpha.13`: real Structured Theme and Resource Agents with review-before-write.
+- `alpha.14`: model-neutral Prompt IR and the real Structured Prompt Agent with review-before-execute.
+- `alpha.15`: real Structured Semantic QA Agent, Contract consistency checks, Findings, Revision Request, Artifact Review state, and Export Gate without false visual-verification claims.
