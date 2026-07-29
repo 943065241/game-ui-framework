@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "game-ui-framework"
-version = "1.0.0a23"
-description = "Local-first, privacy-separated game UI production framework with configurable Hosts and Tools"
+version = "1.0.0a24"
+description = "Local-first, privacy-separated game UI production framework with authenticated Hosts and Git change management"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -18,6 +18,7 @@ image = ["Pillow>=10.0"]
 
 [project.scripts]
 guif = "guif.cli:main"
+guif-ops = "guif.ops_cli:main"
 
 [tool.setuptools.packages.find]
 include = ["guif*"]
