@@ -94,8 +94,9 @@ def test_upgrade_public_result_hides_private_paths_and_full_migration_evidence(t
     serialized = json.dumps(result)
     assert result["status"] == "verified"
     assert result["private_report_written"] is True
-    assert "private_report" not in serialized
-    assert "report" not in serialized
+    assert "private_report_path" not in result
+    assert "report_path" not in result
+    assert "migration_private_evidence" not in result
     assert str(layout.root) not in serialized
     assert result["migration"] == {
         "status": "applied",
