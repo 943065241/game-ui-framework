@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import platform
 import sys
 import tarfile
 import zipfile
 from datetime import datetime, timezone
 from email.parser import Parser
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from guif import __version__
@@ -60,16 +59,28 @@ def _wheel_metadata(path: Path) -> tuple[str, str]:
 
 
 def _sdist_metadata(path: Path) -> tuple[str, str]:
+    """Read the canonical top-level PKG-INFO from a source distribution.
+
+    Setuptools sdists can also contain an ``*.egg-info/PKG-INFO`` copy. Only the
+    canonical ``<sdist-root>/PKG-INFO`` member represents the archive metadata
+    contract that build frontends consume.
+    """
+
     try:
         with tarfile.open(path, mode="r:*") as archive:
             candidates = sorted(
-                member
-                for member in archive.getmembers()
-                if member.isfile() and member.name.endswith("/PKG-INFO")
+                (
+                    member
+                    for member in archive.getmembers()
+                    if member.isfile()
+                    and PurePosixPath(member.name).name == "PKG-INFO"
+                    and len(PurePosixPath(member.name).parts) == 2
+                ),
+                key=lambda member: member.name,
             )
             if len(candidates) != 1:
                 raise ReleaseProvenanceError(
-                    f"Source distribution must contain exactly one PKG-INFO file: {path.name}"
+                    f"Source distribution must contain exactly one top-level PKG-INFO file: {path.name}"
                 )
             extracted = archive.extractfile(candidates[0])
             if extracted is None:
@@ -112,6 +123,17 @@ def _write_manifest(path: Path, payload: dict[str, Any]) -> None:
     temporary.replace(path)
 
 
+def _normalize_commit(value: str) -> str:
+    commit = value.strip().lower()
+    if len(commit) not in {40, 64} or any(
+        character not in "0123456789abcdef" for character in commit
+    ):
+        raise ReleaseProvenanceError(
+            "git_commit must be a 40- or 64-character hexadecimal commit identity"
+        )
+    return commit
+
+
 def generate_hash_provenance(
     dist_dir: Path,
     *,
@@ -123,9 +145,7 @@ def generate_hash_provenance(
     root = dist_dir.resolve()
     if not root.is_dir():
         raise ReleaseProvenanceError(f"Distribution directory does not exist: {root}")
-    commit = git_commit.strip().lower()
-    if not commit or any(character not in "0123456789abcdef" for character in commit):
-        raise ReleaseProvenanceError("git_commit must be a hexadecimal commit identity")
+    commit = _normalize_commit(git_commit)
 
     wheels = sorted(root.glob("*.whl"))
     sdists = sorted(root.glob("*.tar.gz"))
@@ -192,7 +212,11 @@ def verify_hash_provenance(
         raise ReleaseProvenanceError("Unsupported provenance kind")
     if payload.get("signature_present") is not False or payload.get("attestation_present") is not False:
         raise ReleaseProvenanceError("Hash provenance must not claim a signature or attestation")
-    if expected_git_commit is not None and payload.get("git_commit") != expected_git_commit.lower():
+    manifest_commit = payload.get("git_commit")
+    if not isinstance(manifest_commit, str):
+        raise ReleaseProvenanceError("Provenance Git commit is missing")
+    manifest_commit = _normalize_commit(manifest_commit)
+    if expected_git_commit is not None and manifest_commit != _normalize_commit(expected_git_commit):
         raise ReleaseProvenanceError("Git commit does not match provenance manifest")
 
     package = payload.get("package")
@@ -231,7 +255,7 @@ def verify_hash_provenance(
         "status": "verified",
         "provenance_kind": "hash-only",
         "package": dict(package),
-        "git_commit": payload.get("git_commit"),
+        "git_commit": manifest_commit,
         "artifact_count": len(records),
         "signature_present": False,
         "attestation_present": False,
