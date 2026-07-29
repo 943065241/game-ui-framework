@@ -48,7 +48,6 @@ def _replace_output(task: Any, output_type: str, value: Any, *, agent: str) -> N
     for output in reversed(task.outputs):
         if isinstance(output, dict) and output.get("type") == output_type:
             output["value"] = value
-            output["agent"] = agent
             return
     task.add_output(output_type, value, agent=agent)
 
@@ -206,9 +205,7 @@ def decide_approval(
     if not normalized_actor:
         raise ValueError("actor must not be empty")
     if normalized_decision not in APPROVAL_DECISIONS:
-        raise ValueError(
-            "decision must be approved, rejected, or changes-requested"
-        )
+        raise ValueError("decision must be approved, rejected, or changes-requested")
 
     prompt_ir = task.state.get("prompt_ir")
     if not isinstance(prompt_ir, dict):
