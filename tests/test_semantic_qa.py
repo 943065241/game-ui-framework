@@ -1,48 +1,44 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from guif.core import init_project, record_memory
 from guif.resource import create_resource_manifest
 from guif.runtime import Runtime
 from guif.semantic_qa import build_semantic_qa_report, validate_semantic_qa_report
-from guif.theme import create_theme
+
+PROJECT = "SampleGame"
 
 
 def _create_project_theme(tmp_path: Path) -> None:
-    theme_path = create_theme(
-        tmp_path,
-        "LeekParty",
-        "Medieval Harbor",
-        "Warm, readable medieval harbor UI direction.",
-    )
-    theme = json.loads(theme_path.read_text(encoding="utf-8"))
-    theme.update(
+    Runtime(tmp_path).create_private_theme(
+        "Fictional Geometric Arcade",
         {
-            "palette": ["warm gold", "deep sea blue"],
-            "materials": ["weathered wood", "aged brass"],
-            "lighting": "warm sunset",
-            "must_include": ["harbor view", "gold coins"],
-            "avoid": ["pirate skulls", "dirty visual noise"],
-        }
+            "description": "Synthetic abstract arcade UI direction for semantic QA tests.",
+            "palette": ["test blue", "test gray"],
+            "materials": ["matte polymer", "brushed alloy"],
+            "lighting": "flat studio light",
+            "must_include": ["hexagonal navigation", "abstract tokens"],
+            "avoid": ["real brands", "photoreal people"],
+        },
+        project=PROJECT,
+        actor="test-host",
     )
-    theme_path.write_text(json.dumps(theme), encoding="utf-8")
 
 
 def test_semantic_qa_reviews_contracts_without_claiming_visual_results(tmp_path: Path) -> None:
-    init_project(tmp_path, "LeekParty")
+    init_project(tmp_path, PROJECT)
     _create_project_theme(tmp_path)
     record_memory(
         tmp_path,
-        "LeekParty",
+        PROJECT,
         "decision",
-        "The shop page must keep the harbor view and must not include bottom tab navigation.",
+        "The fictional shop page must keep hexagonal navigation and must not include bottom tab navigation.",
     )
     create_resource_manifest(
         tmp_path,
-        "LeekParty",
-        "purchase-button",
+        PROJECT,
+        "action-button",
         "button",
         264,
         134,
@@ -51,8 +47,8 @@ def test_semantic_qa_reviews_contracts_without_claiming_visual_results(tmp_path:
     )
 
     task = Runtime(tmp_path).run(
-        "LeekParty",
-        "Create a 1080x2340 portrait medieval harbor shop page, reuse the purchase button, and export Unity",
+        PROJECT,
+        "Create a 1080x2340 portrait fictional geometric arcade shop page, reuse the action button, and export Unity",
         pipeline="ui-production",
     )
 
@@ -111,12 +107,12 @@ def test_semantic_qa_preserves_upstream_blockers(tmp_path: Path) -> None:
 
 
 def test_semantic_qa_blocks_unsafe_executable_job(tmp_path: Path) -> None:
-    init_project(tmp_path, "LeekParty")
+    init_project(tmp_path, PROJECT)
     _create_project_theme(tmp_path)
 
     task = Runtime(tmp_path).run(
-        "LeekParty",
-        "Create a 1080x2340 portrait medieval harbor shop page for Unity",
+        PROJECT,
+        "Create a 1080x2340 portrait fictional geometric arcade shop page for Unity",
         pipeline="ui-production",
     )
     assert task.state["prompt_ir"]["status"] == "review-required"
