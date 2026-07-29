@@ -6,26 +6,62 @@ GUIF is a local-first game UI production framework with configurable Hosts and T
 
 ## Status
 
-`v1.0.0-alpha.24` adds authenticated Host operations, optimistic Task concurrency, exclusive Task leases, stable external result callbacks, and Task-bound Git Change Sets.
+`v1.0.0-alpha.25` adds a runnable authenticated Production Host Gateway and a private signed Operation Ledger.
 
 ```text
 private Theme selection
   -> Prompt / Approval / Tool handoff
   -> authenticated Host actor
-  -> optimistic Task etag
-  -> exclusive expiring Task lease
-  -> authenticated result callback
-  -> Artifact / Review / Revision / Gated Export
-  -> reviewable Git Change Set
-  -> dedicated branch + commit
-  -> optional revert commit
+  -> Task etag + exclusive lease
+  -> Production Host Gateway
+  -> image result callback
+  -> Artifact / Review / Revision
+  -> Gated Export
+  -> Git Change Set / Commit / Revert
+  -> signed private Operation Ledger
 ```
 
 The bilingual living product specification is maintained at [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md). Privacy migration and repository-history guidance are in [`docs/PRIVACY_MIGRATION.md`](docs/PRIVACY_MIGRATION.md).
 
-## Authenticated Host actors
+## Production Host Gateway
 
-Host credentials are private local records stored outside framework and Project Git. Registration returns a bearer token exactly once. GUIF persists only a PBKDF2-HMAC-SHA256 verifier, not the original secret.
+Run the local Gateway:
+
+```bash
+pip install -e .[dev]
+guif-gateway --workspace . --host 127.0.0.1 --port 8765
+```
+
+The default bind is loopback-only. A non-loopback bind requires both explicit `--allow-remote` and TLS certificate/key files:
+
+```bash
+guif-gateway \
+  --host 0.0.0.0 \
+  --port 8765 \
+  --allow-remote \
+  --tls-cert server.crt \
+  --tls-key server.key
+```
+
+The built-in server is a small single-node Host boundary, not an internet-edge reverse proxy. Production deployments should still place policy-appropriate networking, certificate rotation, rate limiting, and process supervision around it.
+
+### Gateway endpoints
+
+```text
+GET  /health
+GET  /v1/descriptor
+GET  /v1/tasks/{project}/{task_id}/summary
+POST /v1/tasks/{project}/{task_id}/lease
+POST /v1/tasks/{project}/{task_id}/approvals/{approval_id}
+POST /v1/tasks/{project}/{task_id}/callbacks/{handoff_id}
+POST /v1/tasks/{project}/{task_id}/exports
+GET  /v1/ledger/verify
+GET  /v1/ledger/entries?limit=100
+```
+
+All `/v1` endpoints require a GUIF bearer credential with the relevant capability. Mutating requests require an `Idempotency-Key`; exclusive mutations also require a Task etag and lease token.
+
+### Create a Gateway credential
 
 ```python
 from pathlib import Path
@@ -36,6 +72,9 @@ issued = runtime.register_host_credential(
     actor_id="production-host",
     host_id="chatgpt",
     capabilities=(
+        "gateway:read",
+        "task:read",
+        "ledger:read",
         "task:lease",
         "approval:decide",
         "tool-result:submit",
@@ -49,24 +88,98 @@ issued = runtime.register_host_credential(
     created_by="local-admin",
 )
 
-bearer_token = issued["bearer_token"]  # visible once
+bearer_token = issued["bearer_token"]  # shown once
 ```
 
-Credential metadata records the actor, Host, roles, capabilities, issuer, lifecycle, and optional expiration. Credentials can be listed, revoked, or rotated without exposing secret verifiers.
+GUIF persists a PBKDF2-HMAC-SHA256 verifier, never the original bearer secret.
 
-An authenticated operation stores a normalized actor snapshot:
+### Acquire a Task lease over HTTP
 
-```json
+```http
+POST /v1/tasks/SampleGame/task-123/lease
+Authorization: Bearer guifh1....
+Content-Type: application/json
+Idempotency-Key: lease-2026-001
+
 {
-  "actor_id": "production-host",
-  "host_id": "chatgpt",
-  "credential_id": "cred-...",
-  "capabilities": ["task:lease", "tool-result:submit"],
-  "authenticated": true
+  "expected_task_etag": "task-sha256:...",
+  "ttl_seconds": 300,
+  "purpose": "host-result-callback"
 }
 ```
 
-## Optimistic Task concurrency
+The lease token is returned once and is not stored in Gateway idempotency receipts. Replaying the same lease request cannot reveal the token again.
+
+### Submit a generated or edited image
+
+The callback body is the raw image file, avoiding base64 expansion:
+
+```http
+POST /v1/tasks/SampleGame/task-123/callbacks/handoff-456
+Authorization: Bearer guifh1....
+Idempotency-Key: result-2026-001
+If-Match: "task-sha256:..."
+X-GUIF-Lease-Token: guifl1....
+X-GUIF-Filename: generated-screen.png
+X-GUIF-Content-SHA256: <sha256>
+X-GUIF-Width: 1080
+X-GUIF-Height: 2340
+X-GUIF-Model-ID: image-model
+Content-Type: image/png
+
+<raw PNG bytes>
+```
+
+The Gateway validates credential capability, Host/Tool/Handoff identity, Task etag, lease ownership, content size, optional content SHA-256, and idempotency before Artifact registration. Successful callback replays return the stored non-secret receipt and do not create duplicate Artifacts.
+
+The default body limit is 32 MiB and can be changed with `--max-body-mb`.
+
+## Signed Operation Ledger
+
+Authenticated Runtime operations and Gateway request outcomes are appended to a private HMAC-SHA256 chain:
+
+```text
+<private-data-root>/operation-ledger/
+  signing-key.json
+  entries.jsonl
+  head.json
+```
+
+Each entry records:
+
+```text
+sequence
+operation + status
+authenticated actor snapshot
+Project / Task / object scope
+sanitized request and result evidence
+previous entry hash
+payload hash
+entry hash
+HMAC signature
+```
+
+The signed head checkpoint detects modified entries, broken ordering, missing middle entries, and tail deletion.
+
+Inspect it with:
+
+```bash
+guif-ledger --workspace . descriptor
+guif-ledger --workspace . verify
+guif-ledger --workspace . list --limit 50
+guif-ledger --workspace . list --operation host.callback.submit
+```
+
+Or through Runtime:
+
+```python
+report = runtime.verify_operation_ledger()
+entries = runtime.list_operation_ledger(limit=100)
+```
+
+The ledger provides **local tamper evidence**, not public-key non-repudiation. An attacker who obtains the private ledger key and can rewrite every private ledger file can forge a replacement chain. Alpha.25 does not provide an external timestamp authority or remote immutable log.
+
+## Authenticated operations
 
 Every persisted Task has a deterministic etag:
 
@@ -74,200 +187,26 @@ Every persisted Task has a deterministic etag:
 etag = runtime.get_task_etag("SampleGame", task_id)
 ```
 
-A write operation rejects a stale etag rather than silently overwriting a newer Task state.
+Exclusive writes use an expiring Task lease bound to Project, Task, actor, credential, purpose, and base etag. Stale state, expired leases, wrong actors, wrong credentials, and tampered tokens fail closed.
 
-For exclusive operations, acquire an expiring lease:
-
-```python
-lease = runtime.acquire_task_lease(
-    "SampleGame",
-    task_id,
-    bearer_token=bearer_token,
-    expected_task_etag=etag,
-    ttl_seconds=300,
-    purpose="host-result-callback",
-)
-
-lease_token = lease["lease_token"]  # visible once
-```
-
-The lease binds:
-
-- Project and Task identity;
-- authenticated actor and credential;
-- base Task etag;
-- purpose;
-- acquisition and expiration times;
-- consumed, released, or expired lifecycle.
-
-A second active lease is rejected. Mutating operations consume the lease after success. Stale Task state, expired leases, wrong actors, wrong credentials, and tampered lease tokens fail closed.
-
-## Stable authenticated Host callback
-
-The legacy `submit_tool_result()` API remains available for compatibility. Production Host integration should use `submit_authenticated_tool_result()`.
-
-```python
-content = Path("generated-screen.png").read_bytes()
-
-task = runtime.submit_authenticated_tool_result(
-    "SampleGame",
-    task_id,
-    handoff_id,
-    bearer_token=bearer_token,
-    lease_token=lease_token,
-    expected_task_etag=etag,
-    content=content,
-    filename="generated-screen.png",
-    mime_type="image/png",
-    width=1080,
-    height=2340,
-    model_id="image-model",
-)
-```
-
-The callback validates:
-
-- Host credential and `tool-result:submit` capability;
-- Host identity against the persisted handoff;
-- Tool and execution identity;
-- active lease ownership;
-- expected Task etag;
-- submitted content SHA-256;
-- handoff status and idempotent callback identity.
-
-Completed callback records are persisted as `host-callbacks.json` and link actor, lease, envelope, execution, handoff, content hash, and resulting Artifact.
-
-## Authenticated Approval and Export
-
-Approval and production writes can use the same identity and lease boundary:
-
-```python
-task = runtime.decide_approval_authenticated(
-    "SampleGame",
-    task_id,
-    approval_id,
-    "approved",
-    bearer_token=bearer_token,
-    lease_token=lease_token,
-    expected_task_etag=etag,
-    comment="Reviewed against the approved contract.",
-)
-```
-
-```python
-record = runtime.execute_gated_export_authenticated(
-    "SampleGame",
-    task_id,
-    bearer_token=bearer_token,
-    lease_token=lease_token,
-    expected_task_etag=etag,
-    target_engine="unity",
-)
-```
-
-Authenticated actor and lease evidence are attached to Approval and Export records. Existing string-actor APIs remain compatibility paths and do not provide the alpha.24 authentication guarantee.
-
-## Task-bound Git Change Sets
-
-A completed Gated Export can be converted into a reviewable Git Change Set. Preparation does not create a branch or commit.
-
-```python
-change = runtime.prepare_export_git_change(
-    "SampleGame",
-    task_id,
-    export_id,
-    bearer_token=bearer_token,
-    expected_task_etag=etag,
-    branch_name="guif/sample-game/export-001",
-)
-
-diff = runtime.diff_git_change(
-    "SampleGame",
-    task_id,
-    change["change_set_id"],
-)
-```
-
-The plan records:
-
-- repository and Project roots;
-- source Task and completed Export;
-- Export transaction SHA-256;
-- base Git HEAD and branch;
-- selected Project truth, Engine output, and transaction paths;
-- proposed branch and commit message;
-- working-tree status.
-
-After review, acquire a fresh lease and execute:
-
-```python
-committed = runtime.execute_git_change(
-    "SampleGame",
-    task_id,
-    change["change_set_id"],
-    bearer_token=bearer_token,
-    lease_token=lease_token,
-    expected_task_etag=etag,
-)
-```
-
-GUIF verifies that Git HEAD still matches the plan, creates a dedicated branch, stages only selected paths, commits them, records the staged diff hash, and links the commit back to the Gated Export.
-
-A committed Change Set can produce a normal Git revert commit:
-
-```python
-reverted = runtime.revert_git_change(
-    "SampleGame",
-    task_id,
-    change["change_set_id"],
-    bearer_token=bearer_token,
-    lease_token=lease_token,
-    expected_task_etag=etag,
-    reason="Restore the previous approved Project state.",
-)
-```
-
-Revert fails closed when selected paths contain newer uncommitted changes.
-
-## Operational CLI
-
-Alpha.24 adds a separate `guif-ops` entry point so bearer and lease tokens can remain in environment variables instead of command history.
-
-```bash
-pip install -e .[dev]
-
-guif-ops credential-create production-host chatgpt \
-  task:lease tool-result:submit approval:decide \
-  export:execute git:prepare git:commit git:revert
-
-export GUIF_HOST_TOKEN='guifh1....'
-
-guif-ops task-etag <task-id> --project SampleGame
-
-guif-ops lease-acquire <task-id> \
-  --project SampleGame \
-  --expected-etag 'task-sha256:...'
-
-export GUIF_TASK_LEASE='guifl1....'
-
-guif-ops callback-submit <task-id> <handoff-id> generated.png \
-  --project SampleGame \
-  --expected-etag 'task-sha256:...'
-```
-
-Other commands include:
+Authenticated APIs include:
 
 ```text
-credential-list / credential-revoke / credential-rotate
-lease-show / lease-renew / lease-release
-callback-list / callback-show
-approval-decide
-export-execute / export-rollback
-git-plan / git-list / git-show / git-diff / git-commit / git-revert
-summary
+acquire_task_lease / renew_task_lease / release_task_lease
+submit_authenticated_tool_result
+decide_approval_authenticated
+execute_gated_export_authenticated
+rollback_gated_export_authenticated
+prepare_export_git_change
+execute_git_change
+revert_git_change
 ```
 
-## Private data layout
+Each direct authenticated Runtime operation writes `started` and `completed` or `failed` ledger entries. Bearer tokens, lease tokens, image bytes, and credential verifiers are excluded from ledger details.
+
+## Private Theme boundary
+
+Real user Themes remain private, user-owned, and versioned outside framework and Project Git:
 
 ```text
 <private-data-root>/
@@ -275,17 +214,15 @@ summary
   conversation-theme-bindings/
   project-theme-bindings/
   host-credentials/
+  gateway-requests/
+  operation-ledger/
   runs/<project>/<task-id>/
-    task.json
-    task-lease.json
-    host-callbacks.json
-    git-changes.json
   plans/
   migrations/
   privacy-reports/
 ```
 
-Full Theme content, Host credential verifiers, Task leases, callback evidence, natural-language Plans, and Runtime evidence remain outside framework and Project Git by default.
+A new visual-design conversation must select, create, derive, or explicitly continue without a Theme. Persisted Task Context stores only Theme ID, version, snapshot hash, and privacy marker; full Theme content is hydrated inside the private boundary at runtime.
 
 ## Existing production flow
 
@@ -298,7 +235,19 @@ GUIF continues to provide:
 - deterministic metadata review and optional semantic Visual Inspectors;
 - controlled Revision execution and review-gated supersession;
 - Gated Export, Engine manifests, transaction audit, backups, and rollback;
+- Task-bound Git Change Sets with plan, diff, branch, commit, and revert;
 - current-tree privacy audit and legacy Theme migration.
+
+## Command-line entry points
+
+```text
+guif          framework, Theme, Task, Artifact, QA, Revision, and Export commands
+guif-ops      authenticated credentials, leases, callbacks, Approval, Export, and Git operations
+guif-gateway  authenticated HTTP Host boundary
+guif-ledger   private Operation Ledger inspection and verification
+```
+
+`guif-ops` reads bearer and lease tokens from `GUIF_HOST_TOKEN` and `GUIF_TASK_LEASE`, avoiding command-history exposure.
 
 ## Development
 
@@ -314,15 +263,17 @@ pytest -q
 
 ## Current limitations
 
-- Host credentials are local bearer credentials; OIDC, mTLS, hardware-backed keys, and remote identity providers are not implemented.
-- Task leases are logical private-store leases, not operating-system or distributed locks. Legacy unauthenticated APIs can bypass them.
-- Git Change Sets require a local Git executable, a named current branch, and configured Git author identity.
-- Git execution creates local branches and commits; remote push, pull requests, protected-branch negotiation, and server-side checks are not automated.
-- Callback content is submitted through the local Runtime API or CLI; a network callback server is not included.
-- Private storage remains file-backed and does not provide encryption-at-rest, remote synchronization, or retention policy.
+- The Gateway uses local GUIF bearer credentials; OIDC, mTLS client identity, hardware-backed keys, and remote identity providers are not implemented.
+- The bundled WSGI server is suitable for a controlled single-node boundary, not direct exposure as a public internet edge.
+- Task leases and ledger locking are process-local/file-backed rather than distributed coordination primitives.
+- Legacy unauthenticated Runtime APIs remain for compatibility and can bypass alpha.25 authentication and ledger guarantees.
+- The Operation Ledger uses a private symmetric HMAC key and is not a public signature or external immutable audit service.
+- ChatGPT product-side orchestration must still be configured to call the Gateway endpoints automatically.
 - The default semantic Visual Inspector Registry is empty.
+- Private storage does not yet provide encryption-at-rest, remote synchronization, retention policy, or disaster-recovery replication.
+- Git execution creates local branches and commits; remote push, pull requests, and protected-branch negotiation are not automated.
 - Current-tree privacy audit cannot prove removal from Git history, forks, caches, or external clones.
 
 ## Next phase
 
-The next priority is **alpha.25: Production Host Gateway and Signed Operation Ledger**: network callback transport, OIDC or pluggable identity verification, cross-process locking, signed callback and Export receipts, remote Git push/PR integration, protected-branch checks, and durable operation recovery.
+The next priority is **alpha.26: Real ChatGPT Image Loop and Default Visual Inspector**: Host-side automatic handoff consumption, image generation/edit execution, result submission through the Gateway, default semantic visual inspection, revision retry orchestration, and an end-to-end runnable project acceptance test.
