@@ -57,10 +57,17 @@ def _write_wheel(path: Path, *, version: str = __version__) -> None:
 
 def _write_sdist(path: Path, *, version: str = __version__) -> None:
     metadata = f"Metadata-Version: 2.1\nName: game-ui-framework\nVersion: {version}\n\n".encode()
+    root = f"game_ui_framework-{version}"
     with tarfile.open(path, "w:gz") as archive:
-        info = tarfile.TarInfo(f"game_ui_framework-{version}/PKG-INFO")
-        info.size = len(metadata)
-        archive.addfile(info, io.BytesIO(metadata))
+        canonical = tarfile.TarInfo(f"{root}/PKG-INFO")
+        canonical.size = len(metadata)
+        archive.addfile(canonical, io.BytesIO(metadata))
+
+        # Setuptools can include this additional copy. Provenance must select
+        # only the canonical top-level PKG-INFO member.
+        nested = tarfile.TarInfo(f"{root}/game_ui_framework.egg-info/PKG-INFO")
+        nested.size = len(metadata)
+        archive.addfile(nested, io.BytesIO(metadata))
 
 
 def _dist_fixture(tmp_path: Path, *, wheel_version: str = __version__) -> Path:
@@ -122,6 +129,12 @@ def test_release_hash_provenance_rejects_wheel_sdist_version_mismatch(tmp_path: 
     dist = _dist_fixture(tmp_path, wheel_version="9.9.9")
     with pytest.raises(ReleaseProvenanceError, match="metadata must match"):
         generate_hash_provenance(dist, git_commit=COMMIT)
+
+
+def test_release_hash_provenance_rejects_non_commit_identity(tmp_path: Path) -> None:
+    dist = _dist_fixture(tmp_path)
+    with pytest.raises(ReleaseProvenanceError, match="40- or 64-character"):
+        generate_hash_provenance(dist, git_commit="abc123")
 
 
 def test_soak_profiles_are_bounded_and_non_mutating(tmp_path: Path) -> None:
