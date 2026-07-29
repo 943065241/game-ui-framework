@@ -5,13 +5,15 @@ import json
 from guif.core import init_project, validate_project
 from guif.resource import create_resource_manifest, load_resource_manifest, validate_resource_data
 
+PROJECT = "SampleGame"
+
 
 def test_create_and_load_resource_manifest(tmp_path):
-    init_project(tmp_path, "LeekParty")
+    init_project(tmp_path, PROJECT)
     path = create_resource_manifest(
         tmp_path,
-        "LeekParty",
-        "trade-button-long",
+        PROJECT,
+        "action-button-long",
         "button",
         264,
         134,
@@ -19,12 +21,12 @@ def test_create_and_load_resource_manifest(tmp_path):
         target_engine="unity",
     )
     manifest = load_resource_manifest(path)
-    assert manifest.resource_id == "trade-button-long"
+    assert manifest.resource_id == "action-button-long"
     assert manifest.width == 264
     assert manifest.height == 134
     assert manifest.alpha_required is True
-    assert manifest.output_name == "trade-button-long.png"
-    assert validate_project(tmp_path, "LeekParty") == []
+    assert manifest.output_name == "action-button-long.png"
+    assert validate_project(tmp_path, PROJECT) == []
 
 
 def test_rejects_jpg_with_required_alpha():
@@ -45,8 +47,8 @@ def test_rejects_jpg_with_required_alpha():
 
 
 def test_project_validation_reports_invalid_resource(tmp_path):
-    root = init_project(tmp_path, "LeekParty")
+    root = init_project(tmp_path, PROJECT)
     path = root / "production-assets" / "bad.resource.json"
     path.write_text(json.dumps({"schema_version": 1}), encoding="utf-8")
-    errors = validate_project(tmp_path, "LeekParty")
+    errors = validate_project(tmp_path, PROJECT)
     assert any("bad.resource.json" in error for error in errors)
