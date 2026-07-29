@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from guif.pillow_compat import flattened_image_data
+
 
 @dataclass(frozen=True)
 class CompositeReport:
@@ -73,7 +75,7 @@ def compose_masked_edit(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output.save(output_path, format="PNG")
 
-    mask_values = list(working_mask.getdata())
+    mask_values = list(flattened_image_data(working_mask))
     editable = sum(value == 255 for value in mask_values)
     protected = sum(value == 0 for value in mask_values)
     feathered = len(mask_values) - editable - protected

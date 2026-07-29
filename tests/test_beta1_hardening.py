@@ -222,13 +222,13 @@ def test_beta1_preserves_frozen_public_api_and_publishes_support_window() -> Non
     support = support_contract()
 
     assert compatibility["release"] == "1.0.0-alpha.28"
-    assert compatibility["current_release"] == "1.0.0-beta.1"
+    assert compatibility["current_release"] == "1.0.0-beta.2"
     assert compatibility["origin_release"] == "1.0.0-alpha.28"
     assert compatibility["public_api_version"] == 1
     assert compatibility["channel"] == "beta"
     assert "theme-confirmation" in compatibility["conversation"]["stages"]
     assert "ready-to-export" in compatibility["conversation"]["stages"]
-    assert support["release"] == "1.0.0-beta.1"
+    assert support["release"] == "1.0.0-beta.2"
     assert support["deprecation"]["migration_path_required"] is True
     assert set(support["supported_upgrade_sources"]) == {
         "1.0.0-alpha.27",
