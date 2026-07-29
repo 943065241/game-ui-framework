@@ -85,6 +85,9 @@ class Runtime(LegacyProviderRuntime):
             raise ValueError(f"Task is cancelled: {task_id}")
         return super().resume(project, task_id)
 
+    def get_host_profile(self) -> dict[str, Any]:
+        return self.tool_execution.host.to_dict()
+
     def list_tools(self) -> tuple[dict[str, Any], ...]:
         return self.tool_execution.list_tools()
 
