@@ -6,6 +6,30 @@ from typing import Any
 
 ASCII_TOKEN_PATTERN = re.compile(r"[a-z0-9]+", re.IGNORECASE)
 CJK_PATTERN = re.compile(r"[\u3400-\u9fff]+")
+STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "by",
+    "create",
+    "for",
+    "from",
+    "in",
+    "is",
+    "it",
+    "make",
+    "of",
+    "on",
+    "or",
+    "the",
+    "this",
+    "to",
+    "with",
+}
 MEMORY_TYPE_WEIGHT = {
     "decisions": 4,
     "best-practices": 3,
@@ -24,7 +48,11 @@ def _context_value(context: Any, name: str, default: Any) -> Any:
 
 def tokenize(text: str) -> set[str]:
     lowered = text.lower()
-    tokens = {match.group(0) for match in ASCII_TOKEN_PATTERN.finditer(lowered)}
+    tokens = {
+        match.group(0)
+        for match in ASCII_TOKEN_PATTERN.finditer(lowered)
+        if match.group(0) not in STOPWORDS
+    }
     for match in CJK_PATTERN.finditer(lowered):
         segment = match.group(0)
         tokens.add(segment)
@@ -39,6 +67,19 @@ def _serialize(value: Any) -> str:
     if isinstance(value, str):
         return value
     return json.dumps(value, ensure_ascii=False, sort_keys=True)
+
+
+def _semantic_theme_text(theme: dict[str, Any]) -> str:
+    values = [
+        theme.get("name", ""),
+        theme.get("description", ""),
+        theme.get("palette", []),
+        theme.get("materials", []),
+        theme.get("lighting", ""),
+        theme.get("must_include", []),
+        theme.get("avoid", []),
+    ]
+    return " ".join(_serialize(value) for value in values)
 
 
 def _score_record(query_tokens: set[str], text: str, *, base_score: int = 0) -> tuple[int, list[str]]:
@@ -99,7 +140,7 @@ def select_relevant_context(
     query_tokens = tokenize(requirement)
     active_theme = _context_value(context, "active_theme", None)
     if isinstance(active_theme, dict):
-        query_tokens.update(tokenize(_serialize(active_theme)))
+        query_tokens.update(tokenize(_semantic_theme_text(active_theme)))
 
     memory_values = tuple(_context_value(context, "memory", ()))
     resource_values = tuple(_context_value(context, "resources", ()))
