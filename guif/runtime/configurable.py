@@ -4,22 +4,25 @@ from pathlib import Path
 from typing import Any
 
 from guif.providers import ProviderRegistry
+from guif.revision import (
+    create_revision_job,
+    decide_revision_approval,
+    get_revision_job_by_plan,
+    list_revision_jobs,
+    revision_approval_summary,
+)
+from guif.revision_execution import RevisionAwareToolExecutionService
 from guif.runtime.pipeline import Pipeline
 from guif.runtime.registry import AgentRegistry
 from guif.runtime.runtime import Runtime as LegacyProviderRuntime
 from guif.runtime.store import TaskStore
 from guif.runtime.task import Task
-from guif.tool_execution import ToolExecutionError, ToolExecutionService
+from guif.tool_execution import ToolExecutionError
 from guif.tools import HostProfile, ToolRegistry, create_tool_scaffold
 
 
 class Runtime(LegacyProviderRuntime):
-    """GUIF Runtime with configurable Host and Tool routing.
-
-    The inherited Provider API remains available when ``provider_id`` is
-    explicitly supplied. The default path resolves a Tool and currently
-    selects the ChatGPT image Host bridge through Project defaults.
-    """
+    """GUIF Runtime with configurable Host, Tool, and Revision routing."""
 
     def __init__(
         self,
@@ -39,7 +42,7 @@ class Runtime(LegacyProviderRuntime):
             store=store,
             providers=providers,
         )
-        self.tool_execution = ToolExecutionService(
+        self.tool_execution = RevisionAwareToolExecutionService(
             workspace,
             store=self.store,
             tools=tools,
@@ -159,6 +162,110 @@ class Runtime(LegacyProviderRuntime):
             tool_id,
             capabilities,
             execution_mode=execution_mode,
+        )
+
+    def create_revision_job(self, project: str, task_id: str, revision_id: str) -> Task:
+        task = self.store.load(project, task_id)
+        create_revision_job(task, revision_id)
+        self.store.save(task)
+        return task
+
+    def list_revision_jobs(self, project: str, task_id: str) -> tuple[dict[str, Any], ...]:
+        return list_revision_jobs(self.store.load(project, task_id))
+
+    def get_revision_approval(self, project: str, task_id: str, revision_id: str) -> dict[str, Any]:
+        return revision_approval_summary(self.store.load(project, task_id), revision_id)
+
+    def decide_revision(
+        self,
+        project: str,
+        task_id: str,
+        revision_id: str,
+        decision: str,
+        *,
+        actor: str,
+        comment: str | None = None,
+    ) -> Task:
+        task = self.store.load(project, task_id)
+        decide_revision_approval(
+            task,
+            revision_id,
+            decision,
+            actor=actor,
+            comment=comment,
+        )
+        self.store.save(task)
+        return task
+
+    def approve_revision(
+        self,
+        project: str,
+        task_id: str,
+        revision_id: str,
+        *,
+        actor: str,
+        comment: str | None = None,
+    ) -> Task:
+        return self.decide_revision(
+            project,
+            task_id,
+            revision_id,
+            "approved",
+            actor=actor,
+            comment=comment,
+        )
+
+    def reject_revision(
+        self,
+        project: str,
+        task_id: str,
+        revision_id: str,
+        *,
+        actor: str,
+        comment: str | None = None,
+    ) -> Task:
+        return self.decide_revision(
+            project,
+            task_id,
+            revision_id,
+            "rejected",
+            actor=actor,
+            comment=comment,
+        )
+
+    def request_revision_changes(
+        self,
+        project: str,
+        task_id: str,
+        revision_id: str,
+        *,
+        actor: str,
+        comment: str | None = None,
+    ) -> Task:
+        return self.decide_revision(
+            project,
+            task_id,
+            revision_id,
+            "changes-requested",
+            actor=actor,
+            comment=comment,
+        )
+
+    def execute_revision(
+        self,
+        project: str,
+        task_id: str,
+        revision_id: str,
+        *,
+        tool_id: str | None = None,
+    ) -> Task:
+        task = self.store.load(project, task_id)
+        job = get_revision_job_by_plan(task, revision_id)
+        return self.execute_job(
+            project,
+            task_id,
+            str(job["id"]),
+            tool_id=tool_id,
         )
 
 
