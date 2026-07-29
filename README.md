@@ -6,7 +6,7 @@ GUIF is a local-first, AI-agnostic framework for planning, producing, reviewing,
 
 ## Status
 
-`v1.0.0-alpha.11` — Workflow-driven Runtime Pipelines, the first real structured Planner Agent, persisted and resumable Task Runs, checkpointed execution, project Context loading, Engine Adapter exports, deterministic validation, protected editing, Memory, Project, Theme, and Resource contracts.
+`v1.0.0-alpha.12` — Workflow-driven Runtime Pipelines, real deterministic Planner and Director Agents, relevance-based Context selection, persisted and resumable Task Runs, checkpointed execution, Engine Adapter exports, deterministic validation, protected editing, and Git-friendly Project knowledge.
 
 ## Product specification
 
@@ -16,10 +16,12 @@ It defines GUIF's expected product, verified current state, missing capabilities
 
 ## What works now
 
-- `guif init <project>` creates an isolated project workspace.
-- `guif inspect [project]` summarizes framework or project state, including persisted Run count.
-- `guif run "<requirement>" --project <project>` resolves a Workflow into a Runtime Pipeline, executes it, and persists checkpoints.
-- The built-in `planner` is a real deterministic Agent that writes a structured UI production plan into the Task and Output index.
+- `guif init <project>` creates an isolated Project workspace.
+- `guif inspect [project]` summarizes Framework or Project state, including persisted Run count.
+- `guif run "<requirement>" --project <project>` resolves a Workflow into a Runtime Pipeline, selects relevant Context, executes Agents, and persists checkpoints.
+- The built-in `planner` creates a validated structured UI Production Plan.
+- The built-in `director` reviews composition, hierarchy, Theme constraints, Resource reuse, Memory constraints, conflicts, and approval points.
+- Runtime ranks Project Memory, Resource manifests, and Project Workflow manifests against the current Requirement and active Theme.
 - Project Workflow manifests can override built-in Workflows and define the ordered `agents` executed by Runtime.
 - Workflow schema v1 remains readable; GUIF infers a compatible Agent sequence from the legacy `manager` field.
 - `guif run-list --project <project>` lists persisted Task Runs.
@@ -51,10 +53,11 @@ pytest -q
 The intended entry point is natural-language work directed through ChatGPT or another Agent Host:
 
 ```text
-User requirement
+User Requirement
   -> ChatGPT / Agent Host
   -> GUIF Runtime
   -> Project Context snapshot
+  -> relevance-based Context selection
   -> resolved Workflow manifest
   -> Runtime Pipeline
   -> registered Agents
@@ -70,18 +73,19 @@ from guif.runtime import Runtime
 runtime = Runtime(Path.cwd())
 task = runtime.run(
     "LeekParty",
-    "Create a 1080x2340 portrait medieval harbor shop page and export it for Unity",
-    pipeline="planning",
+    "Create a 1080x2340 portrait medieval harbor shop page, reuse the purchase button, and export Unity",
+    pipeline="ui-production",
 )
 print(task.state["plan"])
+print(task.state["direction"])
 ```
 
 The equivalent CLI command is:
 
 ```bash
-guif run "Create a 1080x2340 portrait medieval harbor shop page and export it for Unity" \
+guif run "Create a 1080x2340 portrait medieval harbor shop page, reuse the purchase button, and export Unity" \
   --project LeekParty \
-  --pipeline planning
+  --pipeline ui-production
 ```
 
 ## Workflow-driven Pipelines
@@ -91,13 +95,14 @@ Workflow schema v2 contains both human-readable steps and an executable Agent se
 ```json
 {
   "schema_version": 2,
-  "id": "planning",
-  "name": "Structured UI Planning",
+  "id": "ui-production",
+  "name": "Complete UI Production",
   "manager": "UI Director",
   "steps": [
-    "Convert the requirement and project context into a structured production plan"
+    "Create a structured UI production plan",
+    "Review art direction and resource reuse"
   ],
-  "agents": ["planner"]
+  "agents": ["planner", "director", "theme", "resource", "prompt", "qa", "export"]
 }
 ```
 
@@ -115,20 +120,42 @@ Built-in executable Workflows include:
 - `quality-assurance`
 - `framework-evolution`
 
+## Relevance-based Context selection
+
+Runtime loads the complete Project Context snapshot and then creates a deterministic, budgeted selection for the current Requirement.
+
+The selection ranks:
+
+- Markdown Memory records from `memory/**/*.md`;
+- Production Resource manifests;
+- Project Workflow manifests.
+
+Ranking uses Requirement terms plus semantic values from the active Theme. English tokens and Chinese character n-grams are supported. Generic English stop words are removed, and unrelated records are excluded rather than included only because of their type.
+
+The result is stored in:
+
+```python
+task.state["context_selection"]
+```
+
+It contains selected records, relevance scores, matched terms, budgets, total counts, and omitted counts. Resume uses the persisted selection rather than silently rebuilding the failed Task against new Project knowledge.
+
+The complete Context remains in `context.json`; the selected subset exists to keep Agent inputs focused and auditable.
+
 ## Structured Planner Agent
 
-The alpha.11 Planner is model-neutral and deterministic. It does not call an LLM. It converts the requirement and current Project Context into a validated Plan schema containing:
+The Planner is model-neutral and deterministic. It does not call an LLM. It converts the Requirement and Project Context into a validated Plan schema containing:
 
-- detected page type, orientation, and canvas dimensions;
+- detected Page type, orientation, and canvas dimensions;
 - target Engine;
 - active Theme contract, positive requirements, and exclusions;
 - reusable Resource candidates with reasons and scores;
 - suggested missing Resource contracts;
-- deliverables and QA criteria;
+- Deliverables and QA criteria;
 - ordered execution steps and dependencies;
 - risks, open questions, and Context summary.
 
-The Plan is available in both:
+The Plan is available in:
 
 ```python
 task.state["plan"]
@@ -140,7 +167,39 @@ and the persisted Output index as:
 ui-production-plan
 ```
 
-This is the first built-in Agent that performs real domain work. `director`, `theme`, `resource`, `prompt`, `qa`, and `export` are still Contract Agents and do not yet complete their intended production responsibilities automatically.
+## Structured Director Agent
+
+The Director consumes the Planner output and creates a validated art-direction review. It currently provides:
+
+- page-specific portrait or landscape composition zones;
+- focal order and interaction hierarchy;
+- active Theme palette, materials, lighting, required elements, and exclusions;
+- Memory-derived constraints such as `must`, `avoid`, `不要`, and `必须` decisions;
+- approved, review-required, or weak Resource reuse decisions;
+- blocking conflicts and human approval points;
+- structured handoff instructions for Theme, Resource, Prompt, and QA work.
+
+The Director returns one of:
+
+```text
+ready
+needs-review
+blocked
+```
+
+The review is available in:
+
+```python
+task.state["direction"]
+```
+
+and the persisted Output index as:
+
+```text
+art-direction-review
+```
+
+Planner and Director are now real domain Agents. `theme`, `resource`, `prompt`, `qa`, and `export` remain Contract Agents and do not yet complete their intended production responsibilities automatically.
 
 ## Persisted Task Runs
 
@@ -167,6 +226,7 @@ Pipelines checkpoint the Task before and after every Agent. When an Agent fails,
 ```text
 Runtime
   -> Context Loader
+  -> Context Retriever
   -> Workflow Resolver
   -> Pipeline
   -> Task Store
@@ -201,9 +261,9 @@ Runtime Context currently loads:
 ```bash
 guif init LeekParty
 
-guif run "Plan a 1080x2340 portrait medieval harbor shop page for Unity" \
+guif run "Create a 1080x2340 portrait medieval harbor shop page for Unity" \
   --project LeekParty \
-  --pipeline planning
+  --pipeline ui-production
 
 guif run-list --project LeekParty
 guif run-show <task-id> --project LeekParty
@@ -247,13 +307,14 @@ These JSON Sidecars are deterministic GUIF metadata, not native engine-generated
 2. Git and Project files are the long-term source of truth.
 3. Runtime orchestration stays model-agnostic.
 4. Workflow manifests are the executable source of Pipeline order.
-5. Agents do not depend on or directly invoke one another.
-6. Runtime Runs must be inspectable, persisted, and recoverable.
-7. Effect Images and Production Assets remain separate.
-8. Engine-specific behavior belongs in Adapters, not the Framework Core.
-9. Local edits preserve non-target pixels through mask-based composition.
-10. A release is complete only when Feature, Test, CI, the English README, the Chinese README, Version Metadata, and the Product Specification agree.
+5. Agents receive focused, persisted Context selections instead of silently relying on unbounded Project data.
+6. Agents do not depend on or directly invoke one another.
+7. Runtime Runs must be inspectable, persisted, and recoverable.
+8. Effect Images and Production Assets remain separate.
+9. Engine-specific behavior belongs in Adapters, not the Framework Core.
+10. Local edits preserve non-target pixels through mask-based composition.
+11. A release is complete only when Feature, Test, CI, the English README, the Chinese README, Version Metadata, and the Product Specification agree.
 
 ## Repository direction
 
-The next priority is to replace the Contract-only Director with a real art-direction and reuse-review Agent, then add relevance-based Context and Memory retrieval. GUIF must continue proving the natural-language production loop with real Project tasks rather than expanding placeholder interfaces. Priorities and acceptance criteria are maintained in [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md).
+The next priority is to implement a real Theme Agent and Resource Agent so the approved Plan and Director review can become concrete production contracts. After that, GUIF should define the model-neutral Prompt IR before integrating Generation tools. Priorities and acceptance criteria are maintained in [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md).
