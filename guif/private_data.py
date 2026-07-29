@@ -62,6 +62,14 @@ class PrivateDataLayout:
         return self.root / "operation-audit"
 
     @property
+    def operation_ledger(self) -> Path:
+        return self.root / "operation-ledger"
+
+    @property
+    def gateway_requests(self) -> Path:
+        return self.root / "gateway-requests"
+
+    @property
     def migrations(self) -> Path:
         return self.root / "migrations"
 
