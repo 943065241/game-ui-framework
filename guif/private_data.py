@@ -85,5 +85,13 @@ class PrivateDataLayout:
     def privacy_reports(self) -> Path:
         return self.root / "privacy-reports"
 
+    @property
+    def backups(self) -> Path:
+        return self.root / "backups"
+
+    @property
+    def diagnostics(self) -> Path:
+        return self.root / "diagnostics"
+
 
 __all__ = ["PrivateDataLayout", "default_private_data_root"]
