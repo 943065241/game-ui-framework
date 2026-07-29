@@ -2,11 +2,11 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-GUIF is a local-first, AI-agnostic framework for planning, directing, contracting, prompting, reviewing, exporting, and evolving game UI production work.
+GUIF is a local-first, AI-agnostic framework for planning, directing, contracting, prompting, reviewing, approving, exporting, and evolving game UI production work.
 
 ## Status
 
-`v1.0.0-alpha.15` — Workflow-driven Runtime Pipelines, real deterministic Planner, Director, Theme, Resource, Prompt, and Semantic QA Agents, relevance-based Context selection, persisted and resumable Task Runs, Engine Adapter exports, deterministic validation, protected editing, and Git-friendly Project knowledge.
+`v1.0.0-alpha.16` — Workflow-driven Runtime Pipelines, real deterministic Planner, Director, Theme, Resource, Prompt, and Semantic QA Agents, persistent Approval decisions with controlled Prompt state transitions, relevance-based Context selection, resumable Task Runs, Engine Adapter exports, deterministic validation, protected editing, and Git-friendly Project knowledge.
 
 ## Product specification
 
@@ -25,10 +25,10 @@ It defines GUIF's expected product, verified current state, missing capabilities
 - `resource` creates validated Resource manifest candidates without silently modifying Project files.
 - `prompt` creates a versioned, provider-independent Prompt IR with jobs, constraints, references, output contracts, approval points, blockers, and provenance.
 - `qa` performs deterministic semantic Contract QA, verifies cross-Agent consistency and execution safety, and creates an explicit Export Gate.
-- Runtime ranks Project Memory, Resource manifests, and Project Workflow manifests against the current Requirement and active Theme.
+- Runtime persists Approval decisions and safely changes Prompt jobs between `review-required`, `blocked`, and `ready`.
+- Approval, rejection, and change-request history is auditable and can be revised without deleting previous decisions.
 - Project Workflow manifests can override built-in Workflows and declare executable `agents`.
-- Workflow schema v1 remains readable through the legacy `manager` mapping.
-- Task Runs are persisted, inspectable, and resumable after failure.
+- Task Runs are persisted, inspectable, resumable after failure, and list their Approval status.
 - Project, Theme, Workflow, Resource, Image Asset, Pixel Protection, and Engine Adapter validation are available.
 - The test suite targets Python 3.10, 3.11, and 3.12.
 
@@ -60,8 +60,11 @@ User Requirement
        -> Resource
        -> Prompt
        -> Semantic QA
-       -> Export
+       -> Export contract
   -> persisted Task and Outputs
+  -> Human / Host Approval decisions
+  -> controlled Prompt and QA state refresh
+  -> executable jobs only when every required approval passes
 ```
 
 Runtime does not depend on OpenAI or any other model provider. A Host can call it directly:
@@ -83,9 +86,19 @@ print(task.state["theme_contract"])
 print(task.state["resource_contracts"])
 print(task.state["prompt_ir"])
 print(task.state["qa_report"])
+
+approvals = runtime.get_approvals("LeekParty", task.task_id)
+for approval_id in approvals["pending_ids"]:
+    task = runtime.approve(
+        "LeekParty",
+        task.task_id,
+        approval_id,
+        actor="reviewer@example.com",
+        comment="Approved for provider preparation.",
+    )
 ```
 
-Equivalent CLI command:
+Equivalent CLI start command:
 
 ```bash
 guif run "Create a 1080x2340 portrait medieval harbor shop page, reuse the purchase button, and export Unity" \
@@ -135,13 +148,13 @@ Runtime loads the complete Project Context snapshot and creates a deterministic,
 
 It ranks Markdown Memory records, Production Resource manifests, and Project Workflow manifests. English tokens and Chinese character n-grams are supported. Generic English stop words are removed, and unrelated records are excluded.
 
-The result is stored in:
+The persisted result is stored in:
 
 ```python
 task.state["context_selection"]
 ```
 
-It contains selected records, scores, matched terms, budgets, total counts, and omitted counts. Resume uses the persisted selection instead of silently rebuilding the failed Task against changed Project knowledge.
+It contains selected records, scores, matched terms, budgets, total counts, and omitted counts. Resume uses the persisted selection instead of silently rebuilding a failed Task against changed Project knowledge.
 
 ## Structured production Agents
 
@@ -153,9 +166,7 @@ The deterministic Planner creates Page type, orientation, canvas dimensions, tar
 task.state["plan"]
 ```
 
-```text
-ui-production-plan
-```
+Output: `ui-production-plan`.
 
 ### Director
 
@@ -167,9 +178,7 @@ Status: `ready`, `needs-review`, or `blocked`.
 task.state["direction"]
 ```
 
-```text
-art-direction-review
-```
+Output: `art-direction-review`.
 
 ### Theme
 
@@ -179,11 +188,7 @@ The Theme Agent resolves the active Project Theme or infers a reviewable determi
 task.state["theme_contract"]
 ```
 
-```text
-resolved-theme-contract
-```
-
-Status: `ready`, `review-required`, or `blocked`.
+Output: `resolved-theme-contract`.
 
 An inferred Theme is not automatically activated or written into `projects/<project>/themes/`.
 
@@ -195,11 +200,9 @@ The Resource Agent identifies approved existing reuse, unresolved reuse candidat
 task.state["resource_contracts"]
 ```
 
-```text
-resource-contract-bundle
-```
+Output: `resource-contract-bundle`.
 
-Generated manifests use `review-before-write`; Runtime does not create or overwrite Project Resource files without explicit approval.
+Generated manifests use `review-before-write`; Runtime does not create or overwrite Project Resource files without explicit approval and a future materialization operation.
 
 ### Prompt
 
@@ -209,9 +212,7 @@ The Prompt Agent converts Plan, Director review, Theme contract, and Resource bu
 task.state["prompt_ir"]
 ```
 
-```text
-model-neutral-prompt-ir
-```
+Output: `model-neutral-prompt-ir`.
 
 Prompt IR schema v1 contains:
 
@@ -221,58 +222,93 @@ Prompt IR schema v1 contains:
 - structured Objective, Composition, Visual, Content, and Technical instructions;
 - approved Resource references and exact Output Contracts;
 - per-job Acceptance Criteria;
-- required capabilities such as `image-generation`, `image-editing`, `protected-region-editing`, or `transparent-output`;
+- required Provider capabilities;
 - Approval Points, Blockers, Handoff, and full Provenance.
 
-Status:
-
-```text
-ready
-review-required
-blocked
-```
-
-Jobs are executable only when Prompt IR status is `ready`. A review-required or blocked IR remains inspectable and persisted, but a Provider Adapter must not execute it automatically.
-
-Prompt IR is not an OpenAI, image-model, or Figma payload. A later Provider Adapter may translate it, but must preserve instructions, negative constraints, references, output contracts, acceptance criteria, and provenance.
+Jobs are executable only when Prompt IR status is `ready`. A `review-required` or `blocked` IR remains inspectable and persisted, but a Provider Adapter must not execute it automatically.
 
 ### Semantic QA
 
-The alpha.15 QA Agent performs deterministic Contract QA before any Provider or Export step. It checks:
+Semantic QA performs deterministic Contract checks before any Provider or Export step:
 
 - Prompt IR schema validity;
-- the complete upstream Output provenance chain;
-- Page type, orientation, and canvas consistency between Plan and Prompt IR;
+- complete upstream Output provenance;
+- Page, orientation, and canvas consistency;
 - preservation of Theme `must_include` and `avoid` constraints;
-- one-to-one coverage between Resource Manifest Candidate and Production Asset Job;
+- one-to-one Resource Candidate and Production Job coverage;
 - Resource Output Contract validity and equality;
 - approved-reference boundaries;
-- `review-before-execute` safety;
-- required Provider capabilities.
+- Provider capability completeness;
+- Prompt executable flags and persisted Approval state consistency.
 
 ```python
 task.state["qa_report"]
 ```
 
-```text
-semantic-qa-report
-```
+Output: `semantic-qa-report`.
 
-QA status:
+QA status is `passed`, `review-required`, or `blocked`. No visual Semantic QA Adapter exists yet. When no generated Artifact is registered, `artifact_review.status` is `not-run` and Export remains blocked even when Contract checks pass.
 
-```text
-passed
-review-required
-blocked
-```
+## Persistent Approval API
 
-The report contains Checks, Findings, Revision Request, Artifact Review state, Provenance, Handoff, and an explicit:
+Each Prompt IR initializes a persisted Approval state:
 
 ```python
-task.state["qa_report"]["export_gate"]
+task.state["approval_state"]
 ```
 
-At alpha.15, no visual Semantic QA Adapter exists. When no generated Artifact is registered, the report records `artifact_review.status: "not-run"` and explicitly states that it does not claim visual quality results. Consequently, Export remains blocked even when Contract checks pass. This prevents contract-only reasoning from being presented as visual verification.
+Approval status is one of:
+
+```text
+not-required
+pending
+approved
+rejected
+changes-requested
+```
+
+Each decision records the Approval ID, decision, actor, optional comment, timestamp, source, and question. The latest decision per Approval ID controls the gate, while `history` remains append-only.
+
+Controlled transition rules:
+
+- unresolved required points keep Prompt IR `review-required`;
+- a rejection or change request makes Prompt IR `blocked`;
+- all required points approved and no non-Approval blocker makes Prompt IR `ready`;
+- Prompt jobs become executable only in `ready`;
+- changing a previous rejection or change request to approved can recover the gate;
+- Semantic QA is rebuilt after every decision;
+- the Task lifecycle remains `completed` because Approval is post-run governance;
+- Approval never mutates Project Theme or Resource files and never calls a Provider.
+
+Runtime API:
+
+```python
+runtime.get_approvals(project, task_id)
+runtime.approve(project, task_id, approval_id, actor="reviewer", comment="...")
+runtime.reject(project, task_id, approval_id, actor="reviewer", comment="...")
+runtime.request_changes(project, task_id, approval_id, actor="reviewer", comment="...")
+```
+
+CLI:
+
+```bash
+guif run-approval-list <task-id> --project LeekParty
+
+guif run-approve <task-id> <approval-id> \
+  --project LeekParty \
+  --actor reviewer@example.com \
+  --comment "Approved"
+
+guif run-reject <task-id> <approval-id> \
+  --project LeekParty \
+  --actor reviewer@example.com \
+  --comment "Rejected because the composition conflicts with the brief"
+
+guif run-request-changes <task-id> <approval-id> \
+  --project LeekParty \
+  --actor reviewer@example.com \
+  --comment "Increase the primary action hierarchy"
+```
 
 ## Persisted Task Runs
 
@@ -289,10 +325,13 @@ task.json       complete Task snapshot and lifecycle state
 context.json    complete Project Context snapshot
 events.jsonl    audit event representation
 outputs.json    registered Output index
+approvals.json  latest Approval state and append-only decision history
 error.json      failure details, present only while failed
 ```
 
-Pipelines checkpoint before and after every Agent. On failure, GUIF records the failing Agent, exception type, message, and retry index. `guif run-resume` continues from that position. Completed Tasks cannot be resumed.
+Pipelines checkpoint before and after every Agent. On failure, GUIF records the failing Agent, exception type, message, and retry index. `guif run-resume` continues from that position. Completed Tasks cannot be resumed, but their Approval state can still be reviewed and changed.
+
+`guif run-list` includes `approval_status` and `pending_approval_count`.
 
 ## Quick start
 
@@ -305,6 +344,7 @@ guif run "Create a 1080x2340 portrait medieval harbor shop page for Unity" \
 
 guif run-list --project LeekParty
 guif run-show <task-id> --project LeekParty
+guif run-approval-list <task-id> --project LeekParty
 guif validate LeekParty
 ```
 
@@ -337,14 +377,15 @@ These JSON Sidecars are deterministic GUIF metadata, not native Engine-generated
 6. Agents do not directly invoke one another.
 7. Runtime Runs must be inspectable, persisted, and recoverable.
 8. Inferred Theme and Resource proposals require review before Project files are changed.
-9. Prompt IR is provider-independent and requires approval before execution.
-10. Contract QA must not claim visual QA when no visual Artifact was inspected.
-11. Export requires a passing explicit Export Gate.
-12. Effect Images and Production Assets remain separate.
-13. Engine-specific behavior belongs in Adapters, not Framework Core.
-14. Local edits preserve non-target pixels through mask-based composition.
-15. A release is complete only when Feature, Test, CI, both READMEs, Version Metadata, and the Product Specification agree.
+9. Approval decisions are explicit, attributed, persisted, reversible through a new decision, and never silently inferred.
+10. Prompt IR is provider-independent and requires every required Approval before execution.
+11. Contract QA must not claim visual QA when no visual Artifact was inspected.
+12. Export requires a passing explicit Export Gate.
+13. Effect Images and Production Assets remain separate.
+14. Engine-specific behavior belongs in Adapters, not Framework Core.
+15. Local edits preserve non-target pixels through mask-based composition.
+16. A release is complete only when Feature, Test, CI, both READMEs, Version Metadata, and the Product Specification agree.
 
 ## Repository direction
 
-The next priority is an explicit Approval API and state transition contract. It must resolve Director, Theme, Resource, and Prompt approval points without mutating Project truth or enabling Provider execution implicitly. After that, GUIF can add Provider Adapters, Artifact registration, visual Semantic QA, Revision Loops, and a real Export Agent. Priorities and acceptance criteria are maintained in [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md).
+The next priority is a Provider Adapter and Artifact registration contract. It must consume only approved, executable Prompt jobs, preserve structured constraints and provenance, record capability and execution metadata, and never bypass the Approval or Semantic QA gates. Visual Semantic QA, Revision Loops, and the real Export Agent follow after Artifact registration is stable. Priorities and acceptance criteria are maintained in [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md).
