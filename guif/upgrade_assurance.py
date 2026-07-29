@@ -6,11 +6,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from guif.compatibility import compatibility_contract
+from guif.compatibility import MVP_RELEASE, compatibility_contract
 from guif.private_data import PrivateDataLayout
 from guif.private_migration import PrivateSchemaMigrator
 
-BETA_RELEASE = "1.0.0-beta.1"
+BETA_RELEASE = MVP_RELEASE
 SUPPORTED_ALPHA_SOURCES = (
     "1.0.0-alpha.27",
     "1.0.0-alpha.28",
@@ -134,32 +134,47 @@ class UpgradeAssuranceService:
             raise UpgradeAssuranceError(
                 "Private schema upgrade is blocked and requires manual inspection"
             )
+        normalized_actor = actor.strip()
+        if not normalized_actor:
+            raise ValueError("actor must not be empty")
         migration_result: dict[str, Any] | None = None
         if plan["private_schema_status"] == "migration-required":
-            migration_result = self.migrator.apply(actor=actor)
+            migration_result = self.migrator.apply(actor=normalized_actor)
         post_scan = self.migrator.scan()
         if post_scan["status"] != "current":
             raise UpgradeAssuranceError(
                 f"Private schemas are not current after upgrade: {post_scan['status']}"
             )
+        public_migration = None
+        if migration_result is not None:
+            public_migration = {
+                "status": migration_result.get("status"),
+                "applied_count": migration_result.get("applied_count"),
+                "compatibility_preserved": migration_result.get("compatibility_preserved"),
+            }
         result = {
             "schema_version": 1,
             "status": "verified",
             "source_release": plan["source_release"],
             "target_release": BETA_RELEASE,
             "portable_backup_count": plan["portable_backup_count"],
-            "migration": migration_result,
+            "migration": public_migration,
             "private_schema_status": post_scan["status"],
             "public_api_version": compatibility_contract()["public_api_version"],
             "public_api_preserved": True,
-            "actor": actor.strip() or "upgrade-assurance",
+            "actor": normalized_actor,
             "completed_at": _now(),
         }
         report_path = (
             self.layout.upgrade_reports
             / f"upgrade-{_timestamp()}-{plan['source_release'].replace('.', '-')}.json"
         )
-        _write_json(report_path, result)
+        private_report = {
+            **result,
+            "migration_private_evidence": migration_result,
+            "report_storage": "private-data-store",
+        }
+        _write_json(report_path, private_report)
         return {**result, "private_report_written": True}
 
 
