@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from PIL import Image
@@ -8,10 +9,20 @@ from guif.theme import create_theme, validate_theme_file
 
 
 def test_create_and_validate_theme(tmp_path: Path) -> None:
-    init_project(tmp_path, "Demo")
-    theme_path = create_theme(tmp_path, "Demo", "Medieval Harbor", "Warm sunset harbor shop")
+    root = init_project(tmp_path, "Demo")
+    theme_path = create_theme(
+        tmp_path,
+        "Demo",
+        "Fictional Geometric Arcade",
+        "A synthetic example using abstract polygons and neutral test colors.",
+    )
     assert theme_path.exists()
     assert validate_theme_file(theme_path) == []
+    assert not str(theme_path).startswith(str(root))
+    config = json.loads((root / "project.json").read_text(encoding="utf-8"))
+    assert "current_theme" not in config
+    assert "theme_binding" not in config
+    assert not (root / "themes").exists()
 
 
 def test_pixel_protection_passes_when_only_masked_area_changes(tmp_path: Path) -> None:
