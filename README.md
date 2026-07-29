@@ -2,260 +2,210 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-GUIF is a local-first game UI production framework with configurable Hosts and Tools. ChatGPT is the default Host, while image generation, image editing, visual inspection, Git operations, and export remain replaceable Tool capabilities.
+GUIF is a local-first game UI production framework with configurable Hosts and Tools. ChatGPT is the default Host and `chatgpt-image` is the default image generation and editing Tool, but neither is a hard-coded Core dependency.
 
 ## Status
 
-`v1.0.0-alpha.21` adds a reviewable Host and Tool discovery and connection workflow.
+`v1.0.0-alpha.22` adds the first production **Gated Export Agent**.
 
-GUIF now distinguishes:
+A generated file is no longer allowed to enter Project truth merely because a Tool returned it. GUIF now evaluates the persisted Task, initial Approval, Contract QA, aggregate Visual Review, active Artifact identity, approved Resource Contract, target Engine compatibility, and Revision resolution before any production file is written.
 
 ```text
-registered   an Adapter exists in the current Runtime
-available    the current Host or local Runtime can use it now
-installable  a Catalog entry exists, but no Adapter is registered yet
+Prompt / Revision Job
+  -> Tool execution or ChatGPT handoff
+  -> Artifact Registry
+  -> metadata and semantic Visual Review
+  -> active reviewed Artifact
+  -> Gated Export Plan                 no Project mutation
+  -> Gated Export Execute
+       -> Project truth materialization
+       -> Engine-specific export
+       -> Export Manifest
+       -> transaction audit and backups
+  -> optional conflict-aware rollback
 ```
 
-Missing Tools still fail closed. The Runtime now links a persisted connection request to eligible `waiting-for-tool` resolutions rather than silently installing a Plugin, requesting a secret in plain text, or falling back to `dry-run`.
+The bilingual living product specification is maintained at [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md).
 
-The controlled visual-revision loop from alpha.20 remains intact: Revision Plans become separately approved edit Jobs, source Artifacts are immutable and SHA-256 verified, and replacements supersede sources only after a passing semantic visual review.
+## Export gate
 
-## Product specification
+`Runtime.prepare_gated_export()` creates a persisted, reviewable plan and does not modify Project files.
 
-The bilingual living product specification is maintained at [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md). Feature implementation, tests, CI, both READMEs, version metadata, and this specification must agree for a release to be complete.
+The plan checks:
 
-## Host discovery
+- Task status is `completed`;
+- initial Approval is `approved` or `not-required`;
+- Contract QA is `passed`;
+- aggregate `qa_report.export_gate.allowed` is true;
+- at least one active `production-asset` Artifact exists;
+- every selected Artifact is real, visual, reviewed, and not a simulation;
+- Artifact files remain inside the Run directory and match registered SHA-256 values;
+- every Artifact Output Contract exactly matches an approved Resource manifest candidate;
+- no duplicate active Artifact exists for the same Resource;
+- all Revision Plans are `resolved` or `rejected`;
+- the Resource target is compatible with the selected Engine.
+
+Any failed check produces a persisted `blocked` Export record. No production file is copied and no implicit fallback is used.
+
+## Project truth materialization
+
+A ready Export writes approved assets to:
+
+```text
+projects/<project>/production-assets/files/<output-name>
+projects/<project>/production-assets/<resource-id>.resource.json
+```
+
+The materialized Resource manifest points to the managed Project source file. Existing files are backed up before replacement.
+
+Only active `production-asset` Artifacts are materialized. Effect images, simulations, receipts, stale Artifacts, and unreviewed results remain available for provenance but do not enter production truth.
+
+## Engine export
+
+Each execution creates an immutable output directory:
+
+```text
+projects/<project>/exports/<engine>/<export-id>/
+  <approved assets>
+  <engine adapter metadata>
+  export-manifest.json
+```
+
+Unity, Godot, Unreal, and Generic adapters remain supported. The Export Manifest records:
+
+- Task and Export identity;
+- target Engine and actor;
+- gate snapshot;
+- source Artifact, Job, Review, and SHA-256;
+- materialized Project paths;
+- Engine output paths and SHA-256;
+- Adapter output and import hints.
+
+The older `guif export` command remains available for validating and exporting Resource files that already exist in Project truth. New AI production flows should use the Task-bound gated Export API.
+
+## Transaction audit and rollback
+
+Each completed Export stores:
+
+```text
+projects/<project>/export-history/<export-id>/
+  transaction.json
+  backups/
+```
+
+The transaction records every Project truth mutation, whether a file previously existed, its prior hash, backup path, and exported hash.
+
+Rollback is conflict-aware. GUIF compares current Project files with the hashes written by the Export. If a file changed afterward, rollback fails closed instead of overwriting newer work. A force rollback requires an explicit actor and reason and is recorded in the audit.
+
+## Runtime API
 
 ```python
 runtime = Runtime(workspace)
-report = runtime.discover_host()
-```
 
-The report uses `guif-host-capability-discovery-v1` and includes:
-
-- Host identity;
-- advertised capabilities;
-- currently available Tool IDs;
-- Host metadata;
-- discovery timestamp.
-
-The default ChatGPT Host advertises `chatgpt-image`, image generation and editing, protected-region editing, transparent output, visual inspection, and Git operation capabilities.
-
-## Tool discovery
-
-```python
-tools = runtime.discover_tools(project="LeekParty")
-```
-
-Each discovered record contains:
-
-- `status` and complete `states`;
-- registered, available, installable, and ready booleans;
-- Tool Manifest or Catalog metadata;
-- Host and execution mode;
-- current Health Check;
-- latest Project connection status;
-- permission, data-scope, external-call, cost, credential, and Host-support disclosures.
-
-Workspace installable entries may be declared in:
-
-```text
-.guif/tool-catalog.json
-```
-
-Example:
-
-```json
-{
-  "tools": [
-    {
-      "tool_id": "custom-image",
-      "name": "Custom Image Tool",
-      "version": "1.0",
-      "capabilities": ["image-generation", "image-editing"],
-      "install_method": "plugin-manager",
-      "source": "trusted-workspace-catalog",
-      "permissions": ["network-access"],
-      "data_scopes": ["prompt-job", "approved-reference-images"],
-      "external_call": true,
-      "billable": true,
-      "requires_credentials": true,
-      "credential_kind": "api-key-reference"
-    }
-  ]
-}
-```
-
-A Catalog entry does not install or register the Tool.
-
-## Connection workflow
-
-```text
-missing or unavailable Tool
-  -> connection request
-  -> review disclosures
-  -> approve or reject
-  -> installation-required / waiting-for-credentials / waiting-for-host-support
-  -> Health Check retry
-  -> connected
-  -> execute the same persisted Job
-```
-
-Create and approve a request:
-
-```python
-request = runtime.request_tool_connection(
+plan = runtime.prepare_gated_export(
     "LeekParty",
-    "image-generation",
-    "chatgpt-image",
-    requested_by="ChatGPT Host",
+    task_id,
+    target_engine="unity",
 )
 
-connected = runtime.approve_tool_connection(
+record = runtime.execute_gated_export(
     "LeekParty",
-    request["request_id"],
+    task_id,
+    target_engine="unity",
     actor="project-owner@example.com",
-    comment="Permissions and data scope reviewed.",
+)
+
+exports = runtime.list_gated_exports("LeekParty", task_id)
+record = runtime.get_gated_export("LeekParty", task_id, record["export_id"])
+
+rolled_back = runtime.rollback_gated_export(
+    "LeekParty",
+    task_id,
+    record["export_id"],
+    actor="project-owner@example.com",
+    reason="Restore the previous production asset set.",
 )
 ```
-
-Rejecting a request never changes Project Tool configuration.
-
-Approving an installable-only entry returns `installation-required`; GUIF does not auto-install it. Approving a Tool that requires credentials returns `waiting-for-credentials` until an opaque reference is supplied.
-
-## Credential policy
-
-GUIF connection state stores only references such as:
-
-```text
-env://CUSTOM_IMAGE_API_KEY
-secret-manager://projects/leek-party/custom-image
-```
-
-It does not store the credential secret itself. Every request records:
-
-```json
-{
-  "credential": {
-    "required": true,
-    "kind": "api-key-reference",
-    "reference": "env://CUSTOM_IMAGE_API_KEY",
-    "secret_stored_by_guif": false
-  }
-}
-```
-
-Credential resolution and secret storage remain the responsibility of the Host, Plugin, operating environment, or secret manager.
-
-## Health retry
-
-```python
-retry = runtime.retry_tool_health("LeekParty", "chatgpt-image")
-```
-
-Health retries are appended to `tool-connections.json`. An already approved request can move to `connected` when Host, Tool, or credential configuration becomes healthy.
-
-## Tool Adapter contract tests
-
-```python
-report = runtime.run_tool_contract_tests("chatgpt-image")
-```
-
-The runner performs no external call. It validates:
-
-- Manifest schema and identity;
-- capability declaration;
-- input and output contracts;
-- implementation of `prepare()` or `execute()` for the declared execution mode;
-- permission, data-scope, cost, and credential disclosures;
-- Health Check identity and status shape.
-
-The generated Adapter scaffold now reminds implementers to complete disclosures and run:
-
-```bash
-guif tool-contract-test <tool-id>
-```
-
-A passing contract test does not install, trust, sign, or automatically register a Plugin.
-
-## Default ChatGPT path
-
-```text
-User
-  -> ChatGPT Host
-  -> GUIF Runtime
-  -> Approval
-  -> Tool Resolver
-  -> chatgpt-image
-  -> external Handoff
-  -> ChatGPT generates or edits the image
-  -> Host submits the real file
-  -> Artifact Registry
-  -> Visual Review / controlled Revision
-  -> gated Export
-```
-
-ChatGPT Host and `chatgpt-image` are defaults, not GUIF Core dependencies. `dry-run` remains explicit contract testing only and is never an implicit production fallback.
 
 ## CLI
 
 ```bash
-guif host-discover
-
-guif tool-discover --project LeekParty
-
-guif tool-connect-request image-generation chatgpt-image \
+guif run-export-plan <task-id> \
   --project LeekParty \
-  --requested-by "ChatGPT Host"
+  --target unity
 
-guif tool-connect-list --project LeekParty
-
-guif tool-connect-approve <request-id> \
+guif run-export-execute <task-id> \
   --project LeekParty \
+  --target unity \
   --actor project-owner@example.com
 
-guif tool-connect-reject <request-id> \
+guif run-export-list <task-id> --project LeekParty
+guif run-export-show <task-id> <export-id> --project LeekParty
+
+guif run-export-rollback <task-id> <export-id> \
   --project LeekParty \
-  --actor project-owner@example.com
-
-guif tool-health-retry chatgpt-image --project LeekParty
-
-guif tool-contract-test chatgpt-image
+  --actor project-owner@example.com \
+  --reason "Restore the previous approved production set."
 ```
 
-Existing production and revision commands remain available, including `run-execute`, `run-tool-submit`, `run-revision-create`, `run-revision-approve`, `run-revision-execute`, and `run-artifact-review`.
+Use `--force` only after reviewing post-export conflicts.
 
-## Persistence
+## Persisted Run state
 
-Project-level discovery and connection evidence is stored at:
+Task Run directories may now include:
 
 ```text
-projects/<project>/tool-connections.json
+approvals.json
+artifacts.json
+executions.json
+tool-resolution.json
+tool-handoffs.json
+visual-reviews.json
+revision-plans.json
+revision-execution.json
+gated-exports.json
 ```
 
-It contains connection requests, decisions, disclosure snapshots, credential references, status transitions, and Health Check history. Task-specific resolution and handoff records remain in each Run directory.
+`run-list` includes `gated_export_count`, `completed_export_count`, and `latest_export_status`.
+
+## Existing production capabilities
+
+GUIF also provides:
+
+- Workflow-driven Planner, Director, Theme, Resource, Prompt, and Semantic QA Agents;
+- relevance-based Project Context selection;
+- persistent initial and Revision Approval gates;
+- configurable Host and Tool routing with ChatGPT defaults;
+- registered, available, and installable Tool discovery;
+- reviewable Tool connection requests and opaque Credential references;
+- external ChatGPT image generation and editing handoffs;
+- Artifact identity, provenance, SHA-256, MIME, dimensions, and References;
+- deterministic metadata review and optional semantic Visual Inspectors;
+- controlled Revision Jobs with immutable source binding and review-gated supersession;
+- protected-pixel composition checks;
+- deterministic legacy Resource export.
+
+## Development
+
+```bash
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS / Linux
+source .venv/bin/activate
+pip install -e .[dev]
+pytest -q
+```
 
 ## Current limitations
 
-- GUIF does not yet install Plugins or dynamically load a newly installed Adapter.
-- There is no authenticated Host or Approval identity yet.
-- Credential references are not resolved by GUIF Core.
-- Catalog entries are workspace-local and are not signed or remotely verified.
-- ChatGPT product-side automatic handoff callback wiring remains outside GUIF Core.
-- The default semantic Visual Inspector Registry is still empty.
-- The built-in Export Agent remains Contract-only.
-
-## Operating principles
-
-1. Discovery is evidence, not installation.
-2. Connection requires explicit approval.
-3. Permissions, data scope, external calls, cost, and Credentials must be disclosed before connection.
-4. GUIF stores credential references, never credential secrets.
-5. Production Tool failures remain fail-closed.
-6. Contract tests perform no external calls.
-7. ChatGPT is the default Host and image Tool, not a hard-coded dependency.
-8. Revision sources remain immutable and replacements require passing review before supersession.
+- ChatGPT product-side orchestration must still consume external handoffs and submit files automatically.
+- The default semantic Visual Inspector Registry is empty.
+- Gated Export currently materializes generated `production-asset` Artifacts; packaging approved reused Resources into the same transaction is a later extension.
+- Rollback is file-based and does not yet create a Git branch or commit.
+- Export actors are strings rather than authenticated Host identities.
+- Remote object storage, retention policy, concurrent Export locking, and signed manifests are not implemented.
 
 ## Next phase
 
-The next priority is **alpha.22: Gated Export Agent**. It will consume active Artifact records, Contract QA, Visual Review, Revision resolution, and Project Resource contracts before materializing approved production assets into Project truth and engine-specific export outputs.
+The next priority is **alpha.23: Authenticated Host API and Git Change Management**: stable Host result protocol, authenticated actors, optimistic concurrency, Git change sets, branch and commit creation, rollback integration, cancellation, and execution summaries.
