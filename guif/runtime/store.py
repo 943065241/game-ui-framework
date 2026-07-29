@@ -64,6 +64,8 @@ class TaskStore:
         _write_optional_json(run_dir / "approvals.json", state.get("approval_state"))
         _write_optional_json(run_dir / "artifacts.json", state.get("artifact_registry"))
         _write_optional_json(run_dir / "executions.json", state.get("provider_executions"))
+        _write_optional_json(run_dir / "visual-reviews.json", state.get("visual_reviews"))
+        _write_optional_json(run_dir / "revision-plans.json", state.get("revision_plans"))
 
         return run_dir
 
@@ -85,11 +87,23 @@ class TaskStore:
             approval_state = state.get("approval_state", {}) if isinstance(state, dict) else {}
             artifact_registry = state.get("artifact_registry", {}) if isinstance(state, dict) else {}
             execution_state = state.get("provider_executions", {}) if isinstance(state, dict) else {}
+            visual_review_state = state.get("visual_reviews", {}) if isinstance(state, dict) else {}
+            revision_state = state.get("revision_plans", {}) if isinstance(state, dict) else {}
+            qa_report = state.get("qa_report", {}) if isinstance(state, dict) else {}
             artifact_records = (
                 artifact_registry.get("records", []) if isinstance(artifact_registry, dict) else []
             )
             execution_attempts = (
                 execution_state.get("attempts", []) if isinstance(execution_state, dict) else []
+            )
+            visual_reviews = (
+                visual_review_state.get("records", []) if isinstance(visual_review_state, dict) else []
+            )
+            revision_plans = (
+                revision_state.get("records", []) if isinstance(revision_state, dict) else []
+            )
+            artifact_review = (
+                qa_report.get("artifact_review", {}) if isinstance(qa_report, dict) else {}
             )
             summaries.append(
                 {
@@ -118,6 +132,15 @@ class TaskStore:
                     "provider_execution_count": len(execution_attempts)
                     if isinstance(execution_attempts, list)
                     else 0,
+                    "visual_review_count": len(visual_reviews)
+                    if isinstance(visual_reviews, list)
+                    else 0,
+                    "revision_plan_count": len(revision_plans)
+                    if isinstance(revision_plans, list)
+                    else 0,
+                    "artifact_review_status": artifact_review.get("status")
+                    if isinstance(artifact_review, dict)
+                    else None,
                 }
             )
         summaries.sort(
