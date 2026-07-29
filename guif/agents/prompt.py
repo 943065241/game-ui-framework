@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from guif.agents.base import Agent
+from guif.approval import initialize_approvals
 from guif.prompt_ir import build_prompt_ir, validate_prompt_ir
 
 if TYPE_CHECKING:
@@ -19,6 +20,9 @@ class StructuredPromptAgent(Agent):
         errors = validate_prompt_ir(prompt_ir)
         if errors:
             raise ValueError("Invalid Prompt IR: " + "; ".join(errors))
+        task.state["prompt_ir"] = prompt_ir
+        task.add_output("model-neutral-prompt-ir", prompt_ir, agent=self.name)
+        approval_state = initialize_approvals(task)
         task.state.setdefault("agents", {})[self.name] = {
             "status": "completed",
             "implementation": "model-neutral-prompt-ir",
@@ -27,12 +31,11 @@ class StructuredPromptAgent(Agent):
             "job_count": len(prompt_ir["jobs"]),
             "blocker_count": len(prompt_ir["blockers"]),
             "approval_point_count": len(prompt_ir["approval_points"]),
+            "required_approval_count": len(approval_state["required_ids"]),
         }
-        task.state["prompt_ir"] = prompt_ir
-        task.add_output("model-neutral-prompt-ir", prompt_ir, agent=self.name)
         task.record(
             self.name,
             "completed",
-            f"Prompt IR created with {len(prompt_ir['jobs'])} job(s) and status {prompt_ir['status']}.",
+            f"Prompt IR created with {len(prompt_ir['jobs'])} job(s), status {prompt_ir['status']}, and {len(approval_state['required_ids'])} required approval(s).",
         )
         return task
