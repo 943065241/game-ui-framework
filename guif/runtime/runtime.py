@@ -8,19 +8,7 @@ from guif.runtime.pipeline import Pipeline
 from guif.runtime.registry import AgentRegistry
 from guif.runtime.store import TaskStore
 from guif.runtime.task import Task
-
-
-DEFAULT_PIPELINES = {
-    "ui-production": Pipeline(
-        "ui-production",
-        ("planner", "director", "theme", "resource", "prompt", "qa", "export"),
-    ),
-    "planning": Pipeline("planning", ("planner",)),
-    "resource-production": Pipeline(
-        "resource-production",
-        ("director", "theme", "resource", "prompt", "qa", "export"),
-    ),
-}
+from guif.workflow import load_workflow
 
 
 class RuntimeExecutionError(RuntimeError):
@@ -38,14 +26,18 @@ class Runtime:
     ) -> None:
         self.workspace = workspace
         self.registry = registry or AgentRegistry(build_default_agents())
-        self.pipelines = dict(pipelines or DEFAULT_PIPELINES)
+        self.pipelines = dict(pipelines or {})
         self.store = store or TaskStore(workspace)
 
-    def _resolve_pipeline(self, name: str) -> Pipeline:
+    def _resolve_pipeline(self, project: str, name: str) -> Pipeline:
+        configured = self.pipelines.get(name)
+        if configured is not None:
+            return configured
         try:
-            return self.pipelines[name]
-        except KeyError as exc:
+            workflow = load_workflow(self.workspace, project, name)
+        except FileNotFoundError as exc:
             raise ValueError(f"Unknown pipeline: {name}") from exc
+        return Pipeline.from_workflow(workflow)
 
     def _execute(self, task: Task, pipeline: Pipeline, *, start_index: int) -> Task:
         task.start()
@@ -71,7 +63,7 @@ class Runtime:
     def run(self, project: str, requirement: str, *, pipeline: str = "ui-production") -> Task:
         if not requirement.strip():
             raise ValueError("Requirement must not be empty")
-        resolved_pipeline = self._resolve_pipeline(pipeline)
+        resolved_pipeline = self._resolve_pipeline(project, pipeline)
         context = load_runtime_context(self.workspace, project)
         task = Task(
             project=project,
@@ -79,14 +71,26 @@ class Runtime:
             pipeline=resolved_pipeline.name,
             context=context,
         )
-        task.record("runtime", "started", f"Loaded project context for {project}")
+        task.state["pipeline"] = resolved_pipeline.to_dict()
+        task.record(
+            "runtime",
+            "started",
+            f"Loaded project context and workflow {resolved_pipeline.name} for {project}",
+        )
         return self._execute(task, resolved_pipeline, start_index=0)
 
     def resume(self, project: str, task_id: str) -> Task:
         task = self.store.load(project, task_id)
         if task.status == "completed":
             raise ValueError(f"Task is already completed: {task_id}")
-        resolved_pipeline = self._resolve_pipeline(task.pipeline)
+        resolved_pipeline = self._resolve_pipeline(project, task.pipeline)
+        stored_agents = tuple(task.state.get("pipeline", {}).get("agents", ()))
+        if stored_agents and stored_agents != resolved_pipeline.agents:
+            raise ValueError(
+                "Workflow agents changed after the task was created; resume is unsafe. "
+                f"stored={stored_agents}, current={resolved_pipeline.agents}"
+            )
+        task.state["pipeline"] = resolved_pipeline.to_dict()
         task.record(
             "runtime",
             "resumed",
