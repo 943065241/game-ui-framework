@@ -1,7 +1,7 @@
 # GUIF Product Specification / GUIF 产品规格说明
 
 > Status / 状态: Living document / 持续迭代文档  
-> Baseline / 基线版本: `v1.0.0-alpha.21`  
+> Baseline / 基线版本: `v1.0.0-alpha.22`  
 > Last reviewed / 最近审阅: 2026-07-29
 
 ---
@@ -10,15 +10,13 @@
 
 ### 0. 文档目的
 
-本文件是 GUIF 的产品定义、已验证能力、边界、风险和后续迭代基线。产品定位、Runtime、Task、Host、Tool、Approval、Artifact、Visual Review、Revision、Export 或兼容性发生变化时，必须在同一个 Release 或 Pull Request 中更新本文件。
-
-一次 Release 只有在 Feature、Test、CI、中英文 README、Version Metadata 和本文件一致时才算完成。
+本文件定义 GUIF 的产品定位、已验证能力、边界、风险与迭代基线。Feature、Test、CI、中英文 README、Version Metadata 和本文件必须在同一个 Release 中保持一致。
 
 ### 1. 产品定义
 
-GUIF 是一个以自然语言为主要入口、由可配置 Host 调度、通过可配置 Tool 完成具体工作、以 Project File 与 Git 作为长期事实来源、面向游戏 UI 生产全过程的可执行 AI 工作框架。
+GUIF 是一个本地优先、以自然语言为主要入口、Host 与 Tool 均可配置、以 Project File 与 Git 作为长期事实来源、面向游戏 UI 全生产流程的可执行 AI 工作框架。
 
-默认产品路径：
+默认路径：
 
 ```text
 用户
@@ -29,346 +27,213 @@ GUIF 是一个以自然语言为主要入口、由可配置 Host 调度、通过
        -> Planner / Director / Theme / Resource / Prompt
        -> Contract QA
        -> Initial Approval
-       -> Tool Resolver
-            -> Discovery
-            -> Connection Workflow
-            -> Tool Execution / External Handoff
+       -> Tool Discovery / Connection / Execution
        -> Artifact Registry
        -> Visual Review
        -> Controlled Revision
        -> Gated Export
+       -> Project Truth / Engine Output / Audit
 ```
 
-ChatGPT 在默认路径中承担两个独立角色：
+核心原则：
 
-- **ChatGPT Host**：负责对话、确认、调度、Tool Invocation 与结果展示；
-- **`chatgpt-image` Tool**：通过 External Callback 完成图片生成和修图。
+- ChatGPT-first，但不把 ChatGPT 写死在 Core；
+- Tool 可配置，生产任务缺少 Tool 时 Fail Closed；
+- 先审批、后执行；先 Review、后 Supersession；
+- Artifact 与 Source 通过 SHA-256 保持身份；
+- Metadata Review 不冒充 Semantic Visual Review；
+- 未通过全部 Gate 的结果不得写入 Project Truth；
+- 生产变更必须可审计、可恢复，并避免覆盖后续修改。
 
-二者都是默认值，不是 GUIF Core 的硬编码依赖。
+### 2. alpha.22 已验证能力
 
-### 2. 核心原则
+#### 2.1 Gated Export Plan
 
-- Host 与 Tool 均可配置；
-- ChatGPT-first 默认体验；
-- Review Before Execute / Write；
-- 生产任务 Fail Closed；
-- 不允许隐式 Dry-run Fallback；
-- Discovery 不等于安装；
-- Connection 必须显式审批；
-- 权限、数据范围、外部调用、费用和 Credential 必须披露；
-- GUIF 只保存 Credential Reference，不保存 Secret；
-- Simulation、Metadata Check 和 Semantic Review 必须区分；
-- Revision Source 不覆盖，Replacement 必须通过 Review 后才能 Supersede；
-- 所有关键状态必须可持久化、可审计、可恢复。
+`Runtime.prepare_gated_export()` 会读取持久化 Task 并生成可审阅 Export Record，不修改 Project 文件。
 
-### 3. alpha.21 已验证能力
+检查项：
 
-#### 3.1 Host Capability Discovery
+1. Task 为 `completed`；
+2. Initial Approval 为 `approved` 或 `not-required`；
+3. Contract QA 为 `passed`；
+4. 聚合 `qa_report.export_gate.allowed` 为 true；
+5. 存在 Active `production-asset` Artifact；
+6. Artifact 不是 Simulation，包含真实视觉 Pixel，并且 Visual Review 为 `passed`；
+7. Artifact 文件仍位于 Run Directory 内，且 SHA-256 与登记记录一致；
+8. Artifact Output Contract 与已批准 Resource Manifest Candidate 一致；
+9. 同一个 Resource 只有一个 Active Artifact；
+10. 所有 Revision Plan 为 `resolved` 或 `rejected`；
+11. Resource Target 与 Export Target Engine 兼容。
 
-Runtime 提供 `guif-host-capability-discovery-v1`：
+任一检查失败：
+
+```text
+Export.status = blocked
+Project Truth 不变
+Engine Output 不创建
+```
+
+#### 2.2 Project Truth Materialization
+
+Ready Export 将已批准生产资源写入：
+
+```text
+projects/<project>/production-assets/files/<output-name>
+projects/<project>/production-assets/<resource-id>.resource.json
+```
+
+Materialized Manifest 的 `source` 指向由 GUIF 管理的生产文件。已有文件在覆盖前保存 Backup。
+
+当前只 Materialize Active `production-asset` Artifact。Effect Image、Simulation、Receipt、Stale Artifact 和未完成 Review 的 Artifact 不进入生产集合。
+
+#### 2.3 Engine-specific Export
+
+每次执行创建独立目录：
+
+```text
+projects/<project>/exports/<engine>/<export-id>/
+  approved assets
+  adapter metadata
+  export-manifest.json
+```
+
+继续支持 Generic、Unity、Godot 和 Unreal Adapter。Manifest 保存：
+
+- Export、Task、Project、Target Engine 和 Actor；
+- Gate Snapshot；
+- Artifact、Job、Review、Resource 与 SHA-256；
+- Project Truth Path；
+- Engine Output Path 与 Hash；
+- Adapter Result 和 Import Hint。
+
+#### 2.4 Transaction Audit
+
+每次完成的 Export 创建：
+
+```text
+projects/<project>/export-history/<export-id>/
+  transaction.json
+  backups/
+```
+
+Transaction 对每个生产变更保存：
+
+- Path；
+- 文件之前是否存在；
+- Before SHA-256；
+- Backup Path；
+- After SHA-256；
+- Actor 与时间；
+- Engine Output 与 Export Manifest。
+
+执行过程发生异常时，GUIF 自动恢复已经写入的 Project 文件并删除不完整 Engine Output。
+
+#### 2.5 Conflict-aware Rollback
+
+Rollback 会在恢复前比较当前文件 Hash 与 Export 写入时的 After Hash。
+
+```text
+文件未被后续修改
+  -> 安全恢复 Backup 或删除新建文件
+
+文件已被后续修改
+  -> 默认拒绝 Rollback
+  -> 只有明确 force + actor + reason 才允许继续
+```
+
+Rollback 的状态、Actor、Reason、Force 与冲突列表会进入 Task Event、Export Record 和 Transaction Audit。
+
+#### 2.6 Persistence 与 Runtime API
+
+Run Directory 新增：
+
+```text
+gated-exports.json
+```
+
+`run-list` 新增：
+
+```text
+gated_export_count
+completed_export_count
+latest_export_status
+```
+
+Runtime API：
 
 ```python
-runtime.discover_host()
+prepare_gated_export(project, task_id, target_engine=None)
+execute_gated_export(project, task_id, target_engine=None, actor="host")
+list_gated_exports(project, task_id)
+get_gated_export(project, task_id, export_id)
+rollback_gated_export(project, task_id, export_id, actor=..., reason=..., force=False)
 ```
 
-报告包括 Host ID、Capability、Available Tool、Metadata 和 Discovery Timestamp。
-
-默认 ChatGPT Host 声明：
+CLI：
 
 ```text
-image-generation
-image-editing
-protected-region-editing
-transparent-output
-visual-inspection
-github-operation
+run-export-plan
+run-export-execute
+run-export-list
+run-export-show
+run-export-rollback
 ```
 
-#### 3.2 Tool 状态模型
+### 3. 与既有能力的关系
 
-GUIF 现在区分：
+alpha.22 不替代以下能力：
 
-```text
-registered   当前 Runtime 中存在 Adapter
-available    当前 Host 或本地 Runtime 可以使用
-installable  Catalog 中存在安装信息，但 Adapter 尚未注册
-```
+- alpha.16 Initial Approval；
+- alpha.17 Artifact Registry；
+- alpha.18 Visual Review 与 Revision Plan；
+- alpha.19 Configurable Host / Tool 与 ChatGPT Handoff；
+- alpha.20 Revision Job、独立 Revision Approval、Immutable Source 与 Gated Supersession；
+- alpha.21 Tool Discovery、Connection、Credential Reference、Health Retry 与 Contract Test。
 
-Discovery Record 还包含：
+旧版 `guif export` 继续用于已经存在于 Project Truth 的 Resource。Task 产生的 AI Artifact 应通过 Gated Export 才能进入生产文件。
 
-```text
-ready
-manifest
-health
-connection_status
-host_id
-mode
-disclosure
-```
+### 4. 当前边界
 
-`available` 不代表用户已经批准绑定到 Project；`installable` 不代表 Tool 已安装或可信。
+- 默认 Semantic Visual Inspector Registry 为空；
+- ChatGPT 产品侧尚未自动消费 Handoff 并提交结果；
+- Gated Export 尚未把 Approved Reuse Resource 与新 Artifact 合并为同一事务；
+- Actor 仍是字符串，没有认证和签名；
+- Rollback 尚未与 Git Branch、Commit 和 Revert 集成；
+- 没有 Remote Object Storage、Retention、Lease 或 Concurrent Export Lock；
+- Export Manifest 尚未签名；
+- Engine Adapter 仍生成导入 Metadata，不直接操作运行中的 Unity、Godot 或 Unreal Editor。
 
-#### 3.3 Workspace Tool Catalog
-
-可选 Catalog 文件：
-
-```text
-.guif/tool-catalog.json
-```
-
-Catalog Entry 必须声明：
-
-- Tool ID、Name、Version；
-- Capability；
-- Install Method 与 Source；
-- Permission；
-- Data Scope；
-- External Call；
-- Billable / Unknown Cost；
-- Credential Requirement 与 Credential Kind；
-- Supported Host。
-
-GUIF 不会根据 Catalog 自动安装 Tool。
-
-#### 3.4 Tool Disclosure
-
-Registered Tool Manifest 与 Catalog Entry 都会输出统一 Disclosure：
-
-```json
-{
-  "permissions": [],
-  "data_scopes": [],
-  "external_call": true,
-  "cost": "unknown",
-  "billable": null,
-  "requires_credentials": false,
-  "credential_kind": null,
-  "supported_hosts": ["chatgpt"]
-}
-```
-
-Cost 状态为：
-
-```text
-billable
-no-charge
-unknown
-```
-
-`unknown` 必须被明确展示，不能默认为免费。
-
-#### 3.5 Connection Request
-
-当 Tool 缺失、未注册或不可用时，Runtime 保持 `waiting-for-tool`。对于非 Reference 文件问题，Runtime 会关联一个 Project 级 Connection Request。
-
-Connection Lifecycle：
-
-```text
-pending
-  -> approved / rejected
-  -> connected
-  -> installation-required
-  -> waiting-for-credentials
-  -> waiting-for-host-support
-  -> health-check-failed
-  -> unsupported
-```
-
-Request 保存：
-
-- Capability 与 Required Capability；
-- Tool ID；
-- Requested By 与 Reason；
-- Tool State；
-- Disclosure Snapshot；
-- Approval Actor、Comment 与 Timestamp；
-- Credential Reference；
-- Health Result；
-- Recovery Actions；
-- Decision History。
-
-#### 3.6 Connection 决策规则
-
-```text
-Reject
-  -> 不修改 Project Tool Configuration
-
-Approve Registered + Healthy Tool
-  -> Bind Project Capability
-  -> connected
-
-Approve Installable-only Tool
-  -> installation-required
-  -> 不自动安装
-
-Approve Credential Tool without reference
-  -> waiting-for-credentials
-
-Approve Tool without Host support
-  -> waiting-for-host-support / health-check-failed
-```
-
-重复执行 Approve 可以在提供 Credential Reference 后继续完成 Connection。
-
-#### 3.7 Credential Policy
-
-允许保存：
-
-```text
-env://TOKEN_NAME
-secret-manager://project/tool
-host-vault://connection-id
-```
-
-禁止保存：
-
-```text
-API Key Secret
-Password
-Access Token Value
-Private Key Content
-```
-
-Connection Record 明确包含：
-
-```json
-{
-  "secret_stored_by_guif": false
-}
-```
-
-Credential 的真实解析由 Host、Plugin、运行环境或 Secret Manager 完成。
-
-#### 3.8 Health Check Retry
-
-```python
-runtime.retry_tool_health(project, tool_id)
-```
-
-每次 Retry 保存 Attempt、Host、Mode、Health Result 与 Timestamp。已经 Approved 的 Request 在配置恢复健康后可以自动进入 `connected`。
-
-#### 3.9 Tool Adapter Contract Test Runner
-
-```python
-runtime.run_tool_contract_tests(tool_id)
-```
-
-Runner 为 Side-effect-free，不调用外部服务。检查：
-
-- Manifest Schema；
-- Adapter / Manifest Identity；
-- Capability；
-- Input / Output Contract；
-- Execution Mode 对应实现；
-- Permission / Data Scope / Cost / Credential Disclosure；
-- Health Check Identity 和 Status Shape。
-
-Contract Test Passed 不代表：
-
-- Plugin 已安装；
-- Plugin 已签名；
-- Plugin 来源可信；
-- 用户已批准 Connection；
-- Tool 可以访问 Production Data。
-
-#### 3.10 持久化
-
-Project 级文件：
-
-```text
-projects/<project>/tool-connections.json
-```
-
-保存 Connection Requests、Decision History、Disclosure Snapshot、Credential Reference 和 Health Check History。
-
-Task 级文件继续保存于 Run Directory：
-
-```text
-tool-resolution.json
-tool-handoffs.json
-executions.json
-artifacts.json
-visual-reviews.json
-revision-plans.json
-revision-execution.json
-```
-
-### 4. 已有闭环
-
-当前 GUIF 可以完成：
-
-```text
-Project Init
--> Requirement
--> Plan / Direction / Theme / Resource / Prompt
--> Contract QA
--> Initial Approval
--> Tool Discovery / Resolution
--> Connection Request when needed
--> ChatGPT Handoff or Direct Tool
--> External Result Submission
--> Artifact Registration
--> Visual Eligibility / Metadata Review
--> Revision Plan
--> Independent Revision Approval
--> Editing Tool
--> Replacement Artifact
--> Re-review
--> Passing Review gated Supersession
-```
-
-### 5. 当前限制
-
-- 不自动安装 Plugin；
-- 不动态加载新安装 Adapter；
-- Catalog 尚无签名、远程可信校验和 Distribution Metadata；
-- Host、Approval Actor 和 Result Submitter 尚未认证；
-- GUIF Core 不解析 Credential Reference；
-- ChatGPT 产品侧 Handoff 自动 Callback Wiring 尚未完成；
-- 默认 Semantic Visual Inspector 仍为空；
-- Mask、多 Source Revision 和 Protected Region Package 尚未标准化；
-- Export Agent 仍为 Contract-only；
-- Git Change Management 未开发。
-
-### 6. 后续迭代
-
-#### alpha.22：Gated Export Agent
-
-- Export Agent 消费 Active Artifact；
-- 验证 Contract QA、Visual Review、Revision Resolution；
-- 匹配 Resource Contract；
-- Materialize Approved Production Asset 到 Project Truth；
-- Engine-specific Export Manifest；
-- Rollback 与 Audit。
+### 5. 下一阶段
 
 #### alpha.23：Authenticated Host API 与 Git Change Management
 
 - Stable Host Result Protocol；
-- Authenticated Host / Actor Identity；
-- Result Submission Authorization；
-- Git Change Set、Branch、Commit、Rollback；
-- Pause、Cancel、Streaming、Summary。
+- Authenticated Host / Approval / Export Actor；
+- Optimistic Concurrency 与 Task Lease；
+- Git Change Set；
+- Branch、Commit、Diff、Revert；
+- Export Transaction 与 Git Commit 关联；
+- Pause、Cancel、Timeout 和 Result Summary。
 
-#### alpha.24：Plugin Distribution 与 Trust
+#### 后续候选
 
-- Signed Catalog；
-- Dynamic Adapter Loading；
-- Dependency Isolation；
-- Permission Enforcement；
-- Credential Resolver Contract；
-- Remote Catalog 与 Version Upgrade。
+- Approved Reuse Resource Packaging；
+- Multi-source 与 Mask Package Revision；
+- Signed Tool / Export Manifest；
+- Cost、Latency、Privacy 与 Quality-aware Tool Routing；
+- Remote Artifact Store 与 Retention；
+- Native Engine Editor Integration。
 
-### 7. 主要风险
+### 6. 主要风险
 
-- 如何把 ChatGPT Product Tool Call 自动连接到 GUIF Handoff / Result Submission；
-- Catalog 和 Plugin 的信任、签名与供应链安全；
-- Cost、Latency、Privacy 和 Quality-aware Routing；
-- Credential Reference 的跨 Host 可移植性；
-- Waiting State 的并发、Lease、Timeout 和 Optimistic Lock；
-- Upstream Contract 变化后 Approval、Handoff、Artifact、Revision 和 Connection 是否失效；
-- 如何避免 Framework 继续增加 Contract，却没有真实产品侧自动化。
+- Host Callback 仍依赖产品侧编排；
+- Semantic Inspection 的默认责任主体尚未确定；
+- 未认证 Actor 无法作为强审计身份；
+- 文件系统事务不能完全替代 Git 或数据库事务；
+- Force Rollback 可能覆盖后续工作，必须保持显式且可审计；
+- Framework 可能继续增加 Contract，而没有缩短真实用户生产路径。
 
-### 8. 迭代记录
+### 7. 迭代记录
 
 - `alpha.9`：Runtime、Task、Agent、Registry、Pipeline Contract。
 - `alpha.10`：Persistent Run、Checkpoint、Failure Resume。
@@ -379,10 +244,11 @@ Project Init
 - `alpha.15`：Semantic Contract QA。
 - `alpha.16`：Persistent Approval 与 Controlled State Transition。
 - `alpha.17`：Provider Adapter、Dry-run 与 Artifact Registry。
-- `alpha.18`：Visual Artifact Inspection、Revision Plan、Supersession。
-- `alpha.19`：Configurable Host / Tool、ChatGPT Bridge、Waiting State、External Submission。
-- `alpha.20`：Controlled Revision Job、Independent Revision Approval、Immutable Source、Review-gated Supersession。
-- `alpha.21`：Host / Tool Discovery、Registered / Available / Installable State、Connection Request、Disclosure、Credential Reference、Health Retry 与 Contract Test Runner。
+- `alpha.18`：Visual Artifact Inspection、Revision Plan 与 Supersession。
+- `alpha.19`：Configurable Host / Tool、ChatGPT Bridge、Waiting State 与 External Submission。
+- `alpha.20`：Revision Job、Independent Approval、Immutable Source 与 Review-gated Supersession。
+- `alpha.21`：Host / Tool Discovery、Connection Request、Credential Reference 与 Contract Test。
+- `alpha.22`：Gated Export Plan、Project Truth Materialization、Engine Export Manifest、Transaction Audit 与 Conflict-aware Rollback。
 
 ---
 
@@ -390,52 +256,87 @@ Project Init
 
 ### 0. Purpose
 
-This living document defines GUIF's product scope, verified capabilities, boundaries, risks, and next iteration baseline. It must change in the same release whenever Runtime, Host, Tool, Approval, Artifact, Review, Revision, Export, or compatibility changes.
+This file is GUIF's living product definition, verified capability review, boundary, risk register, and iteration baseline. Feature implementation, tests, CI, both READMEs, version metadata, and this specification must agree for a release to be complete.
 
 ### 1. Product definition
 
-GUIF is an executable game UI production framework with a natural-language entry point, configurable Hosts, configurable Tools, Project files and Git as durable truth, inspectable execution, and recoverable state.
+GUIF is a local-first executable AI work framework for end-to-end game UI production. Natural language is the primary interface, Hosts and Tools are configurable, and Project files plus Git are the long-term source of truth.
 
-ChatGPT is the default Host and `chatgpt-image` is the default image generation and editing Tool. They are replaceable defaults, not Core dependencies.
+Default path:
 
-### 2. Verified state at alpha.21
+```text
+User
+  -> ChatGPT Host by default
+  -> GUIF Runtime
+  -> deterministic production Agents
+  -> Contract QA and initial Approval
+  -> Tool discovery, connection, and execution
+  -> Artifact Registry
+  -> Visual Review
+  -> controlled Revision
+  -> Gated Export
+  -> Project truth, Engine output, and audit
+```
 
-GUIF now exposes a Host capability discovery protocol and distinguishes registered, available, and installable Tools.
+Core principles:
 
-A Tool discovery record includes current state, readiness, Manifest or Catalog metadata, Health Check, Project connection status, and permission, data-scope, external-call, cost, credential, and Host-support disclosures.
+- ChatGPT-first, not ChatGPT-hard-coded;
+- production fail-closed behavior;
+- approval before execution and review before supersession;
+- SHA-256 Artifact and source identity;
+- no false semantic visual claims;
+- no Project mutation before every required gate passes;
+- auditable and recoverable production changes;
+- rollback must not silently overwrite later work.
 
-Workspace installable entries may be declared in `.guif/tool-catalog.json`. Catalog entries are evidence only; GUIF does not auto-install or auto-register them.
+### 2. Verified state at alpha.22
 
-When an eligible Tool resolution fails, GUIF keeps the Task in `waiting-for-tool` and links a persisted Project connection request. The user can approve or reject after reviewing disclosures. Approval may produce `connected`, `installation-required`, `waiting-for-credentials`, `waiting-for-host-support`, or `health-check-failed`.
+#### 2.1 Gated Export Plan
 
-Credentials are represented only by opaque references. GUIF explicitly records that it did not store the secret value.
+`Runtime.prepare_gated_export()` evaluates persisted Task state without mutating Project files.
 
-Health retries are persisted and can complete an already approved connection after configuration becomes healthy.
+It requires a completed Task, satisfied initial Approval, passing Contract QA, aggregate Visual Export Gate approval, at least one active production Artifact, real reviewed pixels, valid Run-local path and SHA-256 identity, an exact approved Resource Contract match, unique active Resource identity, resolved or rejected Revision Plans, and Engine compatibility.
 
-The Tool Adapter contract-test runner performs no external calls. It validates Manifest identity, capabilities, I/O contracts, execution method, disclosures, and Health Check shape.
+A failed check persists a blocked Export record and performs no production write.
 
-### 3. Existing production loop
+#### 2.2 Project truth materialization
 
-The alpha.20 controlled Revision lifecycle remains active: Visual findings become separately approved edit Jobs, source files are immutable and hash-verified, replacements receive automatic metadata review, and sources are superseded only after a passing semantic visual review.
+A ready Export writes managed assets and Resource manifests under `production-assets/`. Existing files are backed up before replacement. Only active reviewed `production-asset` Artifacts are selected.
+
+#### 2.3 Engine output
+
+Each execution creates `exports/<engine>/<export-id>/` with approved assets, Engine Adapter metadata, and `export-manifest.json`. The manifest captures gate, Artifact, Resource, review, SHA-256, path, actor, and Adapter provenance.
+
+#### 2.4 Audit and rollback
+
+`export-history/<export-id>/transaction.json` records every mutation and backup. Execution failures trigger automatic restoration. Explicit rollback compares current hashes with the hashes written by the Export and fails closed when later Project changes are detected. Force rollback requires an actor and reason and remains auditable.
+
+#### 2.5 APIs and persistence
+
+New Runtime APIs prepare, execute, list, show, and roll back gated Exports. `gated-exports.json` persists Task-bound state, and Run summaries expose Export counts and latest status.
+
+### 3. Compatibility
+
+Alpha.22 builds on persistent Approval, Artifact Registry, Visual Review, configurable Tools, ChatGPT external handoffs, controlled Revision Jobs, immutable source binding, Tool Discovery, Connection Requests, opaque Credential references, Health Retry, and Tool Contract Tests.
+
+The legacy `guif export` command remains available for Resources already present in Project truth. AI-produced Artifacts should use the gated Task-bound path.
 
 ### 4. Remaining gaps
 
-- automatic Plugin installation and dynamic Adapter loading;
-- signed and remotely verified Catalogs;
-- authenticated Host, Approval, and Result identities;
-- Credential Reference resolution;
-- automatic ChatGPT product-side callback wiring;
-- default semantic visual inspection;
-- mask and multi-source Revision contracts;
-- gated production Export Agent;
-- Git change management.
+- automatic ChatGPT product callback wiring;
+- a default semantic Visual Inspector;
+- authenticated and signed actors;
+- packaging approved reused Resources in the same Export transaction;
+- Git branch, commit, and revert integration;
+- concurrent Export locking and Task leases;
+- remote Artifact storage and retention;
+- signed Export manifests;
+- native live Engine editor integration.
 
-### 5. Next phases
+### 5. Next phase
 
-1. `alpha.22`: Gated Export Agent, approved Artifact materialization, engine-specific manifests, rollback, and audit.
-2. `alpha.23`: Authenticated Host API, result authorization, and Git change management.
-3. `alpha.24`: Plugin distribution, signed Catalogs, dynamic loading, dependency isolation, permission enforcement, and Credential Resolver contracts.
+`alpha.23` will focus on an authenticated Host API and Git change management: stable result protocol, actor identity, optimistic concurrency, leases, Git change sets, branches, commits, diffs, reverts, transaction-to-commit linkage, cancellation, timeouts, and execution summaries.
 
 ### 6. Main risks
 
-The principal unresolved questions concern ChatGPT product-side automatic callbacks, Plugin supply-chain trust, cost/privacy-aware routing, credential portability, waiting-state concurrency, stale contract invalidation, and avoiding contract growth without real product automation.
+The main risks are product-side callback dependency, unresolved semantic inspection ownership, weak string actor identity, file transactions without Git or database atomicity, dangerous forced rollback, and interface growth that does not shorten the real user production path.
