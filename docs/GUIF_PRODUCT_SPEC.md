@@ -1,7 +1,7 @@
 # GUIF Product Specification / GUIF 产品规格说明
 
 > Status / 状态: Living document / 持续迭代文档  
-> Baseline / 基线版本: `v1.0.0-alpha.17`  
+> Baseline / 基线版本: `v1.0.0-alpha.18`  
 > Last reviewed / 最近审阅: 2026-07-29
 
 ---
@@ -15,7 +15,7 @@
 发生以下变化时，必须在同一个 Release 或 Pull Request 中同步更新本文件：
 
 - 产品定位、边界或核心原则变化；
-- Runtime、Task、Agent、Workflow、Pipeline、Context、Memory、Theme、Resource、Prompt、Approval、Provider、Artifact、QA 或 Export 等核心能力变化；
+- Runtime、Task、Agent、Workflow、Context、Prompt、Approval、Provider、Artifact、Visual Review、Revision、QA 或 Export 等核心能力变化；
 - 某项能力从 Contract / 占位升级为真实可执行能力；
 - CLI、Agent Host 接入方式、Project 目录或数据格式发生兼容性变化；
 - 迭代优先级、已知风险或待验证假设变化。
@@ -34,85 +34,74 @@ GUIF 是一个以自然语言为主要入口、由 ChatGPT 或其他 Agent Host 
 用户：为《韭菜派对》制作中世纪港口商店页面，
 复用已有金币和按钮，检查后导出 Unity。
 
-ChatGPT / Agent Host
+Agent Host
   -> 选择 Project
-  -> 调用 GUIF Runtime
-  -> 加载完整 Project Context Snapshot
-  -> 选择相关 Memory、Resource 和 Workflow
-  -> Planner 生成 Production Plan
-  -> Director 生成 Art Direction Review
-  -> Theme Agent 生成 Resolved Theme Contract
-  -> Resource Agent 生成 Resource Contract Bundle
-  -> Prompt Agent 生成 Model-neutral Prompt IR
-  -> Semantic QA 检查 Contract 与执行安全
-  -> Human / Host 审批 Approval Point
-  -> Provider Adapter 执行已批准 Job
-  -> Artifact Registry 保存产物与 Provenance
-  -> Visual QA 检查真实视觉结果
-  -> Revision Loop 修订并复检
-  -> Export Agent 交付 Engine-ready Output
-  -> 保存 Task、Output、Decision、Report、Artifact 和 Git Change
+  -> GUIF Runtime 加载 Context 并解析 Workflow
+  -> Planner / Director / Theme / Resource
+  -> Prompt IR 与 Contract QA
+  -> Human Approval
+  -> Provider Execution
+  -> Artifact Registration
+  -> Visual Eligibility 与 Metadata Review
+  -> Visual Inspection Adapter
+  -> Revision Plan / Revision Execution
+  -> Gated Export
+  -> 保存 Task、Approval、Execution、Artifact、Review、Revision 与 Git Change
 ```
 
-CLI 用于开发、调试、自动化和 CI，不应成为普通用户的主要工作方式。
+普通用户主要表达目标和审批关键决定；CLI 用于实现、调试、自动化和 CI。
 
 #### 1.3 核心价值
 
-- **自然语言优先**：用户表达目标，Framework 负责拆解、约束和执行。
-- **长期 Project Knowledge**：Theme、Decision、Lesson、Mistake 和 Best Practice 由 Project File 与 Git 追踪。
-- **可执行而非 Prompt Collection**：GUIF 必须产生 Task、Plan、Review、Contract、Prompt IR、Approval、Execution、Artifact 和 QA Report。
-- **Model / Provider Agnostic**：Runtime 和 Prompt IR 不直接依赖单一 Provider。
-- **Project Isolation**：Framework Code 与具体游戏 Project 分离。
-- **Deterministic Production**：Naming、Dimension、Alpha、Validation、Hash、Export 和 Engine Adaptation 尽可能可重复。
-- **可审计、可恢复**：Run 必须说明读取了什么、选择了什么、执行了什么、产生了什么、为什么失败，以及如何继续。
-- **Review Before Write / Execute**：推导结果未经批准，不得成为 Project Truth，也不得自动提交给 Provider。
-- **Capability Before Invocation**：Provider 调用前必须验证 Capability 与 Reference Binding。
-- **No False Verification**：没有检查视觉 Artifact 时，不得声称视觉质量已经通过。
+- **自然语言优先**：用户表达目标，Framework 负责拆解、约束、执行和解释。
+- **可执行而非 Prompt Collection**：GUIF 必须产生 Task、Plan、Contract、Approval、Execution、Artifact、Review 和 Revision。
+- **Model / Provider Agnostic**：Runtime、Prompt IR、Provider 和 Visual Inspection Contract 不绑定单一服务。
+- **Project Isolation**：不同游戏的 Theme、Resource、Memory、Run 和 Artifact 互不污染。
+- **Deterministic Contract**：Naming、Dimension、Alpha、Hash、State Transition、Validation 和 Export 尽可能可重复。
+- **可审计、可恢复**：每次 Run 必须说明输入、Context、Decision、Execution、Artifact、Failure 和下一步。
+- **Review Before Write / Execute**：未经批准不得把推导结果写入 Project Truth 或调用 Provider。
+- **Capability Before Invocation**：Provider 与 Visual Inspector 必须声明并满足 Capability。
+- **No False Verification**：Simulation、Metadata Check 和 Visual Semantic Review 必须明确区分。
+- **Immutable Provenance**：Revision 不覆盖原 Artifact，旧结果保留并通过 Supersession 关联。
 
 #### 1.4 目标架构
 
 ```text
-User
-  -> ChatGPT / Agent Host
+User / Agent Host
   -> GUIF Runtime
-       -> Context Loader
-       -> Context Retrieval
-       -> Workflow Resolver
-       -> Pipeline
-       -> Task Store
+       -> Context Loader / Retrieval
+       -> Workflow Resolver / Pipeline
        -> Agent Registry
-            -> Planner Agent
-            -> Director Agent
-            -> Theme Agent
-            -> Resource Agent
-            -> Prompt Agent
-            -> Semantic QA Agent
+            -> Planner
+            -> Director
+            -> Theme
+            -> Resource
+            -> Prompt
+            -> Semantic Contract QA
        -> Approval Gate
        -> Provider Registry
-            -> Dry-run Provider
-            -> future Image / Editing / Figma Provider
        -> Artifact Registry
-       -> Visual QA Adapter / Agent
-       -> Revision Loop
+       -> Visual Review Service
+            -> Eligibility / Integrity
+            -> Image Metadata Inspection
+            -> Visual Inspection Registry
+            -> Revision Planner
+       -> Revision Execution
+       -> Visual Recheck
        -> Export Agent
-       -> Outputs + Reports + Memory + Git Changes
+       -> Task Store / Git Change Management
 ```
 
 职责边界：
 
-- **Agent Host**：理解对话、确认用户意图、提供 Actor Identity、处理 Approval 并解释结果。
-- **Runtime**：加载 Context、解析 Workflow、创建或恢复 Task、调度 Agent、保存 Checkpoint，并执行 Approval / Provider / Artifact 状态转换。
-- **Workflow**：声明人类可读 Step 与可执行 Agent Order。
-- **Pipeline**：Workflow 在一次 Run 中的解析结果，负责执行顺序与恢复位置。
-- **Task Store**：持久化 Task、Context、Event、Output、Approval、Execution、Artifact 和 Error。
-- **Agent**：完成单一职责；Agent 不直接调用其他 Agent。
-- **Prompt IR**：Provider-independent Generation / Editing Contract，不是具体 API Payload。
-- **Approval Gate**：控制 Prompt IR 与 Job 在 `review-required`、`blocked`、`ready` 之间转换。
-- **Provider Adapter**：接收 `ExecutionRequest`，返回 `ExecutionResult`，不得绕过 Approval、QA、Capability 或 Reference Gate。
-- **Artifact Registry**：保存 Artifact Identity、File、Hash、Metadata、Reference、Approval Snapshot 和 Provenance。
-- **Semantic QA**：验证 Contract、一致性和执行安全；没有视觉检查能力时必须保持 `not-run`。
-- **Export Gate**：只有 Contract、Approval、Artifact 和 Visual QA 全部满足时才允许真实 Export。
-- **Git**：长期事实来源、变更记录和协作边界。
+- **Agent Host**：理解对话、提供 Identity、处理 Approval、选择 Provider / Inspector 并解释结果。
+- **Runtime**：执行生产 Workflow 和受控 Provider 状态转换，不承担具体模型逻辑。
+- **Provider Adapter**：接收 `ExecutionRequest`，返回 `ExecutionResult`。
+- **Artifact Registry**：保存文件身份、Hash、Provider Metadata、Output Contract、Approval Snapshot 和 Provenance。
+- **Visual Review Service**：区分 Simulation 与 Visual Artifact，执行 Integrity / Metadata Check，调用可选 Inspector，并建立 Revision Plan。
+- **Visual Inspection Adapter**：只在 Capability 满足时判断 Theme、Composition、Content、Readability、Usability 和 Resource Compliance。
+- **Revision Plan**：将 Finding 关联到 Source Job 和 Source Artifact，不直接覆盖原文件。
+- **Export Gate**：只有 Contract QA 与所有 Active Visual Artifact Review 均通过时才允许真实 Export。
 
 #### 1.5 非目标
 
@@ -122,15 +111,14 @@ GUIF 不计划：
 - 管理完整游戏逻辑、Server、数值或关卡代码；
 - 训练基础模型；
 - 成为任意行业的通用 Agent Framework；
-- 将全部 AI 与 Tool Logic 塞进 Runtime；
-- 用不可追踪的 Chat Memory 替代 Project File 与 Git；
-- 在没有明确 Approval 的情况下写 Project 或调用 Provider；
-- 把 Dry-run Receipt 描述为真实图片；
-- 在没有实际检查 Artifact 时宣称视觉质量、构图或可用性通过。
+- 把 Dry-run Receipt 描述为图片；
+- 把 Dimension / Format / Alpha Check 描述为视觉美术质量通过；
+- 在没有明确 Approval 的情况下调用 Provider 或修改 Project Truth；
+- 为了简化流程而覆盖或删除旧 Artifact 与 Review Provenance。
 
 ### 2. GUIF 当前内容与进度
 
-以下结论基于 `v1.0.0-alpha.17` 仓库代码。
+以下结论基于 `v1.0.0-alpha.18` 仓库代码。
 
 状态定义：
 
@@ -141,140 +129,140 @@ GUIF 不计划：
 
 | 能力 | 当前状态 | 当前实际内容 | 主要缺口 |
 |---|---|---|---|
-| Project | 可用 | 初始化隔离目录、`project.json` 和 `runs/` | Migration、Template、Archive、Schema Upgrade |
-| Workflow | 基础可用 | Schema v2 声明 `steps` 与 `agents`；Built-in / Project Override；v1 兼容 | Condition、Loop、Policy、Migration |
-| Pipeline | 基础可用 | Workflow-driven；保存 Source、Step、Agent Order；Checkpoint / Resume | Branch、Concurrency、Skip、Cancel、Policy Retry |
-| Runtime | 基础可用 | Context、Workflow、Task、Approval、Provider Execution 和 Artifact Registration | Transaction、Concurrency、Cancel、Capability Negotiation |
-| Task / Task Store | 基础可用 | Lifecycle、Event、Output、Error、Approval、Execution 与 Artifact Registry | Strict I/O Schema、Migration、Diff、Replay、Search |
-| Context Loader / Retrieval | 基础可用 | Project Config、Theme、Workflow、Resource、Markdown Memory；英文 Token、中文 n-gram、Score、Budget | Embedding、History、Artifact Retrieval、Source Hash |
-| Structured Planner | 基础可用 | Page、Canvas、Engine、Theme、Reuse、Missing Resource、QA、Risk、Open Question | Typed Subtask、复杂 Component Tree、Interaction Flow |
-| Structured Director | 基础可用 | Composition、Hierarchy、Memory Constraint、Reuse Decision、Conflict、Approval | Reference Image Review、Cross-page Comparison |
-| Structured Theme Agent | 基础可用 | Active Theme、Preset 推导、Memory 合并、Conflict、状态 | Token、Inheritance、Version、Materialization |
-| Structured Resource Agent | 基础可用 | Reuse、Manifest Candidate、Dimension Provenance、Import Hint、Approval | Variant、Atlas、Nine-slice、Dependency、Materialization |
-| Structured Prompt Agent | 基础可用 | Provider-independent Prompt IR、Job、Constraint、Reference、Output Contract、Capability、Approval、Blocker | Provider-specific Translation、Prompt Migration |
-| Persistent Approval | 基础可用 | Approve / Reject / Request Changes、Actor、Comment、Timestamp、History、Prompt Gate、QA Refresh | Authenticated Identity、Role Policy、Expiry、Contract Hash Invalidation、Optimistic Lock |
-| Provider Adapter Contract | 基础可用 | `ExecutionRequest`、`ExecutionResult`、Provider Registry、Capability Gate、Reference Binding Gate | Real Provider、Credential Handling、Quota、Retry Policy、Streaming |
-| Dry-run Provider | 可用 | 确定性 JSON Receipt；无外部调用；`simulation: true`、`visual: false`、`billable: false` | 不生成视觉 Pixel，仅验证 Contract 与执行链 |
-| Provider Execution Persistence | 基础可用 | Attempt、Request Snapshot、Status、Error、Timing、Latest by Job；失败不破坏 Task / Approval | Retry Command、Backoff、Cancellation、Idempotency Policy |
-| Artifact Registry | 基础可用 | Artifact ID、File、SHA-256、MIME、Dimension、Provider、Reference、Output Contract、Approval Snapshot、QA State | Remote Store、Retention、Version、Stale / Superseded、Database |
-| Reference Binding | 基础可用 | 将 Resource Manifest `source` 解析为 Project 内 File，并保存 Hash 与 Size | URI、Remote File、Multiple Reference Roles、Sandbox Transfer |
-| Structured Semantic QA | 基础可用 | Prompt、Provenance、Page、Theme、Resource、Reference、Execution Gate、Capability；识别 Artifact Metadata | 尚无视觉 Pixel Inspection、Cross-page / Usability QA |
-| Visual Semantic QA | 未开发 | Artifact Review 明确保持 `not-run` | Image Inspection Adapter、Theme / Composition / Content / Readability |
-| Revision Loop | 未开发 | 可生成 Blocking Finding，但不会自动创建与执行 Revision | Revision Task、Provider Re-execution、Artifact Supersession |
-| Export | 基础可用 | Generic / Unity / Godot / Unreal Adapter Metadata | Export Agent 仍 Contract-only；未消费 Artifact / Visual QA Gate |
-| Host Integration | 未开发 | Runtime / CLI API 可调用 | Stable Identity、Result Protocol、Pause、Streaming、Approval UI |
-| Git Change Management | 未开发 | Git 是原则，但 Runtime 不管理 Commit Lifecycle | Change Set、Branch / Commit、Rollback、Approval、Audit |
+| Project / Git-friendly Store | 可用 | Project 初始化、Run Directory、JSON / JSONL / Markdown 持久化 | Migration、Archive、Retention、Locking |
+| Workflow / Pipeline | 基础可用 | Built-in 与 Project Override、Agent Order、Checkpoint、Resume | Branch、Loop、Concurrency、Cancel、Policy Retry |
+| Context / Retrieval | 基础可用 | Project Config、Theme、Workflow、Resource、Memory；英文 Token、中文 n-gram、Budget 与 Provenance | Embedding、Historical Run / Artifact Retrieval、Dedup |
+| Planner | 基础可用 | Page、Canvas、Orientation、Engine、Reuse、Missing Resource、Risk、Open Question | Typed Component Tree、复杂 Interaction、LLM Adapter |
+| Director | 基础可用 | Composition Zone、Focal Order、Constraint、Reuse Decision、Conflict、Approval Point | Reference Image Review、Cross-page Comparison |
+| Theme Agent | 基础可用 | Active Theme、Preset 推导、Memory Constraint、Conflict | Version、Inheritance、Visual Token、Materialization |
+| Resource Agent | 基础可用 | Existing Reuse、Manifest Candidate、Dimension Source、Engine Hint | Variant、Atlas、Nine-slice、Dependency、Materialization |
+| Prompt Agent | 基础可用 | Provider-independent Prompt IR、Job、Constraint、Reference、Output Contract、Capability | Revision Job、Provider-specific Payload Adapter |
+| Semantic Contract QA | 基础可用 | Cross-agent Contract、Approval、Execution Gate、Export Gate | 与 Visual Review 的统一 Schema / Policy |
+| Approval API | 基础可用 | Approve / Reject / Request Changes、History、Prompt Gate、CLI | Authenticated Identity、Role、Signature、Expiry、Optimistic Lock、Contract Hash Invalidation |
+| Provider Adapter | 基础可用 | Request / Result、Capability Gate、Reference Binding、Attempt Persistence | Real Provider、Credential、Quota、Retry、Async |
+| Dry-run Provider | 可用 | Deterministic JSON Receipt；无 External Call、无 Billing、无 Pixel | 仅用于 Contract 验证 |
+| Artifact Registry | 基础可用 | Artifact ID、Path、SHA-256、MIME、Dimension、Provider / Approval / Prompt Provenance | Remote Storage、Retention、Automatic Supersession Policy |
+| Visual Eligibility / Integrity | 可用 | Simulation / Visual 区分；MIME、Path、Existence、SHA-256、Stale Check | Signed Artifact、Remote Reference |
+| Image Metadata Review | 可用 | Width、Height、Format、Alpha、Mode、Output Contract 与 Provider Metadata 一致性 | Color Space、ICC、Compression、Multi-resolution |
+| Visual Inspection Contract | 基础可用 | Request / Result、Capability、Registry、No-adapter=`not-run` | Built-in / Real Inspector、Confidence、Evidence Artifact |
+| Revision Planning | 基础可用 | Finding -> Revision Plan；关联 Source Job / Artifact；Preservation Constraint | Revision Prompt Job、Approval、Execution、Recheck Automation |
+| Artifact Supersession | 基础可用 | 显式 Old -> `stale`、`superseded_by`；New -> `supersedes` | 自动策略、Branching Revision、Conflict Handling |
+| Protected Editing | 可用 | Mask Composition 与 Protected Pixel QA | 尚未进入 Revision Runtime Loop |
+| Visual Semantic QA | Contract 完成 | 可通过外部 Adapter 返回 Passed / Review / Blocked | 默认 Registry 为空；无真实视觉 Model |
+| Export | 基础可用 | Generic / Unity / Godot / Unreal Metadata Adapter | Built-in Export Agent 仍是 Contract-only；尚未消费最终 Visual Gate |
+| Host / Git Integration | 未开发 | README API / CLI 示例 | Stable Result Protocol、Identity、Streaming、Commit / Rollback |
 
 #### 2.1 当前可以真实完成的闭环
 
 ```text
 Project Init
--> Theme、Workflow、Memory 和 Resource Manifest
--> Requirement 进入 Runtime
 -> Context Selection
--> Workflow -> Pipeline
--> Plan
--> Director Review
--> Theme Contract
--> Resource Contract Bundle
+-> Workflow / Pipeline
+-> Plan / Direction / Theme / Resource
 -> Prompt IR
 -> Contract QA
 -> Persistent Approval
 -> Provider Capability / Reference Gate
--> Deterministic Dry-run Execution
--> Artifact File + Artifact Record
--> Execution / Artifact / Approval / QA 持久化
+-> Dry-run 或自定义 Provider Execution
+-> Artifact Registration
+-> Visual Eligibility / File Integrity
+-> Image Metadata Review
+-> 可选 Visual Inspection Adapter
+-> Revision Plan
+-> Artifact Supersession
+-> 全部状态持久化
 ```
 
-针对《韭菜派对》中世纪港口商店页，当前可以自动输出并保存：
+alpha.18 已经能够做到：
 
-- Page Type、Canvas、Orientation 和 Target Engine；
-- Theme、Composition 和 Memory Constraint；
-- Existing Resource Reuse 与 Missing Resource Manifest Candidate；
-- Provider-independent Job 与 Output Contract；
-- Approval Decision 和 History；
-- Capability Requirement 与 Bound Reference Hash；
-- Deterministic Dry-run Receipt；
-- Artifact ID、File、SHA-256、MIME、Dimension 和 Provenance；
-- Contract QA、Artifact Review State 与 Export Gate；
-- Provider Failure Attempt 与 Error。
+- Dry-run Artifact 自动标记为 `not-applicable`，不会声称视觉通过；
+- 真实 Image Artifact 的 File、Hash、MIME、Dimension、Format 和 Alpha 可确定性检查；
+- 没有 Inspector 时保持 `not-run` 和关闭 Export Gate；
+- Inspector Capability 不足时拒绝调用；
+- Finding 可生成带 Source Artifact / Job 的 Revision Plan；
+- Replacement Artifact 可显式 Supersede 原 Artifact，并保留旧记录。
 
 #### 2.2 当前尚不能完成的关键闭环
 
-下面的需求仍不能仅靠 GUIF 自动完成全部生产：
+下面需求仍不能由内置能力完全自动完成：
 
 ```text
-“为 LeekParty 制作符合现有中世纪港口风格的商店页面，
-复用已有金币和按钮，生成真实视觉资源，检查后导出 Unity。”
+“生成商店页图片，检查构图和可读性，
+发现主按钮层级不足后自动修图，再复检并导出 Unity。”
 ```
 
-GUIF 已能把 Job 准备到可批准、可执行，并能通过 Dry-run 验证 Provider / Artifact Contract，但仍不能调用真实图片 Provider、检查真实视觉 Pixel、自动修订、完成视觉 QA 或通过真实 Export Agent 交付 Engine-ready Output。
+当前缺口：
+
+- 没有 Built-in Real Image Provider；
+- 没有 Built-in Semantic Visual Inspector；
+- Revision Plan 尚不能自动转换为新的 Edit Prompt Job；
+- Revision 需要新的 Approval、Provider Execution 和 Source Artifact Binding；
+- 新 Artifact 尚未自动触发 Supersession 与 Recheck；
+- Export Agent 尚未消费最终 Review Gate。
 
 ### 3. 预期待开发内容
 
-开发顺序以“尽快验证真实视觉闭环”为原则，不继续扩充无产出的占位 Interface。
+#### Phase 1–7：已完成的基础
 
-#### Phase 1～6：已完成的基础
-
-- Runtime、Task、Pipeline、Checkpoint、Resume；
-- Workflow-driven Agent Order；
-- Planner、Director、Theme、Resource、Prompt、Semantic QA；
+- Runtime Contract、Task Store、Checkpoint、Resume；
+- Workflow-driven Pipeline；
+- Planner、Director、Theme、Resource、Prompt、Semantic Contract QA；
 - Context Retrieval；
-- Persistent Approval 与受控 Prompt Gate。
+- Persistent Approval；
+- Provider Adapter、Dry-run、Artifact Registry。
 
-#### Phase 7：Provider Adapter + Artifact Registry
+#### Phase 8：Visual Artifact Inspection + Revision Planning
 
-alpha.17 已完成第一版：
+alpha.18 已完成第一版：
 
-- Provider-independent `ExecutionRequest` / `ExecutionResult`；
-- Provider Registry 与 Capability Discovery；
-- Dry-run Provider；
-- 未批准 Job 拒绝执行；
-- Contract QA Gate；
-- Reference File Binding；
-- Artifact File、ID、Hash、MIME、Dimension 和 Provenance；
-- `artifacts.json` 与 `executions.json`；
-- Provider Failure Persistence；
-- CLI Provider / Execute / Artifact 命令。
+- Visual Artifact Eligibility；
+- Safe Path、Existence、Hash 与 MIME Check；
+- Image Dimension、Format、Alpha 与 Provider Metadata Check；
+- Model-neutral Visual Inspection Request / Result；
+- Inspector Capability Registry；
+- Simulation=`not-applicable`；No Inspector=`not-run`；
+- Persistent Visual Review；
+- Finding -> Revision Plan；
+- Explicit Artifact Supersession；
+- Visual Review / Revision Run Summary 与 CLI。
 
 仍待：
 
-- Real Provider Adapter；
-- Credential / Secret Boundary；
-- Quota、Cost、Rate Limit 和 Retry Policy；
-- Streaming / Async Job；
-- Artifact Supersession 与 Approval Invalidation。
+- Review Schema Migration；
+- Confidence、Evidence Image / Region；
+- Cross-page Review；
+- Automatic Review Invalidation after Artifact or Contract changes。
 
-#### Phase 8：Visual Artifact Inspection Contract + Revision Planning
+#### Phase 9：Revision Job Construction + Controlled Revision Execution
 
-下一迭代目标：区分真实视觉 Artifact 与 Simulation，并在不虚构视觉结论的前提下建立 Visual Review Contract。
+下一迭代目标：把已批准 Revision Plan 转换成真正可执行、可审计的 Edit Job。
 
 需要包含：
 
-- Visual Artifact Eligibility：`visual: true`、支持的 MIME、File 存在、Hash 一致；
-- Image Metadata Inspection：Dimension、Format、Alpha 与 Output Contract；
-- Model-neutral Visual Review Request；
-- Visual Inspection Adapter Capability；
-- Dry-run Artifact 自动保持 `not-applicable` 或 `not-run`；
-- Finding：Theme、Composition、Content、Readability、Usability、Resource Compliance；
-- Revision Plan：关联原 Job、Artifact、Finding 和目标修订；
-- Artifact Supersession / Stale 状态；
-- 没有 Inspection Adapter 时明确保持 `not-run`。
+- Revision Plan -> Versioned Prompt Job；
+- Source Artifact 作为 Immutable Bound Reference；
+- Finding 与 Objective 转换为 Edit Instruction；
+- Protected Region / Mask Contract；
+- 新 Revision Approval Point；
+- Editing Provider Capability Gate；
+- Revision Attempt / Failure Persistence；
+- Replacement Artifact 自动链接 Source Artifact；
+- 明确 Supersession Policy；
+- 自动 Visual Recheck。
 
-**验收标准**：Dry-run Receipt 不得被识别为视觉结果；真实图片 Metadata 可以确定性检查；没有视觉 Adapter 时不声称通过；Finding 能生成可追溯 Revision Plan。
+**验收标准**：未经 Revision Approval 不得执行；Source Artifact 不得被覆盖；新 Artifact 必须保留 Revision、Finding、Approval 与 Provider Provenance；失败后旧 Artifact 继续有效。
 
-#### Phase 9：Real Provider + Revision Execution
+#### Phase 10：Real Provider + Built-in Visual Inspector
 
-- 至少一个真实 Generation / Editing Adapter；
-- Credential Boundary 与 Capability Negotiation；
-- Artifact Upload / Download；
-- Retry、Alternative 和 Revision Execution；
-- Protected Editing 进入 Runtime Loop；
-- 新 Artifact 替代旧 Artifact，并保留 Provenance。
+- 至少一个真实 Generation / Editing Provider；
+- Credential / Secret Boundary；
+- Cost、Quota、Rate Limit、Retry 和 Async；
+- 至少一个真实 Visual Inspection Adapter；
+- Confidence、Evidence 和 Human Review Policy。
 
-#### Phase 10：Production Export、Host 与 Git Integration
+#### Phase 11：Production Export、Host 与 Git Integration
 
-- Real Export Agent 消费 Artifact、Approval 和 QA Gate；
+- Real Export Agent 消费 Artifact、Approval、Contract QA 与 Visual Review Gate；
 - Native Engine Import；
 - Stable Host Identity、Result、Pause、Streaming 和 Approval UI；
 - Git Change Set、Commit、Rollback 和 Audit；
@@ -290,24 +278,24 @@ alpha.17 已完成第一版：
 4. 是否推进可验证 End-to-end Loop，而不是增加占位 Contract？
 5. 是否定义 Test、Failure Behavior、Persistence、Approval 和 Acceptance Criteria？
 6. 是否避免未经批准写 Project 或调用 Provider？
-7. 是否避免把 Simulation 或 Metadata Check 描述成视觉验证？
-8. 是否同步更新中英文 README 和本文件？
+7. 是否明确区分 Simulation、Metadata Check 与 Semantic Visual Review？
+8. 是否保留 Source Artifact 与全部 Provenance？
+9. 是否同步更新中英文 README、Version Metadata 和本文件？
 
 ### 5. 主要风险与待验证假设
 
 - Rule-based Planner 是否能长期保持可维护；
 - Mutable Task 是否需要 Typed Subtask；
-- Approval ID 是否需要 Namespace、Version、Expiry 和 Contract Hash；
-- Actor 字符串在没有 Host Identity Contract 时是否足够可信；
-- 上游 Contract 变化后，旧 Approval 和 Artifact 如何自动失效；
-- 多 Host 同时 Approval / Execute 时如何避免 Lost Update；
-- Dry-run Capability 是否应与真实 Provider Capability 分开表达；
+- Approval、Review 与 Artifact 是否需要 Contract Hash、Version 和 Expiry；
+- 多 Host 同时 Approval / Execute / Review 时如何避免 Lost Update；
+- Inspector Result 的 Confidence 与 Evidence 如何标准化；
+- Metadata Passed + Semantic Passed 是否足以打开 Export，还是仍需 Human Approval；
+- Visual Inspector Capability 应按固定维度还是允许 Project 扩展；
+- Revision Plan 如何避免不断累积但无人执行；
+- Artifact Supersession 是显式操作还是成功 Recheck 后自动执行；
 - Real Provider Credential 应位于 Runtime、Host 还是 Plugin Boundary；
-- Provider Retry 如何保证 Idempotency；
-- Artifact ID 应基于 Content、Execution 还是 Version；
 - Artifact Store 何时需要 Database / Object Storage；
-- 视觉检查应使用规则、模型或混合策略；
-- 如何避免 Interface 增长快于真实视觉闭环。
+- 如何避免 Interface 增长快于真实视觉生产闭环。
 
 ### 6. 迭代记录
 
@@ -319,7 +307,8 @@ alpha.17 已完成第一版：
 - `alpha.14`：Model-neutral Prompt IR。
 - `alpha.15`：Semantic Contract QA、Finding、Revision Request、Artifact Review State 和 Export Gate。
 - `alpha.16`：Persistent Approval API、受控 Prompt Job Gate、QA 自动刷新和 Approval CLI。
-- `alpha.17`：Provider Adapter Contract、Capability / Reference Gate、Deterministic Dry-run Provider、Provider Attempt Persistence、Artifact Registry、Artifact CLI。
+- `alpha.17`：Provider Adapter、Capability / Reference Gate、Dry-run、Execution Persistence 和 Artifact Registry。
+- `alpha.18`：Visual Eligibility / Integrity、Image Metadata Review、Visual Inspection Contract、Persistent Review、Revision Plan 与 Artifact Supersession。
 
 ---
 
@@ -327,71 +316,76 @@ alpha.17 已完成第一版：
 
 ### 0. Purpose and maintenance
 
-This file is GUIF's living product definition, verified capability review, risk register, and iteration baseline. It must be updated with every change to product scope, architecture, core capability status, compatibility, priorities, risks, or assumptions.
+This file is GUIF's living product definition, verified capability review, risk register, and iteration baseline. It must change in the same release or pull request whenever product scope, architecture, capability status, compatibility, priorities, risks, or assumptions change.
 
 A release is complete only when Feature, Tests, CI, both READMEs, Version Metadata, and this specification agree.
 
 ### 1. Expected product
 
-GUIF is an executable AI work framework for end-to-end game UI production. Natural language is the primary interface, ChatGPT or another Agent Host performs conversational orchestration, and Git plus Project files remain the long-term source of truth.
+GUIF is an executable AI work framework for end-to-end game UI production. Natural language is the primary interface, an Agent Host manages conversation and identity, and Git plus Project files remain the long-term source of truth.
 
 Expected flow:
 
 ```text
 Requirement
--> Context retrieval
--> Workflow / Pipeline
--> Plan
--> Art-direction review
--> Theme and Resource contracts
--> Model-neutral Prompt IR
--> Semantic Contract QA
--> persistent Approval
--> Provider Adapter execution
+-> Context and Workflow
+-> Plan / Direction / Theme / Resource
+-> Prompt IR and Contract QA
+-> Approval
+-> Provider execution
 -> Artifact registration
--> Visual QA
--> Revision
--> Engine-ready Export
+-> Visual eligibility and metadata inspection
+-> Visual Inspection Adapter
+-> Revision Plan and controlled revision
+-> Visual recheck
+-> gated Engine-ready Export
 ```
 
-Core principles are provider independence, Project isolation, deterministic contracts, inspectable Runs, explicit Approval, capability checks before invocation, review before write or execute, persistent evidence, and no false visual verification.
+Core principles are provider independence, Project isolation, deterministic contracts, inspectable Runs, explicit Approval, capability gates, no false visual verification, and immutable Artifact provenance.
 
-### 2. Verified state at alpha.17
+### 2. Verified state at alpha.18
 
-GUIF can execute deterministic Planner, Director, Theme, Resource, Prompt, and Semantic QA Agents. It persists Task Runs, Context, Outputs, errors, Approval state, Provider attempts, and Artifact records.
+GUIF can execute deterministic Planner, Director, Theme, Resource, Prompt, and Contract QA Agents; persist Approvals; execute approved Prompt jobs through Provider Adapters; and register Artifacts with file identity and provenance.
 
-The Provider contract includes `ExecutionRequest`, `ExecutionResult`, a Provider Registry, capability validation, reference-file binding, and failure persistence. The built-in `dry-run` Provider performs no external call and generates no image pixels. It creates a deterministic JSON receipt marked `simulation: true`, `visual: false`, and `billable: false`.
+Alpha.18 adds a Visual Review Service that:
 
-Runtime refuses Provider execution unless the Task is completed, Prompt IR is ready, the Job is executable, Approval is satisfied, Contract QA passes, required capabilities are available, and Providers that require references receive bound files.
+- rejects stale, missing, corrupted, unsafe-path, or unsupported image Artifacts;
+- classifies simulations and non-visual receipts as `not-applicable`;
+- checks real images for file hash, MIME, dimensions, format, Alpha, and Provider metadata consistency;
+- creates model-neutral Visual Inspection Requests;
+- enforces Inspector capabilities;
+- preserves `not-run` when no Inspector exists;
+- persists Visual Review records and Revision Plans;
+- supports explicit Artifact supersession while retaining old provenance.
 
-Successful execution writes an Artifact file and a record containing Artifact ID, Job, Provider metadata, relative path, SHA-256, MIME type, dimensions, Output Contract, bound references, Approval snapshot, Prompt provenance, and QA state. Provider failures preserve the completed Task and Approval history while recording the failed attempt.
+A capable external Inspector may return `passed`, `review-required`, or `blocked`. Only passing Contract QA plus passing review for every active visual Artifact opens the aggregate Export Gate. The default Inspector Registry is empty, so GUIF does not claim semantic visual approval by itself.
 
-The remaining product gap is concrete: GUIF can prepare, approve, execute, and register a deterministic simulated Artifact, but it cannot yet produce a real visual result, inspect pixels semantically, run a revision loop, or perform a real gated Export.
+The remaining gap is specific: GUIF can identify and plan a revision, but it cannot yet convert that plan into a new approved edit Job, execute the revision, automatically link the replacement Artifact, recheck it, and perform real gated Export.
 
 ### 3. Expected development
 
-1. Visual Artifact eligibility and deterministic image metadata inspection.
-2. Model-neutral Visual Review Requests and inspection capability discovery.
-3. Structured visual Findings and Revision Plans.
-4. At least one real Generation / Editing Provider Adapter.
-5. Artifact supersession, retry, and revision execution.
-6. Real Export Agent consuming Approval, Artifact, and QA gates.
-7. Stable Host identity, streaming, and Git-change contracts.
+1. Build versioned Revision Jobs from Revision Plans.
+2. Bind the source Artifact as an immutable edit reference.
+3. Add Revision Approval, editing capability gates, attempt persistence, replacement linking, supersession policy, and automatic recheck.
+4. Integrate at least one real Generation / Editing Provider and one real Visual Inspector.
+5. Implement a real Export Agent consuming Approval, Artifact, Contract QA, and Visual Review gates.
+6. Add stable Host identity, streaming, pause, Git change management, and end-to-end acceptance tests.
 
-The immediate alpha.18 acceptance target is that Dry-run receipts can never be mistaken for visual Artifacts, real image metadata can be checked against Output Contracts, unavailable visual inspection remains explicitly `not-run`, and QA Findings can produce a traceable Revision Plan.
+The immediate alpha.19 acceptance target is that a proposed revision cannot execute without approval, cannot overwrite the source Artifact, and must create a replacement Artifact whose provenance links the Finding, Revision Plan, Approval, Provider attempt, and source Artifact.
 
 ### 4. Main risks
 
-Important unresolved questions include authenticated identity, Approval invalidation, concurrent decisions, Provider credential ownership, retry idempotency, capability semantics, Artifact identity and storage, visual-review strategy, and preventing interface growth without proving a real visual production loop.
+Important unresolved questions include Contract hash invalidation, authenticated identity, concurrent writers, Inspector confidence and evidence, Human versus automated final approval, extensible review dimensions, revision backlog control, explicit versus automatic supersession, Provider credential boundaries, and file-store scalability.
 
 ### 5. Iteration history
 
 - `alpha.9`: Runtime contracts and Context loading.
-- `alpha.10`: persistent Runs, checkpoints, failures, and resume.
+- `alpha.10`: persistent Task Runs and recovery.
 - `alpha.11`: Workflow-driven Pipelines and Structured Planner.
-- `alpha.12`: Context retrieval and Structured Director.
+- `alpha.12`: relevance retrieval and Structured Director.
 - `alpha.13`: Structured Theme / Resource and review-before-write.
 - `alpha.14`: model-neutral Prompt IR.
 - `alpha.15`: Semantic Contract QA and Export Gate.
-- `alpha.16`: persistent Approval and controlled Prompt execution gate.
-- `alpha.17`: Provider Adapter contract, deterministic Dry-run execution, capability and reference gates, Provider attempt persistence, and Artifact Registry.
+- `alpha.16`: persistent Approval and controlled execution state.
+- `alpha.17`: Provider Adapter, Dry-run execution, and Artifact Registry.
+- `alpha.18`: Visual Artifact eligibility, deterministic image metadata inspection, Visual Inspection Contract, persisted review, Revision Planning, and Artifact supersession.
