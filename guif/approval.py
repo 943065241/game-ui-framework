@@ -38,6 +38,7 @@ def _approval_state(task: Any) -> dict[str, Any]:
             "changes_requested_ids": [],
             "project_mutated": False,
             "provider_executed": False,
+            "provider_execution_ids": [],
             "updated_at": _now(),
         }
         task.state["approval_state"] = state
@@ -48,6 +49,7 @@ def _replace_output(task: Any, output_type: str, value: Any, *, agent: str) -> N
     for output in reversed(task.outputs):
         if isinstance(output, dict) and output.get("type") == output_type:
             output["value"] = value
+            output["agent"] = agent
             return
     task.add_output(output_type, value, agent=agent)
 
@@ -143,6 +145,9 @@ def refresh_approval_gate(task: Any) -> dict[str, Any]:
     else:
         approval_status = "not-required"
 
+    project_mutated = bool(state.get("project_mutated", False))
+    provider_executed = bool(state.get("provider_executed", False))
+    provider_execution_ids = list(state.get("provider_execution_ids", []))
     state.update(
         {
             "schema_version": APPROVAL_SCHEMA_VERSION,
@@ -155,8 +160,9 @@ def refresh_approval_gate(task: Any) -> dict[str, Any]:
             "rejected_ids": rejected_ids,
             "changes_requested_ids": changes_requested_ids,
             "prompt_status": prompt_status,
-            "project_mutated": False,
-            "provider_executed": False,
+            "project_mutated": project_mutated,
+            "provider_executed": provider_executed,
+            "provider_execution_ids": provider_execution_ids,
             "updated_at": _now(),
         }
     )
@@ -168,8 +174,9 @@ def refresh_approval_gate(task: Any) -> dict[str, Any]:
         "pending_ids": pending_ids,
         "rejected_ids": rejected_ids,
         "changes_requested_ids": changes_requested_ids,
-        "project_mutated": False,
-        "provider_executed": False,
+        "project_mutated": project_mutated,
+        "provider_executed": provider_executed,
+        "provider_execution_ids": provider_execution_ids,
     }
 
     errors = validate_prompt_ir(prompt_ir)
@@ -245,6 +252,30 @@ def decide_approval(
         f"{normalized_actor} set {normalized_id} to {normalized_decision}.",
     )
     return refreshed
+
+
+def mark_provider_executed(task: Any, execution_id: str, provider_id: str) -> dict[str, Any]:
+    state = _approval_state(task)
+    execution_ids = state.setdefault("provider_execution_ids", [])
+    if not isinstance(execution_ids, list):
+        raise ValueError("Invalid persisted provider execution ids")
+    if execution_id not in execution_ids:
+        execution_ids.append(execution_id)
+    state["provider_executed"] = True
+    state["updated_at"] = _now()
+    prompt_ir = task.state.get("prompt_ir")
+    if isinstance(prompt_ir, dict):
+        control = prompt_ir.setdefault("approval_control", {})
+        if isinstance(control, dict):
+            control["provider_executed"] = True
+            control["provider_execution_ids"] = list(execution_ids)
+        _replace_output(task, "model-neutral-prompt-ir", prompt_ir, agent="approval")
+    task.record(
+        "approval",
+        "provider-executed",
+        f"Provider {provider_id} executed approved work under execution {execution_id}.",
+    )
+    return state
 
 
 def approval_summary(task: Any) -> dict[str, Any]:
