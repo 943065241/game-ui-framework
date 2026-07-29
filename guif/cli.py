@@ -42,6 +42,10 @@ def build_parser() -> argparse.ArgumentParser:
     _approval_command(sub, "run-approve", "Approve one required task approval point")
     _approval_command(sub, "run-reject", "Reject one required task approval point")
     _approval_command(sub, "run-request-changes", "Request changes for one required task approval point")
+    provider_list_cmd = sub.add_parser("provider-list", help="List registered Provider adapters and capabilities")
+    execute_cmd = sub.add_parser("run-execute", help="Execute one approved Prompt job through a Provider adapter"); execute_cmd.add_argument("task_id"); execute_cmd.add_argument("job_id"); execute_cmd.add_argument("--project", required=True); execute_cmd.add_argument("--provider", default="dry-run")
+    artifact_list_cmd = sub.add_parser("run-artifact-list", help="List Artifact records for a task"); artifact_list_cmd.add_argument("task_id"); artifact_list_cmd.add_argument("--project", required=True)
+    artifact_show_cmd = sub.add_parser("run-artifact-show", help="Show one Artifact record"); artifact_show_cmd.add_argument("task_id"); artifact_show_cmd.add_argument("artifact_id"); artifact_show_cmd.add_argument("--project", required=True)
     validate_cmd = sub.add_parser("validate", help="Validate a project workspace"); validate_cmd.add_argument("project")
     record_cmd = sub.add_parser("record", help="Record reusable project memory"); record_cmd.add_argument("memory_type", choices=("decision", "lesson", "mistake", "best-practice")); record_cmd.add_argument("message"); record_cmd.add_argument("--project", required=True)
     theme_cmd = sub.add_parser("theme-create", help="Create and activate a project theme"); theme_cmd.add_argument("name"); theme_cmd.add_argument("description"); theme_cmd.add_argument("--project", required=True)
@@ -95,14 +99,17 @@ def main(argv: list[str] | None = None) -> int:
                 "run-reject": runtime.reject,
                 "run-request-changes": runtime.request_changes,
             }[args.command]
-            task = method(
-                args.project,
-                args.task_id,
-                args.approval_id,
-                actor=args.actor,
-                comment=args.comment,
-            )
+            task = method(args.project, args.task_id, args.approval_id, actor=args.actor, comment=args.comment)
             print(json.dumps(task.to_dict(), ensure_ascii=False, indent=2)); return 0
+        if args.command == "provider-list":
+            print(json.dumps(Runtime(workspace).list_providers(), ensure_ascii=False, indent=2)); return 0
+        if args.command == "run-execute":
+            task = Runtime(workspace).execute_job(args.project, args.task_id, args.job_id, provider_id=args.provider)
+            print(json.dumps(task.to_dict(), ensure_ascii=False, indent=2)); return 0
+        if args.command == "run-artifact-list":
+            print(json.dumps(Runtime(workspace).list_artifacts(args.project, args.task_id), ensure_ascii=False, indent=2)); return 0
+        if args.command == "run-artifact-show":
+            print(json.dumps(Runtime(workspace).get_artifact(args.project, args.task_id, args.artifact_id), ensure_ascii=False, indent=2)); return 0
         if args.command == "validate":
             errors = validate_project(workspace, args.project)
             if errors:
