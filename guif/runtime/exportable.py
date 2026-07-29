@@ -2,8 +2,52 @@ from __future__ import annotations
 
 from typing import Any
 
-from guif.gated_export import GatedExportError, GatedExportService
+from guif.gated_export import (
+    GatedExportError,
+    GatedExportService,
+    _now,
+    _replace_output,
+    _state,
+)
 from guif.runtime.configurable import Runtime as ConfigurableRuntime
+
+
+class RuntimeGatedExportService(GatedExportService):
+    """Runtime-safe persistence for records already attached to Task state."""
+
+    def _persist(self, task: Any, record: dict[str, Any]) -> dict[str, Any]:
+        state = _state(task)
+        records = state.setdefault("records", [])
+        latest = state.setdefault("latest_by_target", {})
+        if not isinstance(records, list) or not isinstance(latest, dict):
+            raise ValueError("Invalid persisted gated Export state")
+        existing = next(
+            (
+                item
+                for item in records
+                if isinstance(item, dict) and item.get("export_id") == record.get("export_id")
+            ),
+            None,
+        )
+        if existing is None:
+            records.append(record)
+            persisted = record
+        elif existing is record:
+            persisted = existing
+        else:
+            terminal = existing.get("status") in {"completed", "rolled-back"}
+            if terminal and record.get("status") in {"ready", "blocked"}:
+                persisted = existing
+            else:
+                replacement = dict(record)
+                existing.clear()
+                existing.update(replacement)
+                persisted = existing
+        latest[str(persisted["target_engine"])] = persisted["export_id"]
+        state["updated_at"] = _now()
+        _replace_output(task, str(persisted["export_id"]), persisted)
+        self.store.save(task)
+        return persisted
 
 
 class Runtime(ConfigurableRuntime):
@@ -11,7 +55,7 @@ class Runtime(ConfigurableRuntime):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.gated_export = GatedExportService(self.workspace, store=self.store)
+        self.gated_export = RuntimeGatedExportService(self.workspace, store=self.store)
 
     def prepare_gated_export(
         self,
