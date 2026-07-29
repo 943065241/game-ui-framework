@@ -6,73 +6,23 @@ GUIF 是一个本地优先、Host 与 Tool 均可配置的游戏 UI 生产框架
 
 ## 当前状态
 
-`v1.0.0-alpha.26` 新增可领取的 ChatGPT-first Host 工作闭环，用于真实图片生成、图片修图和语义视觉检查。
+`v1.0.0-alpha.27` 新增私有的 Conversation-first Workflow。正常用户流程不再暴露 Task ID、Etag、Lease、Work Claim、Handoff 或 Callback。
 
 ```text
-选择私有 Theme
-  -> Prompt / Approval / Tool Handoff
-  -> 图片生成或图片修图 Host Work
-  -> Authenticated Claim + Task Lease
-  -> Host 真正调用图片 Tool
-  -> Artifact Registration
-  -> Deterministic Metadata Review
-  -> chatgpt-vision Semantic Inspection Work
-  -> passed / review-required / blocked
-  -> 需要时生成 Controlled Revision Job
-  -> Gated Export / Git Change Set
+开始对话
+  -> 确认、创建、派生或明确跳过私有 Theme
+  -> 用自然语言描述需要设计的界面
+  -> 审阅并批准生成契约
+  -> ChatGPT Host 执行图片生成或修图
+  -> 确定性图片 Metadata Review
+  -> chatgpt-vision 语义视觉检查
+  -> 必要时单独批准返修
+  -> Gated Export
 ```
 
 中英文持续迭代规格维护在 [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md)。隐私迁移和仓库历史处理说明见 [`docs/PRIVACY_MIGRATION.md`](docs/PRIVACY_MIGRATION.md)。
 
-## alpha.26 已经可以运行的内容
-
-持久化的 `chatgpt-image` Handoff 现在会成为私有 Host Work：
-
-```text
-image-generation
-image-editing
-visual-inspection
-```
-
-每个 Work Item 包含：
-
-- Project、Task、Tool、Handoff 和 Artifact Identity；
-- 已批准的 Prompt Job 或 Visual Inspection Request；
-- Required Capability 与 Submission Contract；
-- 具有 SHA-256 Identity 的不可变可下载 Attachment；
-- `available / claimed / completed` 状态；
-- 绑定 Authenticated Actor 的一次性 Claim Secret；
-- 与 Artifact 或 Visual Review 关联的 Result Receipt。
-
-Work Record 保存在框架 Git 和 Project Git 之外：
-
-```text
-<private-data-root>/host-work/<project>/work-*.json
-```
-
-持久化 Record 不保存原始 Claim Token。
-
-## Production Gateway 工作流
-
-启动 Gateway：
-
-```bash
-pip install -e .[dev]
-guif-gateway --workspace . --host 127.0.0.1 --port 8765
-```
-
-绑定远程地址仍需要显式启用并配置 TLS：
-
-```bash
-guif-gateway \
-  --host 0.0.0.0 \
-  --port 8765 \
-  --allow-remote \
-  --tls-cert server.crt \
-  --tls-key server.key
-```
-
-创建具备 Host Work Capability 的 Credential：
+## 对话式 API
 
 ```python
 from pathlib import Path
@@ -80,106 +30,145 @@ from guif.runtime import Runtime
 
 runtime = Runtime(Path.cwd())
 issued = runtime.register_host_credential(
-    actor_id="production-host",
+    actor_id="conversation-host",
     host_id="chatgpt",
     capabilities=(
-        "gateway:read",
-        "task:read",
+        "approval:decide",
+        "export:execute",
         "host-work:read",
         "host-work:claim",
         "host-work:complete",
+        "revision:decide",
         "task:lease",
+        "task:resume",
+        "tool:execute",
         "tool-result:submit",
         "visual-inspection:submit",
-        "export:execute",
     ),
 )
 
-bearer_token = issued["bearer_token"]  # 只显示一次
+conversation = runtime.conversation_workflow(
+    bearer_token=issued["bearer_token"],
+)
+
+view = conversation.open(
+    "SampleGame",
+    "conversation-001",
+)
 ```
 
-### 发现 Work
+默认用户视图只包含：
 
-```http
-GET /v1/work?project=SampleGame&status=available
-Authorization: Bearer guifh1....
+```text
+conversation_id
+project
+stage
+message
+Theme 摘要
+当前可执行操作
+安全的 Artifact 摘要
+恢复状态
 ```
 
-### 领取 Work
+默认不会包含 Task ID、Task Etag、Lease Token、Work Claim Token、Handoff ID、Callback ID、私有文件路径或完整 Theme 内容。只有开发和支持场景显式启用 Diagnostics 时才会返回底层标识。
 
-```http
-POST /v1/work/SampleGame/work-image-123/claim
-Authorization: Bearer guifh1....
-Content-Type: application/json
-Idempotency-Key: claim-001
+## Theme 确认
 
-{"ttl_seconds": 300}
+没有私有 Theme Binding 的新对话首先进入：
+
+```text
+theme-confirmation
 ```
 
-响应只返回一次 `guifw1.<work-id>.<secret>`。Claim Ownership 与 Authenticated Actor 和 Credential 绑定。
-
-### 下载不可变 Attachment
-
-```http
-GET /v1/work/SampleGame/work-visual-123/attachments/attachment-456
-Authorization: Bearer guifh1....
-X-GUIF-Work-Claim: guifw1....
-```
-
-返回文件前，GUIF 会重新检查路径边界、文件存在性和 SHA-256。图片修图 Work 可以通过该接口取得不可变 Source Artifact；Visual Inspection Work 可以取得待检查 Artifact。
-
-### 提交真实图片结果
-
-先通过既有 `/lease` Endpoint 获取 Task Lease，再提交原始图片 Bytes：
-
-```http
-POST /v1/work/SampleGame/work-image-123/result
-Authorization: Bearer guifh1....
-Idempotency-Key: image-result-001
-If-Match: "task-sha256:..."
-X-GUIF-Lease-Token: guifl1....
-X-GUIF-Work-Claim: guifw1....
-X-GUIF-Filename: fictional-screen.png
-X-GUIF-Content-SHA256: <sha256>
-X-GUIF-Width: 1080
-X-GUIF-Height: 2340
-X-GUIF-Model-ID: chatgpt-image
-Content-Type: image/png
-
-<raw PNG bytes>
-```
-
-结果会经过 Authenticated Callback Contract 登记。随后 GUIF 自动检查 Artifact Eligibility、File Integrity、Dimension、Format、Alpha 和 Registered Metadata。Metadata Review 通过后，会自动创建 `visual-inspection` Work。
-
-### 提交语义视觉检查结果
-
-```http
-POST /v1/work/SampleGame/work-visual-123/result
-Authorization: Bearer guifh1....
-Idempotency-Key: visual-result-001
-If-Match: "task-sha256:..."
-X-GUIF-Lease-Token: guifl1....
-X-GUIF-Work-Claim: guifw1....
-Content-Type: application/json
-
-{
-  "inspector_id": "chatgpt-vision",
-  "status": "review-required",
-  "summary": "层级需要受控修改。",
-  "findings": [
+```python
+view = conversation.create_theme(
+    "SampleGame",
+    "conversation-001",
+    "Fictional Orbital Fixture",
     {
-      "id": "hierarchy-1",
-      "severity": "review",
-      "category": "composition-and-hierarchy",
-      "code": "primary-action-too-weak",
-      "message": "增强虚构主操作入口的视觉层级。",
-      "evidence": {"region": "lower-center"}
-    }
-  ]
-}
+        "description": "A wholly fictional orbital kiosk interface.",
+        "palette": ["test violet", "test silver"],
+        "materials": ["matte composite"],
+        "lighting": "soft synthetic daylight",
+        "must_include": ["circular menu"],
+        "avoid": ["real brands"],
+    },
+)
 ```
 
-允许的 Status：
+支持以下路径：
+
+```text
+select_theme       选择历史私有 Theme
+create_theme       创建并绑定新 Theme
+derive_theme       创建并绑定新的不可变 Theme Version
+continue_unbound   明确确认本次对话不绑定 Theme
+```
+
+真实 Theme 内容继续保存在框架 Git 和 Project Git 之外的 Private Theme Library。
+
+## 提交自然语言需求
+
+```python
+view = conversation.submit(
+    "SampleGame",
+    "conversation-001",
+    "Create a 1080x2340 fictional orbital shop page and export Unity",
+    request_key="chat-turn-001",
+)
+```
+
+`request_key` 提供幂等性。同一个 Key 与同一需求会返回已有状态；同一个 Key 被用于不同内容时会 Fail Closed，不会重复创建 Task。
+
+初次提交通常进入：
+
+```text
+approval-required
+```
+
+无需处理 Approval ID 或 Task Lease：
+
+```python
+view = conversation.approve(
+    "SampleGame",
+    "conversation-001",
+    comment="Proceed with the approved production contract.",
+)
+```
+
+Service 会自动识别当前 Approval Context、获取并消费 Private Lease、记录 Authenticated Actor，并准备正确的图片 Work。
+
+## 真实图片与视觉闭环
+
+ChatGPT 产品或其他配置后的 Host 提供真正的 Tool Callable：
+
+```python
+view = conversation.run_host_until_blocked(
+    "SampleGame",
+    "conversation-001",
+    image_executor=call_chatgpt_image_tool,
+    visual_inspector=call_chatgpt_visual_inspection,
+)
+```
+
+Service 会将执行范围限制在当前对话的 Active Task，并自动处理：
+
+```text
+Host Work Discovery
+-> Task Etag
+-> Exclusive Task Lease
+-> 绑定 Actor 的一次性 Work Claim
+-> Immutable Attachment Retrieval
+-> Image 或 Semantic Result Submission
+-> Artifact Registration
+-> Metadata Review
+-> Semantic Review
+-> 下一个用户可理解状态
+```
+
+该调用不会消费其他对话的 Work。
+
+Semantic Result 允许：
 
 ```text
 passed
@@ -187,40 +176,93 @@ review-required
 blocked
 ```
 
-只有在收到经过认证的 Inspector Result 后，GUIF 才会声明语义视觉结论。Metadata 不能被当成语义视觉通过。
+Metadata 仍然不能被当作语义视觉通过。
 
-存在可执行 Finding 时，GUIF 会自动创建 Versioned Revision Job。Revision Job 仍处于 `approval-pending`；初始生成 Approval 不会自动授权后续修图。
+## 受控返修
 
-## 可嵌入的 ChatGPT Host Loop
+存在可执行 Semantic Finding 时，会形成 Revision Plan 和 Versioned Revision Job。初始图片生成 Approval 不会授权后续修图。
 
-Host 集成也可以不通过 HTTP，而是提供真实的图片和视觉 Callable：
+用户状态变为：
+
+```text
+revision-approval-required
+```
+
+此时调用 `conversation.approve(...)` 只批准当前 Revision，并准备 `image-editing` Work。原 Artifact 在 Replacement 通过语义视觉检查前继续保持 Active。
+
+## Gated Export
+
+Contract QA 与全部 Active Visual Artifact 通过后，状态变为：
+
+```text
+ready-to-export
+```
 
 ```python
-from guif.chatgpt_host_loop import ChatGPTHostLoop
-
-loop = ChatGPTHostLoop(runtime, bearer_token=bearer_token)
-
-loop.run_once(
+view = conversation.export(
     "SampleGame",
-    image_executor=call_chatgpt_image_tool,
-    visual_inspector=call_chatgpt_visual_inspection,
+    "conversation-001",
+    target_engine="unity",
 )
 ```
 
-`ChatGPTHostLoop` 负责 Work Discovery、Task Etag、Task Lease、Claim Ownership、Immutable Attachment Retrieval、Result Submission、Artifact Registration 和失败时的 Lease Release。传入的 Callable 负责真正生成或修改 Pixel，以及执行语义视觉检查。
+Service 会自动获取 Export Lease 并调用既有 Authenticated Gated Export。对话式入口不会绕过 Engine Manifest、Transaction Evidence、Backup、Rollback 或 Git Change Control。
 
-## 重要执行边界
+## 恢复机制
 
-本地 Python Package 无法自行调用 ChatGPT 内部图片 Tool。alpha.26 提供的是生产 Work Queue、Authenticated Transport、Attachment Binding 和可嵌入 Host SDK，由 ChatGPT 或其他 Host 调用自身 Tool 后回传结果。
-
-因此：
+Conversation Record 与 Checkpoint 保存在私有目录：
 
 ```text
-GUIF 不伪造图片 Pixel。
-GUIF 不根据 Metadata 伪造语义视觉通过。
-dry-run 不会成为生产任务的静默回退。
-Host 必须提供真实图片与视觉能力。
+<private-data-root>/conversation-workflows/<project>/conversation-<sha256>.json
 ```
+
+每个 Checkpoint 记录用户可理解 Stage、持久化 Task Status、Task Etag、Artifact Count 和时间戳。原始 Secret 永远不会写入 Conversation Record。
+
+```python
+view = conversation.recover("SampleGame", "conversation-001")
+```
+
+Recovery 会重新协调 Private Conversation Record、Persisted Task 和 Host Work。Session 中丢失的 Task Reference 可以根据 Task 的 Private Conversation Binding 恢复。Pipeline 失败后可通过 `conversation.retry(...)` 从已保存的 Agent Checkpoint 继续。
+
+## 命令行工作流
+
+Host Token 只需在环境变量中配置一次：
+
+```bash
+export GUIF_HOST_TOKEN='guifh1....'
+```
+
+随后使用对话级命令：
+
+```bash
+guif-conversation open \
+  --project SampleGame \
+  --conversation conversation-001
+
+guif-conversation theme-list \
+  --project SampleGame \
+  --conversation conversation-001
+
+guif-conversation submit \
+  --project SampleGame \
+  --conversation conversation-001 \
+  --request-key chat-turn-001 \
+  "Create a fictional orbital shop page and export Unity"
+
+guif-conversation approve \
+  --project SampleGame \
+  --conversation conversation-001
+
+guif-conversation status \
+  --project SampleGame \
+  --conversation conversation-001
+
+guif-conversation recover \
+  --project SampleGame \
+  --conversation conversation-001
+```
+
+CLI 不会内置虚假的图片模型。真正的图片与视觉执行仍来自配置后的 Host Tool 集成或 Authenticated Gateway Work Endpoint。
 
 ## 私有数据边界
 
@@ -228,6 +270,7 @@ Host 必须提供真实图片与视觉能力。
 <private-data-root>/
   themes/
   conversation-theme-bindings/
+  conversation-workflows/
   project-theme-bindings/
   host-credentials/
   host-work/
@@ -239,20 +282,7 @@ Host 必须提供真实图片与视觉能力。
   privacy-reports/
 ```
 
-真实用户 Theme、对话决策、Prompt、Work Claim、Attachment、Runtime Evidence、Callback Receipt 和 Semantic Finding 默认都不会进入框架 Git 或 Project Git。公共测试和示例只使用完全虚构的 Fixture。
-
-## 继续保留的生产控制
-
-GUIF 继续提供：
-
-- Private Versioned Theme Library 与 Conversation-first Theme Selection；
-- Configurable Host / Tool Discovery、Connection 与 Routing；
-- Contract QA 与 Persistent Approval Gate；
-- Artifact Identity、SHA-256、MIME、Dimension 与 Immutable Reference；
-- Controlled Revision Execution 与 Review-gated Supersession；
-- Gated Export、Engine Manifest、Backup、Rollback 与 Git Change Set；
-- Authenticated Actor、Task Etag、Exclusive Lease、Idempotency 与 Signed Private Operation Evidence；
-- Current-tree Privacy Audit 与 Legacy Theme Migration。
+真实 Theme、Prompt、对话决策、Work Claim、Attachment、Artifact、Finding 和 Runtime Evidence 默认不会进入框架 Git 或 Project Git。公共测试和示例只使用完全虚构的 Fixture。
 
 ## 开发
 
@@ -268,14 +298,13 @@ pytest -q
 
 ## 当前限制
 
-- ChatGPT 产品侧仍需要嵌入 `ChatGPTHostLoop` 或消费 Gateway Work Endpoint；仓库自身不能接入 ChatGPT 内部 Tool Runtime。
-- 默认 Semantic Inspector 是经过认证的外部结果契约，不是本地自主视觉模型。
-- Work Claim 和 Task Lease 是 File-backed 本地协调，不是分布式一致性锁。
-- 内置 WSGI Server 是单节点 Host Boundary，不是互联网边缘反向代理。
+- ChatGPT 产品侧仍需要嵌入 Conversation/Host Loop 或消费 Gateway Work Endpoint；仓库自身不能接入 ChatGPT 内部 Tool Runtime。
+- Semantic Inspector 是经过认证的外部结果契约，不是本地自主视觉模型。
+- Conversation、Work 和 Task 使用 File-backed 本地协调，不是分布式一致性系统。
 - Private Storage 尚未提供静态加密、远程同步、Retention Policy 或多设备冲突处理。
-- 尚未自动执行 Remote Git Push、PR 创建、Protected Branch 协商和 Server-side Check 编排。
+- Conversation CLI 可以维护状态和审批，但独立终端无法直接调用 ChatGPT 内部图片 Tool。
 - Current-tree Privacy Audit 无法证明 Git History、Fork、Cache 或外部 Clone 已被清理。
 
 ## 下一阶段
 
-下一优先级是 **alpha.27：Conversation-first User Workflow and Recovery**：一键初始化、Conversation Session State、自动 Theme 确认、Project 选择、生成与修图进度、失败 Work 恢复、私有备份和 Schema Migration，以及不向用户暴露 Task ID、Etag、Lease、Claim 或 Callback ID 的使用流程。
+下一优先级是 **alpha.28：Usability Freeze and Beta Readiness**：一键 Onboarding、私有 Backup/Restore、Schema Migration、失败诊断、端到端样例验证、兼容性保证，以及在 `beta.1` 前冻结 MVP Scope。
