@@ -44,6 +44,10 @@ class PrivateDataLayout:
         return self.root / "conversation-theme-bindings"
 
     @property
+    def conversation_workflows(self) -> Path:
+        return self.root / "conversation-workflows"
+
+    @property
     def project_bindings(self) -> Path:
         return self.root / "project-theme-bindings"
 
