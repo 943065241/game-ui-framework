@@ -13,6 +13,7 @@ from guif.compatibility import MVP_RELEASE
 from guif.private_data import PrivateDataLayout
 
 PRIVATE_BACKUP_SCHEMA_VERSION = 1
+MAX_MANIFEST_BYTES = 8 * 1024 * 1024
 PORTABLE_CATEGORIES = (
     "themes",
     "conversation-theme-bindings",
@@ -173,7 +174,10 @@ class PrivateBackupService:
         include_sensitive: bool = False,
     ) -> dict[str, Any]:
         categories = self._categories(profile, include_sensitive)
-        destination = destination.expanduser().resolve()
+        raw_destination = destination.expanduser()
+        if raw_destination.is_symlink():
+            raise PrivateBackupError("Private backup destination must not be a symbolic link")
+        destination = raw_destination.resolve()
         try:
             destination.relative_to(self.workspace)
         except ValueError:
@@ -212,6 +216,11 @@ class PrivateBackupService:
             "restore_requires_explicit_apply": True,
         }
         manifest["manifest_sha256"] = _canonical_hash(manifest)
+        manifest_bytes = (
+            json.dumps(manifest, ensure_ascii=False, indent=2) + "\n"
+        ).encode("utf-8")
+        if len(manifest_bytes) > MAX_MANIFEST_BYTES:
+            raise PrivateBackupError("Private backup manifest exceeds its size limit")
         temporary = destination.with_suffix(destination.suffix + ".tmp")
         if temporary.exists():
             temporary.unlink()
@@ -223,10 +232,7 @@ class PrivateBackupService:
                 compresslevel=6,
                 allowZip64=True,
             ) as archive:
-                archive.writestr(
-                    "manifest.json",
-                    json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
-                )
+                archive.writestr("manifest.json", manifest_bytes)
                 by_relative = {relative: path for relative, path in records}
                 for item in files:
                     archive.write(
@@ -253,13 +259,17 @@ class PrivateBackupService:
         }
 
     def _read_verified(self, archive_path: Path) -> tuple[dict[str, Any], dict[str, bytes]]:
-        archive_path = archive_path.expanduser().resolve()
+        raw_archive_path = archive_path.expanduser()
+        if raw_archive_path.is_symlink():
+            raise PrivateBackupError("Private backup archive must not be a symbolic link")
+        archive_path = raw_archive_path.resolve()
         if not archive_path.is_file():
             raise FileNotFoundError(f"Unknown private backup: {archive_path}")
         members: dict[str, bytes] = {}
         with zipfile.ZipFile(archive_path, "r") as archive:
             infos = archive.infolist()
             names: set[str] = set()
+            declared_total = 0
             for info in infos:
                 name = _safe_archive_name(info.filename)
                 if name in names:
@@ -269,10 +279,16 @@ class PrivateBackupService:
                 if mode == stat.S_IFLNK:
                     raise PrivateBackupError(f"Symbolic link archive member is not allowed: {name}")
                 if info.is_dir():
-                    continue
-                if info.file_size > self.max_file_bytes:
+                    raise PrivateBackupError(f"Directory archive member is not allowed: {name}")
+                if info.file_size > self.max_file_bytes and name != "manifest.json":
                     raise PrivateBackupError(f"Archive member exceeds file limit: {name}")
-                members[name] = archive.read(info)
+                if name == "manifest.json" and info.file_size > MAX_MANIFEST_BYTES:
+                    raise PrivateBackupError("Private backup manifest exceeds its size limit")
+                declared_total += info.file_size
+                if declared_total > self.max_total_bytes + MAX_MANIFEST_BYTES:
+                    raise PrivateBackupError("Private backup exceeds total extraction limit")
+            for info in infos:
+                members[info.filename] = archive.read(info)
         raw_manifest = members.get("manifest.json")
         if raw_manifest is None:
             raise PrivateBackupError("Private backup is missing manifest.json")
@@ -344,6 +360,22 @@ class PrivateBackupService:
             "manifest_sha256": manifest.get("manifest_sha256"),
         }
 
+    def _validate_restore_root(self, value: Path) -> Path:
+        root = value.expanduser().resolve()
+        try:
+            root.relative_to(self.workspace)
+        except ValueError:
+            pass
+        else:
+            raise PrivateBackupError(
+                "Private restore target must be outside the framework/project workspace"
+            )
+        if root.is_symlink():
+            raise PrivateBackupError("Private restore target must not be a symbolic link")
+        if root.exists() and not root.is_dir():
+            raise PrivateBackupError("Private restore target must be a directory")
+        return root
+
     def plan_restore(
         self,
         archive_path: Path,
@@ -354,7 +386,7 @@ class PrivateBackupService:
         if conflict not in {"fail", "skip", "replace"}:
             raise ValueError("conflict must be fail, skip, or replace")
         manifest, _ = self._read_verified(archive_path)
-        root = (target_root or self.root).expanduser().resolve()
+        root = self._validate_restore_root(target_root or self.root)
         actions: list[dict[str, Any]] = []
         conflicts: list[str] = []
         for item in manifest["files"]:
@@ -364,11 +396,18 @@ class PrivateBackupService:
                 destination.relative_to(root)
             except ValueError as exc:
                 raise PrivateBackupError(f"Restore target escaped private root: {relative}") from exc
-            exists = destination.exists()
-            current_sha256 = _sha256_file(destination) if exists and destination.is_file() else None
-            same = exists and current_sha256 == item["sha256"]
+            exists = destination.exists() or destination.is_symlink()
+            regular_file = exists and destination.is_file() and not destination.is_symlink()
+            current_sha256 = _sha256_file(destination) if regular_file else None
+            same = regular_file and current_sha256 == item["sha256"]
             if same:
                 action = "unchanged"
+            elif exists and not regular_file:
+                if conflict == "skip":
+                    action = "skip"
+                else:
+                    action = "conflict"
+                    conflicts.append(relative.as_posix())
             elif exists and conflict == "skip":
                 action = "skip"
             elif exists and conflict == "replace":
@@ -444,6 +483,10 @@ class PrivateBackupService:
             item = by_path[relative]
             content = members[str(item["archive_member"])]
             destination = (root / relative).resolve()
+            try:
+                destination.relative_to(root)
+            except ValueError as exc:
+                raise PrivateBackupError(f"Restore target escaped private root: {relative}") from exc
             destination.parent.mkdir(parents=True, exist_ok=True)
             temporary = destination.with_suffix(destination.suffix + ".restore.tmp")
             temporary.write_bytes(content)
@@ -464,6 +507,7 @@ class PrivateBackupService:
 
 __all__ = [
     "BACKUP_PROFILES",
+    "MAX_MANIFEST_BYTES",
     "PORTABLE_CATEGORIES",
     "PRIVATE_BACKUP_SCHEMA_VERSION",
     "PrivateBackupError",
