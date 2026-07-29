@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import io
-import json
 from pathlib import Path
 
 import pytest
@@ -12,7 +11,6 @@ from guif.providers import ExecutionRequest, ExecutionResult, ProviderAdapter, P
 from guif.resource import create_resource_manifest
 from guif.revision_review import RevisionReviewService
 from guif.runtime import Runtime
-from guif.theme import create_theme
 from guif.visual_review import (
     VisualInspectionAdapter,
     VisualInspectionRequest,
@@ -20,6 +18,7 @@ from guif.visual_review import (
     VisualInspectorRegistry,
 )
 
+PROJECT = "SampleGame"
 REVIEW_CAPABILITIES = frozenset(
     {
         "theme-consistency",
@@ -73,7 +72,7 @@ class NeedsRevisionInspector(VisualInspectionAdapter):
                     "severity": "review",
                     "category": "composition-and-hierarchy",
                     "code": "weak-primary-action",
-                    "message": "Increase the hierarchy and contrast of the primary purchase action.",
+                    "message": "Increase the hierarchy and contrast of the primary action.",
                 },
             ),
         )
@@ -99,37 +98,33 @@ def _png(width: int = 108, height: int = 234) -> bytes:
 
 
 def _create_project(tmp_path: Path) -> None:
-    root = init_project(tmp_path, "LeekParty")
-    theme_path = create_theme(
-        tmp_path,
-        "LeekParty",
-        "Medieval Harbor",
-        "Warm medieval harbor UI direction.",
-    )
-    theme = json.loads(theme_path.read_text(encoding="utf-8"))
-    theme.update(
+    root = init_project(tmp_path, PROJECT)
+    Runtime(tmp_path).create_private_theme(
+        "Fictional Geometric Arcade",
         {
-            "palette": ["warm gold", "deep sea blue"],
-            "materials": ["weathered wood", "aged brass"],
-            "lighting": "warm sunset",
-            "must_include": ["harbor view", "gold coins"],
-            "avoid": ["pirate skulls", "dirty visual noise"],
-        }
+            "description": "Synthetic abstract arcade UI direction for revision tests.",
+            "palette": ["test blue", "test gray"],
+            "materials": ["matte polymer", "brushed alloy"],
+            "lighting": "flat studio light",
+            "must_include": ["hexagonal navigation", "abstract tokens"],
+            "avoid": ["real brands", "photoreal people"],
+        },
+        project=PROJECT,
+        actor="test-host",
     )
-    theme_path.write_text(json.dumps(theme), encoding="utf-8")
     source_dir = root / "source"
     source_dir.mkdir()
-    (source_dir / "purchase-button.png").write_bytes(b"reference")
+    (source_dir / "action-button.png").write_bytes(b"reference")
     create_resource_manifest(
         tmp_path,
-        "LeekParty",
-        "purchase-button",
+        PROJECT,
+        "action-button",
         "button",
         264,
         134,
         "png",
         target_engine="unity",
-        source="source/purchase-button.png",
+        source="source/action-button.png",
     )
 
 
@@ -138,28 +133,28 @@ def _revision_ready_task(tmp_path: Path):
     provider = ImageProvider()
     runtime = Runtime(tmp_path, providers=ProviderRegistry((provider,)))
     task = runtime.run(
-        "LeekParty",
-        "Create a 108x234 portrait medieval harbor shop page, reuse the purchase button, and export Unity",
+        PROJECT,
+        "Create a 108x234 portrait fictional geometric arcade shop page, reuse the action button, and export Unity",
         pipeline="ui-production",
     )
     for approval_id in list(task.state["approval_state"]["required_ids"]):
         task = runtime.approve(
-            "LeekParty",
+            PROJECT,
             task.task_id,
             approval_id,
-            actor="Reviewer",
+            actor="TestReviewer",
         )
     source_job_id = task.state["prompt_ir"]["jobs"][0]["id"]
     task = runtime.execute_job(
-        "LeekParty",
+        PROJECT,
         task.task_id,
         source_job_id,
         provider_id=provider.provider_id,
     )
-    source_artifact = runtime.list_artifacts("LeekParty", task.task_id)[0]
+    source_artifact = runtime.list_artifacts(PROJECT, task.task_id)[0]
     inspectors = VisualInspectorRegistry((NeedsRevisionInspector(),))
     task = RevisionReviewService(tmp_path, inspectors=inspectors).review(
-        "LeekParty",
+        PROJECT,
         task.task_id,
         source_artifact["artifact_id"],
         inspector_id="needs-revision",
@@ -171,7 +166,7 @@ def _revision_ready_task(tmp_path: Path):
 def test_revision_job_requires_its_own_approval_gate(tmp_path: Path) -> None:
     runtime, task, source_artifact_id, revision_id = _revision_ready_task(tmp_path)
 
-    task = runtime.create_revision_job("LeekParty", task.task_id, revision_id)
+    task = runtime.create_revision_job(PROJECT, task.task_id, revision_id)
     job = task.state["revision_execution"]["jobs"][0]
     approval = task.state["revision_execution"]["approvals"][revision_id]
 
@@ -182,21 +177,21 @@ def test_revision_job_requires_its_own_approval_gate(tmp_path: Path) -> None:
     assert job["references"][0]["immutable"] is True
     assert approval["status"] == "pending"
     with pytest.raises(ValueError, match="Revision approval gate"):
-        runtime.execute_revision("LeekParty", task.task_id, revision_id)
+        runtime.execute_revision(PROJECT, task.task_id, revision_id)
 
 
 def test_approved_revision_creates_chatgpt_edit_handoff(tmp_path: Path) -> None:
     runtime, task, source_artifact_id, revision_id = _revision_ready_task(tmp_path)
-    task = runtime.create_revision_job("LeekParty", task.task_id, revision_id)
+    task = runtime.create_revision_job(PROJECT, task.task_id, revision_id)
     task = runtime.approve_revision(
-        "LeekParty",
+        PROJECT,
         task.task_id,
         revision_id,
-        actor="Art Director",
+        actor="TestArtDirector",
         comment="Proceed with the controlled edit.",
     )
 
-    task = runtime.execute_revision("LeekParty", task.task_id, revision_id)
+    task = runtime.execute_revision(PROJECT, task.task_id, revision_id)
     job = task.state["revision_execution"]["jobs"][0]
     handoff = task.state["tool_handoffs"]["records"][0]
     bound_reference = handoff["request"]["references"][0]
@@ -207,28 +202,29 @@ def test_approved_revision_creates_chatgpt_edit_handoff(tmp_path: Path) -> None:
     assert handoff["instructions"]["operation"] == "edit"
     assert bound_reference["artifact_id"] == source_artifact_id
     assert bound_reference["status"] == "bound"
+    assert bound_reference["storage_scope"] == "private-run"
     assert bound_reference["sha256"] == bound_reference["expected_sha256"]
 
 
 def test_replacement_is_rechecked_and_supersedes_only_after_passing_review(tmp_path: Path) -> None:
     runtime, task, source_artifact_id, revision_id = _revision_ready_task(tmp_path)
-    task = runtime.create_revision_job("LeekParty", task.task_id, revision_id)
-    task = runtime.approve_revision("LeekParty", task.task_id, revision_id, actor="Art Director")
-    task = runtime.execute_revision("LeekParty", task.task_id, revision_id)
+    task = runtime.create_revision_job(PROJECT, task.task_id, revision_id)
+    task = runtime.approve_revision(PROJECT, task.task_id, revision_id, actor="TestArtDirector")
+    task = runtime.execute_revision(PROJECT, task.task_id, revision_id)
     handoff_id = task.state["tool_handoffs"]["records"][0]["handoff_id"]
 
     task = runtime.submit_tool_result(
-        "LeekParty",
+        PROJECT,
         task.task_id,
         handoff_id,
         content=_png(),
-        filename="shop-revision.png",
+        filename="menu-revision.png",
         mime_type="image/png",
         width=108,
         height=234,
         model_id="chatgpt-image",
     )
-    artifacts = {item["artifact_id"]: item for item in runtime.list_artifacts("LeekParty", task.task_id)}
+    artifacts = {item["artifact_id"]: item for item in runtime.list_artifacts(PROJECT, task.task_id)}
     replacement = next(item for item in artifacts.values() if item["artifact_id"] != source_artifact_id)
 
     assert replacement["revision"]["source_artifact_id"] == source_artifact_id
@@ -238,7 +234,7 @@ def test_replacement_is_rechecked_and_supersedes_only_after_passing_review(tmp_p
 
     inspectors = VisualInspectorRegistry((PassingInspector(),))
     task = RevisionReviewService(tmp_path, inspectors=inspectors).review(
-        "LeekParty",
+        PROJECT,
         task.task_id,
         replacement["artifact_id"],
         inspector_id="revision-passing",
@@ -253,38 +249,37 @@ def test_replacement_is_rechecked_and_supersedes_only_after_passing_review(tmp_p
     assert task.state["revision_execution"]["jobs"][0]["status"] == "passed"
     assert task.state["qa_report"]["artifact_review"]["status"] == "passed"
     assert task.state["qa_report"]["export_gate"]["allowed"] is True
-    run_dir = tmp_path / "projects" / "LeekParty" / "runs" / task.task_id
-    assert (run_dir / "revision-execution.json").is_file()
+    assert (runtime.store.run_dir(PROJECT, task.task_id) / "revision-execution.json").is_file()
 
 
 def test_tampered_revision_source_fails_closed(tmp_path: Path) -> None:
     runtime, task, source_artifact_id, revision_id = _revision_ready_task(tmp_path)
-    task = runtime.create_revision_job("LeekParty", task.task_id, revision_id)
-    task = runtime.approve_revision("LeekParty", task.task_id, revision_id, actor="Art Director")
-    source = runtime.get_artifact("LeekParty", task.task_id, source_artifact_id)
-    run_dir = tmp_path / "projects" / "LeekParty" / "runs" / task.task_id
+    task = runtime.create_revision_job(PROJECT, task.task_id, revision_id)
+    task = runtime.approve_revision(PROJECT, task.task_id, revision_id, actor="TestArtDirector")
+    source = runtime.get_artifact(PROJECT, task.task_id, source_artifact_id)
+    run_dir = runtime.store.run_dir(PROJECT, task.task_id)
     (run_dir / source["file"]["path"]).write_bytes(b"tampered")
 
-    task = runtime.execute_revision("LeekParty", task.task_id, revision_id)
+    task = runtime.execute_revision(PROJECT, task.task_id, revision_id)
 
     assert task.status == "waiting-for-tool"
     assert task.state["revision_execution"]["jobs"][0]["status"] == "waiting-for-tool"
     assert "bound reference files" in task.state["tool_resolution"]["reason"]
-    assert runtime.list_artifacts("LeekParty", task.task_id)[0]["artifact_id"] == source_artifact_id
+    assert runtime.list_artifacts(PROJECT, task.task_id)[0]["artifact_id"] == source_artifact_id
 
 
 def test_rejected_revision_never_reaches_tool_router(tmp_path: Path) -> None:
     runtime, task, _, revision_id = _revision_ready_task(tmp_path)
-    task = runtime.create_revision_job("LeekParty", task.task_id, revision_id)
+    task = runtime.create_revision_job(PROJECT, task.task_id, revision_id)
     task = runtime.reject_revision(
-        "LeekParty",
+        PROJECT,
         task.task_id,
         revision_id,
-        actor="Art Director",
+        actor="TestArtDirector",
         comment="Revise the objectives first.",
     )
 
     with pytest.raises(ValueError, match="Revision approval gate"):
-        runtime.execute_revision("LeekParty", task.task_id, revision_id)
+        runtime.execute_revision(PROJECT, task.task_id, revision_id)
     assert task.state["revision_execution"]["jobs"][0]["executable"] is False
     assert "tool_handoffs" not in task.state
