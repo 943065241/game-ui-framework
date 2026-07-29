@@ -199,6 +199,15 @@ def register_artifact(
     else:
         record = existing
     registry["updated_at"] = _now()
+
+    if not any(
+        isinstance(output, dict)
+        and output.get("type") == "generated-artifact"
+        and isinstance(output.get("value"), dict)
+        and output["value"].get("artifact_id") == artifact_id
+        for output in task.outputs
+    ):
+        task.add_output("generated-artifact", record, agent=f"provider:{result.provider_id}")
     return record
 
 
