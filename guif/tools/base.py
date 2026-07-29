@@ -29,6 +29,14 @@ def _canonical_hash(payload: Any) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _cost_label(value: bool | None) -> str:
+    if value is True:
+        return "billable"
+    if value is False:
+        return "no-charge"
+    return "unknown"
+
+
 @dataclass(frozen=True)
 class HostProfile:
     host_id: str
@@ -61,6 +69,9 @@ class ToolManifest:
     requires_host_support: bool = False
     supported_hosts: tuple[str, ...] = ()
     requires_credentials: bool = False
+    credential_kind: str | None = None
+    permissions: tuple[str, ...] = ()
+    data_scopes: tuple[str, ...] = ()
     external_call: bool = False
     billable: bool | None = None
     description: str = ""
@@ -79,12 +90,30 @@ class ToolManifest:
             raise ValueError("Tool execution_mode must be direct or external-callback")
         if not self.environments:
             raise ValueError("Tool manifest requires at least one environment")
+        if self.requires_credentials and not self.credential_kind:
+            raise ValueError("Credential-requiring Tool must declare credential_kind")
+
+    def disclosure(self) -> dict[str, Any]:
+        return {
+            "permissions": list(self.permissions),
+            "data_scopes": list(self.data_scopes),
+            "external_call": self.external_call,
+            "cost": _cost_label(self.billable),
+            "billable": self.billable,
+            "requires_credentials": self.requires_credentials,
+            "credential_kind": self.credential_kind,
+            "requires_host_support": self.requires_host_support,
+            "supported_hosts": list(self.supported_hosts),
+        }
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         payload["capabilities"] = sorted(self.capabilities)
         payload["environments"] = list(self.environments)
         payload["supported_hosts"] = list(self.supported_hosts)
+        payload["permissions"] = list(self.permissions)
+        payload["data_scopes"] = list(self.data_scopes)
+        payload["disclosure"] = self.disclosure()
         return payload
 
 
@@ -248,6 +277,8 @@ class ToolAdapter(ABC):
         if self.manifest.requires_host_support:
             if self.manifest.supported_hosts and host.host_id not in self.manifest.supported_hosts:
                 reasons.append(f"Host {host.host_id} is not supported by this Tool.")
+            if host.available_tools and self.tool_id not in host.available_tools:
+                reasons.append(f"Host {host.host_id} does not advertise Tool {self.tool_id} as available.")
             missing_host = sorted(self.capabilities - host.capabilities)
             if missing_host:
                 reasons.append(
