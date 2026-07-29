@@ -32,13 +32,17 @@ def test_runtime_persists_loads_and_lists_runs(tmp_path: Path) -> None:
     run_dir = tmp_path / "projects" / "demo" / "runs" / task.task_id
 
     assert {path.name for path in run_dir.iterdir()} == {
+        "approvals.json",
         "context.json",
         "events.jsonl",
         "outputs.json",
         "task.json",
     }
     assert runtime.load_task("demo", task.task_id).to_dict() == task.to_dict()
-    assert runtime.list_runs("demo")[0]["status"] == "completed"
+    summary = runtime.list_runs("demo")[0]
+    assert summary["status"] == "completed"
+    assert summary["approval_status"] in {"pending", "rejected", "changes-requested"}
+    assert summary["pending_approval_count"] >= 0
 
 
 def test_runtime_persists_failure_and_resumes_from_failed_agent(tmp_path: Path) -> None:
