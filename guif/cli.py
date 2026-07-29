@@ -17,6 +17,15 @@ from guif.theme import create_theme, validate_theme_file
 from guif.workflow import list_workflows, load_workflow, validate_workflow_file
 
 
+def _approval_command(sub: argparse._SubParsersAction, name: str, help_text: str) -> None:
+    command = sub.add_parser(name, help=help_text)
+    command.add_argument("task_id")
+    command.add_argument("approval_id")
+    command.add_argument("--project", required=True)
+    command.add_argument("--actor", required=True)
+    command.add_argument("--comment")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="guif", description="Game UI Framework CLI")
     parser.add_argument("--version", action="version", version=f"GUIF {__version__}")
@@ -29,6 +38,10 @@ def build_parser() -> argparse.ArgumentParser:
     run_list_cmd = sub.add_parser("run-list", help="List persisted runtime task runs"); run_list_cmd.add_argument("--project", required=True)
     run_show_cmd = sub.add_parser("run-show", help="Show a persisted runtime task"); run_show_cmd.add_argument("task_id"); run_show_cmd.add_argument("--project", required=True)
     run_resume_cmd = sub.add_parser("run-resume", help="Resume a failed or interrupted runtime task"); run_resume_cmd.add_argument("task_id"); run_resume_cmd.add_argument("--project", required=True)
+    approval_list_cmd = sub.add_parser("run-approval-list", help="Show persisted approval state for a task"); approval_list_cmd.add_argument("task_id"); approval_list_cmd.add_argument("--project", required=True)
+    _approval_command(sub, "run-approve", "Approve one required task approval point")
+    _approval_command(sub, "run-reject", "Reject one required task approval point")
+    _approval_command(sub, "run-request-changes", "Request changes for one required task approval point")
     validate_cmd = sub.add_parser("validate", help="Validate a project workspace"); validate_cmd.add_argument("project")
     record_cmd = sub.add_parser("record", help="Record reusable project memory"); record_cmd.add_argument("memory_type", choices=("decision", "lesson", "mistake", "best-practice")); record_cmd.add_argument("message"); record_cmd.add_argument("--project", required=True)
     theme_cmd = sub.add_parser("theme-create", help="Create and activate a project theme"); theme_cmd.add_argument("name"); theme_cmd.add_argument("description"); theme_cmd.add_argument("--project", required=True)
@@ -72,6 +85,23 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(task.to_dict(), ensure_ascii=False, indent=2)); return 0
         if args.command == "run-resume":
             task = Runtime(workspace).resume(args.project, args.task_id)
+            print(json.dumps(task.to_dict(), ensure_ascii=False, indent=2)); return 0
+        if args.command == "run-approval-list":
+            print(json.dumps(Runtime(workspace).get_approvals(args.project, args.task_id), ensure_ascii=False, indent=2)); return 0
+        if args.command in {"run-approve", "run-reject", "run-request-changes"}:
+            runtime = Runtime(workspace)
+            method = {
+                "run-approve": runtime.approve,
+                "run-reject": runtime.reject,
+                "run-request-changes": runtime.request_changes,
+            }[args.command]
+            task = method(
+                args.project,
+                args.task_id,
+                args.approval_id,
+                actor=args.actor,
+                comment=args.comment,
+            )
             print(json.dumps(task.to_dict(), ensure_ascii=False, indent=2)); return 0
         if args.command == "validate":
             errors = validate_project(workspace, args.project)
