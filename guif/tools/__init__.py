@@ -15,6 +15,11 @@ from guif.tools.config import (
     load_execution_settings,
     validate_execution_config,
 )
+from guif.tools.discovery import (
+    ToolCatalogEntry,
+    ToolDiscoveryService,
+    load_tool_catalog,
+)
 from guif.tools.dry_run import DryRunToolAdapter
 from guif.tools.registry import ToolRegistry, ToolResolution, build_default_tool_registry
 from guif.tools.scaffold import create_tool_scaffold
@@ -26,6 +31,8 @@ __all__ = [
     "ExecutionSettings",
     "HostProfile",
     "ToolAdapter",
+    "ToolCatalogEntry",
+    "ToolDiscoveryService",
     "ToolHandoff",
     "ToolHealthReport",
     "ToolManifest",
@@ -38,5 +45,6 @@ __all__ = [
     "build_default_tool_registry",
     "create_tool_scaffold",
     "load_execution_settings",
+    "load_tool_catalog",
     "validate_execution_config",
 ]
