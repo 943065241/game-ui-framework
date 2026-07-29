@@ -2,37 +2,66 @@
 
 [English](README.md) | **简体中文**
 
-GUIF 是一个本地优先、Host 与 Tool 均可配置的游戏 UI 生产框架。默认 Host 是 ChatGPT，默认图片生成与修图 Tool 是 `chatgpt-image`，但二者都不是 GUIF Core 的硬编码依赖。
+GUIF 是一个本地优先、Host 与 Tool 均可配置的游戏 UI 生产框架。默认 Host 是 ChatGPT，默认图片生成与修图 Tool 是 `chatgpt-image`，默认语义视觉检查器是 `chatgpt-vision`；三者都是可替换契约，不是 GUIF Core 的硬编码依赖。
 
 ## 当前状态
 
-`v1.0.0-alpha.25` 新增可运行的 Authenticated Production Host Gateway，以及私有 Signed Operation Ledger。
+`v1.0.0-alpha.26` 新增可领取的 ChatGPT-first Host 工作闭环，用于真实图片生成、图片修图和语义视觉检查。
 
 ```text
 选择私有 Theme
   -> Prompt / Approval / Tool Handoff
-  -> Authenticated Host Actor
-  -> Task Etag + Exclusive Lease
-  -> Production Host Gateway
-  -> Image Result Callback
-  -> Artifact / Review / Revision
-  -> Gated Export
-  -> Git Change Set / Commit / Revert
-  -> Signed Private Operation Ledger
+  -> 图片生成或图片修图 Host Work
+  -> Authenticated Claim + Task Lease
+  -> Host 真正调用图片 Tool
+  -> Artifact Registration
+  -> Deterministic Metadata Review
+  -> chatgpt-vision Semantic Inspection Work
+  -> passed / review-required / blocked
+  -> 需要时生成 Controlled Revision Job
+  -> Gated Export / Git Change Set
 ```
 
-中英文双语产品规格维护在 [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md)。隐私迁移和 Git 历史处理指引见 [`docs/PRIVACY_MIGRATION.md`](docs/PRIVACY_MIGRATION.md)。
+中英文持续迭代规格维护在 [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md)。隐私迁移和仓库历史处理说明见 [`docs/PRIVACY_MIGRATION.md`](docs/PRIVACY_MIGRATION.md)。
 
-## Production Host Gateway
+## alpha.26 已经可以运行的内容
 
-启动本地 Gateway：
+持久化的 `chatgpt-image` Handoff 现在会成为私有 Host Work：
+
+```text
+image-generation
+image-editing
+visual-inspection
+```
+
+每个 Work Item 包含：
+
+- Project、Task、Tool、Handoff 和 Artifact Identity；
+- 已批准的 Prompt Job 或 Visual Inspection Request；
+- Required Capability 与 Submission Contract；
+- 具有 SHA-256 Identity 的不可变可下载 Attachment；
+- `available / claimed / completed` 状态；
+- 绑定 Authenticated Actor 的一次性 Claim Secret；
+- 与 Artifact 或 Visual Review 关联的 Result Receipt。
+
+Work Record 保存在框架 Git 和 Project Git 之外：
+
+```text
+<private-data-root>/host-work/<project>/work-*.json
+```
+
+持久化 Record 不保存原始 Claim Token。
+
+## Production Gateway 工作流
+
+启动 Gateway：
 
 ```bash
 pip install -e .[dev]
 guif-gateway --workspace . --host 127.0.0.1 --port 8765
 ```
 
-默认只绑定 Loopback。绑定非本机地址时，必须同时显式启用 `--allow-remote` 并提供 TLS 证书和私钥：
+绑定远程地址仍需要显式启用并配置 TLS：
 
 ```bash
 guif-gateway \
@@ -43,25 +72,7 @@ guif-gateway \
   --tls-key server.key
 ```
 
-内置服务是一个受控单机 Host Boundary，不是面向公网的边缘反向代理。真实部署仍应在外层配置符合项目策略的网络隔离、证书轮换、限流和进程托管。
-
-### Gateway Endpoint
-
-```text
-GET  /health
-GET  /v1/descriptor
-GET  /v1/tasks/{project}/{task_id}/summary
-POST /v1/tasks/{project}/{task_id}/lease
-POST /v1/tasks/{project}/{task_id}/approvals/{approval_id}
-POST /v1/tasks/{project}/{task_id}/callbacks/{handoff_id}
-POST /v1/tasks/{project}/{task_id}/exports
-GET  /v1/ledger/verify
-GET  /v1/ledger/entries?limit=100
-```
-
-所有 `/v1` Endpoint 都要求带有相应 Capability 的 GUIF Bearer Credential。所有 POST 写操作都要求 `Idempotency-Key`；独占写操作还要求 Task Etag 与 Lease Token。
-
-### 创建 Gateway Credential
+创建具备 Host Work Capability 的 Credential：
 
 ```python
 from pathlib import Path
@@ -74,139 +85,144 @@ issued = runtime.register_host_credential(
     capabilities=(
         "gateway:read",
         "task:read",
-        "ledger:read",
+        "host-work:read",
+        "host-work:claim",
+        "host-work:complete",
         "task:lease",
-        "approval:decide",
         "tool-result:submit",
+        "visual-inspection:submit",
         "export:execute",
-        "export:rollback",
-        "git:prepare",
-        "git:commit",
-        "git:revert",
     ),
-    roles=("operator",),
-    created_by="local-admin",
 )
 
 bearer_token = issued["bearer_token"]  # 只显示一次
 ```
 
-GUIF 只保存 PBKDF2-HMAC-SHA256 Verifier，不保存原始 Bearer Secret。
-
-### 通过 HTTP 获取 Task Lease
+### 发现 Work
 
 ```http
-POST /v1/tasks/SampleGame/task-123/lease
+GET /v1/work?project=SampleGame&status=available
 Authorization: Bearer guifh1....
-Content-Type: application/json
-Idempotency-Key: lease-2026-001
-
-{
-  "expected_task_etag": "task-sha256:...",
-  "ttl_seconds": 300,
-  "purpose": "host-result-callback"
-}
 ```
 
-Lease Token 只返回一次，不会写入 Gateway Idempotency Receipt。重复同一个 Lease Request 不能再次取得 Token。
-
-### 提交生成或修图结果
-
-Callback Body 直接传输图片文件，避免 Base64 膨胀：
+### 领取 Work
 
 ```http
-POST /v1/tasks/SampleGame/task-123/callbacks/handoff-456
+POST /v1/work/SampleGame/work-image-123/claim
 Authorization: Bearer guifh1....
-Idempotency-Key: result-2026-001
+Content-Type: application/json
+Idempotency-Key: claim-001
+
+{"ttl_seconds": 300}
+```
+
+响应只返回一次 `guifw1.<work-id>.<secret>`。Claim Ownership 与 Authenticated Actor 和 Credential 绑定。
+
+### 下载不可变 Attachment
+
+```http
+GET /v1/work/SampleGame/work-visual-123/attachments/attachment-456
+Authorization: Bearer guifh1....
+X-GUIF-Work-Claim: guifw1....
+```
+
+返回文件前，GUIF 会重新检查路径边界、文件存在性和 SHA-256。图片修图 Work 可以通过该接口取得不可变 Source Artifact；Visual Inspection Work 可以取得待检查 Artifact。
+
+### 提交真实图片结果
+
+先通过既有 `/lease` Endpoint 获取 Task Lease，再提交原始图片 Bytes：
+
+```http
+POST /v1/work/SampleGame/work-image-123/result
+Authorization: Bearer guifh1....
+Idempotency-Key: image-result-001
 If-Match: "task-sha256:..."
 X-GUIF-Lease-Token: guifl1....
-X-GUIF-Filename: generated-screen.png
+X-GUIF-Work-Claim: guifw1....
+X-GUIF-Filename: fictional-screen.png
 X-GUIF-Content-SHA256: <sha256>
 X-GUIF-Width: 1080
 X-GUIF-Height: 2340
-X-GUIF-Model-ID: image-model
+X-GUIF-Model-ID: chatgpt-image
 Content-Type: image/png
 
-<原始 PNG Bytes>
+<raw PNG bytes>
 ```
 
-Gateway 会检查 Credential Capability、Host/Tool/Handoff Identity、Task Etag、Lease Ownership、Body Size、可选 Content SHA-256 和 Idempotency，然后才登记 Artifact。成功 Callback 的重复提交只返回已保存的非敏感 Receipt，不会创建重复 Artifact。
+结果会经过 Authenticated Callback Contract 登记。随后 GUIF 自动检查 Artifact Eligibility、File Integrity、Dimension、Format、Alpha 和 Registered Metadata。Metadata Review 通过后，会自动创建 `visual-inspection` Work。
 
-默认 Body 上限为 32 MiB，可通过 `--max-body-mb` 调整。
+### 提交语义视觉检查结果
 
-## Signed Operation Ledger
+```http
+POST /v1/work/SampleGame/work-visual-123/result
+Authorization: Bearer guifh1....
+Idempotency-Key: visual-result-001
+If-Match: "task-sha256:..."
+X-GUIF-Lease-Token: guifl1....
+X-GUIF-Work-Claim: guifw1....
+Content-Type: application/json
 
-Authenticated Runtime 操作与 Gateway Request 结果会追加到私有 HMAC-SHA256 Chain：
+{
+  "inspector_id": "chatgpt-vision",
+  "status": "review-required",
+  "summary": "层级需要受控修改。",
+  "findings": [
+    {
+      "id": "hierarchy-1",
+      "severity": "review",
+      "category": "composition-and-hierarchy",
+      "code": "primary-action-too-weak",
+      "message": "增强虚构主操作入口的视觉层级。",
+      "evidence": {"region": "lower-center"}
+    }
+  ]
+}
+```
+
+允许的 Status：
 
 ```text
-<private-data-root>/operation-ledger/
-  signing-key.json
-  entries.jsonl
-  head.json
+passed
+review-required
+blocked
 ```
 
-每条 Entry 记录：
+只有在收到经过认证的 Inspector Result 后，GUIF 才会声明语义视觉结论。Metadata 不能被当成语义视觉通过。
 
-```text
-Sequence
-Operation + Status
-Authenticated Actor Snapshot
-Project / Task / Object Scope
-脱敏后的 Request 与 Result Evidence
-Previous Entry Hash
-Payload Hash
-Entry Hash
-HMAC Signature
-```
+存在可执行 Finding 时，GUIF 会自动创建 Versioned Revision Job。Revision Job 仍处于 `approval-pending`；初始生成 Approval 不会自动授权后续修图。
 
-Signed Head Checkpoint 可以发现 Entry 被修改、顺序断裂、中间 Entry 缺失和尾部 Entry 被删除。
+## 可嵌入的 ChatGPT Host Loop
 
-检查命令：
-
-```bash
-guif-ledger --workspace . descriptor
-guif-ledger --workspace . verify
-guif-ledger --workspace . list --limit 50
-guif-ledger --workspace . list --operation host.callback.submit
-```
-
-Runtime API：
+Host 集成也可以不通过 HTTP，而是提供真实的图片和视觉 Callable：
 
 ```python
-report = runtime.verify_operation_ledger()
-entries = runtime.list_operation_ledger(limit=100)
+from guif.chatgpt_host_loop import ChatGPTHostLoop
+
+loop = ChatGPTHostLoop(runtime, bearer_token=bearer_token)
+
+loop.run_once(
+    "SampleGame",
+    image_executor=call_chatgpt_image_tool,
+    visual_inspector=call_chatgpt_visual_inspection,
+)
 ```
 
-该 Ledger 提供的是**本地篡改证据**，不是 Public-key Non-repudiation。能够取得私有 Ledger Key 并重写全部私有文件的攻击者，仍可伪造一条替代 Chain。alpha.25 不提供外部时间戳机构或远程不可变日志。
+`ChatGPTHostLoop` 负责 Work Discovery、Task Etag、Task Lease、Claim Ownership、Immutable Attachment Retrieval、Result Submission、Artifact Registration 和失败时的 Lease Release。传入的 Callable 负责真正生成或修改 Pixel，以及执行语义视觉检查。
 
-## Authenticated Operation
+## 重要执行边界
 
-每个持久化 Task 都有确定性 Etag：
+本地 Python Package 无法自行调用 ChatGPT 内部图片 Tool。alpha.26 提供的是生产 Work Queue、Authenticated Transport、Attachment Binding 和可嵌入 Host SDK，由 ChatGPT 或其他 Host 调用自身 Tool 后回传结果。
 
-```python
-etag = runtime.get_task_etag("SampleGame", task_id)
-```
-
-独占写操作使用带过期时间的 Task Lease，并绑定 Project、Task、Actor、Credential、Purpose 与 Base Etag。Stale State、Expired Lease、错误 Actor、错误 Credential 和篡改 Token 都会 Fail Closed。
-
-经过认证的 API 包括：
+因此：
 
 ```text
-acquire_task_lease / renew_task_lease / release_task_lease
-submit_authenticated_tool_result
-decide_approval_authenticated
-execute_gated_export_authenticated
-rollback_gated_export_authenticated
-prepare_export_git_change
-execute_git_change
-revert_git_change
+GUIF 不伪造图片 Pixel。
+GUIF 不根据 Metadata 伪造语义视觉通过。
+dry-run 不会成为生产任务的静默回退。
+Host 必须提供真实图片与视觉能力。
 ```
 
-每个直接调用的 Authenticated Runtime Operation 都会写入 `started`，以及 `completed` 或 `failed` Ledger Entry。Bearer Token、Lease Token、图片 Bytes 和 Credential Verifier 不会进入 Ledger Detail。
-
-## 私有 Theme Boundary
-
-真实用户 Theme 仍是用户拥有、可版本化的私有数据，不进入框架 Git 或 Project Git：
+## 私有数据边界
 
 ```text
 <private-data-root>/
@@ -214,40 +230,29 @@ revert_git_change
   conversation-theme-bindings/
   project-theme-bindings/
   host-credentials/
+  host-work/
   gateway-requests/
   operation-ledger/
-  runs/<project>/<task-id>/
+  runs/
   plans/
   migrations/
   privacy-reports/
 ```
 
-新的视觉设计对话必须选择历史 Theme、新建 Theme、派生新版本，或明确选择暂不绑定。持久化 Task Context 只保存 Theme ID、Version、Snapshot Hash 与 Privacy Marker；完整 Theme 只在私有 Runtime Boundary 内加载。
+真实用户 Theme、对话决策、Prompt、Work Claim、Attachment、Runtime Evidence、Callback Receipt 和 Semantic Finding 默认都不会进入框架 Git 或 Project Git。公共测试和示例只使用完全虚构的 Fixture。
 
-## 已有生产流程
+## 继续保留的生产控制
 
 GUIF 继续提供：
 
-- 私有 Versioned Theme Library 与 Conversation-first Theme Selection；
-- Workflow-driven Planner、Director、Theme、Resource、Prompt 与 Semantic QA Agent；
-- 可配置 Host / Tool 路由与 ChatGPT 默认值；
-- Artifact Identity、Immutable Reference、SHA-256、MIME 与 Dimension；
-- Deterministic Metadata Review 与可选 Semantic Visual Inspector；
+- Private Versioned Theme Library 与 Conversation-first Theme Selection；
+- Configurable Host / Tool Discovery、Connection 与 Routing；
+- Contract QA 与 Persistent Approval Gate；
+- Artifact Identity、SHA-256、MIME、Dimension 与 Immutable Reference；
 - Controlled Revision Execution 与 Review-gated Supersession；
-- Gated Export、Engine Manifest、Transaction Audit、Backup 与 Rollback；
-- 带 Plan、Diff、Branch、Commit 和 Revert 的 Task-bound Git Change Set；
+- Gated Export、Engine Manifest、Backup、Rollback 与 Git Change Set；
+- Authenticated Actor、Task Etag、Exclusive Lease、Idempotency 与 Signed Private Operation Evidence；
 - Current-tree Privacy Audit 与 Legacy Theme Migration。
-
-## 命令入口
-
-```text
-guif          Framework、Theme、Task、Artifact、QA、Revision 与 Export
-guif-ops      Credential、Lease、Callback、Approval、Export 与 Git Authenticated Operation
-guif-gateway  Authenticated HTTP Host Boundary
-guif-ledger   Private Operation Ledger 检查与验证
-```
-
-`guif-ops` 默认从 `GUIF_HOST_TOKEN` 与 `GUIF_TASK_LEASE` 读取 Token，避免进入命令历史。
 
 ## 开发
 
@@ -263,17 +268,14 @@ pytest -q
 
 ## 当前限制
 
-- Gateway 使用本地 GUIF Bearer Credential；尚未实现 OIDC、mTLS Client Identity、Hardware-backed Key 和 Remote Identity Provider。
-- 内置 WSGI Server 适合作为受控单机 Boundary，不应直接作为公网 Edge 暴露。
-- Task Lease 与 Ledger Lock 仍是 Process-local / File-backed，不是分布式协调原语。
-- 旧版未认证 Runtime API 为兼容性继续存在，可绕过 alpha.25 的认证和 Ledger 保证。
-- Operation Ledger 使用私有对称 HMAC Key，不是公开签名或外部不可变审计服务。
-- ChatGPT 产品侧仍需配置为自动调用 Gateway Endpoint。
-- 默认 Semantic Visual Inspector Registry 仍为空。
-- Private Storage 尚无静态加密、远程同步、Retention Policy 和灾难恢复复制。
-- Git Execution 只创建本地 Branch 与 Commit；尚未自动 Push、创建 PR 或处理 Protected Branch。
+- ChatGPT 产品侧仍需要嵌入 `ChatGPTHostLoop` 或消费 Gateway Work Endpoint；仓库自身不能接入 ChatGPT 内部 Tool Runtime。
+- 默认 Semantic Inspector 是经过认证的外部结果契约，不是本地自主视觉模型。
+- Work Claim 和 Task Lease 是 File-backed 本地协调，不是分布式一致性锁。
+- 内置 WSGI Server 是单节点 Host Boundary，不是互联网边缘反向代理。
+- Private Storage 尚未提供静态加密、远程同步、Retention Policy 或多设备冲突处理。
+- 尚未自动执行 Remote Git Push、PR 创建、Protected Branch 协商和 Server-side Check 编排。
 - Current-tree Privacy Audit 无法证明 Git History、Fork、Cache 或外部 Clone 已被清理。
 
 ## 下一阶段
 
-下一优先级是 **alpha.26：Real ChatGPT Image Loop 与 Default Visual Inspector**：Host 侧自动消费 Handoff、执行图片生成/修图、通过 Gateway 自动回传、默认 Semantic Visual Inspection、Revision Retry Orchestration，以及完整可运行的 End-to-end Project Acceptance Test。
+下一优先级是 **alpha.27：Conversation-first User Workflow and Recovery**：一键初始化、Conversation Session State、自动 Theme 确认、Project 选择、生成与修图进度、失败 Work 恢复、私有备份和 Schema Migration，以及不向用户暴露 Task ID、Etag、Lease、Claim 或 Callback ID 的使用流程。

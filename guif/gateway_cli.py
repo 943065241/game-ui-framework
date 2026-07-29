@@ -4,13 +4,14 @@ import argparse
 import sys
 from pathlib import Path
 
-from guif.host_gateway import DEFAULT_MAX_BODY_BYTES, serve_gateway
+from guif.host_gateway import DEFAULT_MAX_BODY_BYTES
+from guif.host_loop_gateway import serve_host_loop_gateway
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="guif-gateway",
-        description="Run the authenticated GUIF Production Host Gateway",
+        description="Run the authenticated GUIF ChatGPT Host Loop Gateway",
     )
     parser.add_argument("--workspace", type=Path, default=Path.cwd())
     parser.add_argument("--host", default="127.0.0.1")
@@ -19,7 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-body-mb",
         type=int,
         default=DEFAULT_MAX_BODY_BYTES // (1024 * 1024),
-        help="Maximum callback body size in MiB",
+        help="Maximum image result body size in MiB",
     )
     parser.add_argument(
         "--allow-remote",
@@ -37,7 +38,7 @@ def main(argv: list[str] | None = None) -> int:
         print("ERROR: --max-body-mb must be between 1 and 1024", file=sys.stderr)
         return 2
     try:
-        serve_gateway(
+        serve_host_loop_gateway(
             args.workspace.resolve(),
             host=args.host,
             port=args.port,
