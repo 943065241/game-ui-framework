@@ -53,6 +53,13 @@ class TaskStore:
         else:
             _write_json(error_path, payload["error"])
 
+        approval_path = run_dir / "approvals.json"
+        approval_state = payload["state"].get("approval_state")
+        if isinstance(approval_state, dict):
+            _write_json(approval_path, approval_state)
+        elif approval_path.exists():
+            approval_path.unlink()
+
         return run_dir
 
     def load(self, project: str, task_id: str) -> Task:
@@ -69,21 +76,30 @@ class TaskStore:
         summaries: list[dict[str, Any]] = []
         for task_path in sorted(runs_dir.glob("*/task.json")):
             payload = json.loads(task_path.read_text(encoding="utf-8"))
+            approval_state = payload.get("state", {}).get("approval_state", {})
             summaries.append(
                 {
-                    key: payload.get(key)
-                    for key in (
-                        "task_id",
-                        "project",
-                        "requirement",
-                        "pipeline",
-                        "status",
-                        "current_agent",
-                        "next_agent_index",
-                        "created_at",
-                        "updated_at",
-                        "completed_at",
-                    )
+                    **{
+                        key: payload.get(key)
+                        for key in (
+                            "task_id",
+                            "project",
+                            "requirement",
+                            "pipeline",
+                            "status",
+                            "current_agent",
+                            "next_agent_index",
+                            "created_at",
+                            "updated_at",
+                            "completed_at",
+                        )
+                    },
+                    "approval_status": approval_state.get("status")
+                    if isinstance(approval_state, dict)
+                    else None,
+                    "pending_approval_count": len(approval_state.get("pending_ids", []))
+                    if isinstance(approval_state, dict)
+                    else 0,
                 }
             )
         summaries.sort(
