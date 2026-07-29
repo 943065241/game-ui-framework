@@ -4,10 +4,10 @@ from guif.retrieval import select_relevant_context, selected_records, tokenize
 
 
 def test_tokenize_supports_english_and_chinese_terms() -> None:
-    tokens = tokenize("Medieval 港口商店 UI")
+    tokens = tokenize("Geometric 抽象商店 UI")
 
-    assert "medieval" in tokens
-    assert "港口" in tokens
+    assert "geometric" in tokens
+    assert "抽象" in tokens
     assert "商店" in tokens
 
 
@@ -18,12 +18,12 @@ def test_retrieval_ranks_relevant_memory_and_respects_budget() -> None:
             {
                 "path": "memory/decisions/shop.md",
                 "type": "decisions",
-                "content": "The shop page must keep the harbor view and must not use bottom tabs.",
+                "content": "The fictional shop page must keep hexagonal navigation and must not use bottom tabs.",
             },
             {
-                "path": "memory/lessons/trade.md",
+                "path": "memory/lessons/dashboard.md",
                 "type": "lessons",
-                "content": "The trading page orderbook needs stronger contrast.",
+                "content": "The dashboard data grid needs stronger contrast.",
             },
             {
                 "path": "memory/mistakes/login.md",
@@ -37,7 +37,7 @@ def test_retrieval_ranks_relevant_memory_and_respects_budget() -> None:
 
     selection = select_relevant_context(
         context,
-        "Create the medieval harbor shop page without bottom tabs",
+        "Create the geometric arcade shop page without bottom tabs",
         memory_limit=1,
     )
 
@@ -53,16 +53,16 @@ def test_retrieval_selects_matching_resource_and_workflow() -> None:
         "active_theme": None,
         "memory": (),
         "resources": (
-            {"id": "purchase-button", "type": "button", "output_name": "purchase-button.png"},
-            {"id": "trade-chart", "type": "panel", "output_name": "trade-chart.png"},
+            {"id": "action-button", "type": "button", "output_name": "action-button.png"},
+            {"id": "data-chart", "type": "panel", "output_name": "data-chart.png"},
         ),
         "workflows": (
             {"id": "shop-production", "name": "Shop Production", "steps": ["Build shop UI"]},
-            {"id": "trade-production", "name": "Trade Production", "steps": ["Build trade UI"]},
+            {"id": "dashboard-production", "name": "Dashboard Production", "steps": ["Build dashboard UI"]},
         ),
     }
 
-    selection = select_relevant_context(context, "Create a shop purchase button")
+    selection = select_relevant_context(context, "Create a shop action button")
 
-    assert selected_records(selection, "resources")[0]["id"] == "purchase-button"
+    assert selected_records(selection, "resources")[0]["id"] == "action-button"
     assert selected_records(selection, "workflows")[0]["id"] == "shop-production"
