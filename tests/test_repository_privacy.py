@@ -19,5 +19,9 @@ def test_framework_tree_contains_no_user_theme_identifiers() -> None:
         sensitive_terms=sensitive_terms,
         persist=False,
     )
+    details = "\n".join(
+        f"{item.get('path')}: {', '.join(item.get('matched_terms', []))}"
+        for item in report["findings"]
+    )
 
-    assert report["status"] == "passed", report["findings"]
+    assert report["status"] == "passed", details
