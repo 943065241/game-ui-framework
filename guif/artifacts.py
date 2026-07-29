@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from guif.private_data import PrivateDataLayout
 from guif.providers.base import ExecutionRequest, ExecutionResult
 
 ARTIFACT_SCHEMA_VERSION = 1
@@ -26,6 +27,21 @@ def _project_root(task: Any) -> Path:
     return Path(str(value))
 
 
+def _workspace_from_project_root(root: Path) -> Path:
+    resolved = root.resolve()
+    if resolved.parent.name == "projects":
+        return resolved.parent.parent
+    raise ValueError("RuntimeContext.project_root must be projects/<project>")
+
+
+def _allowed_reference_root(task: Any, reference: dict[str, Any], project_root: Path) -> tuple[Path, str]:
+    if reference.get("storage_scope") == "private-run" or reference.get("role") == "revision-source-artifact":
+        workspace = _workspace_from_project_root(project_root)
+        root = PrivateDataLayout(workspace).runs(task.project) / task.task_id
+        return root.resolve(), "private-run"
+    return project_root.resolve(), "project"
+
+
 def bind_references(task: Any, references: list[dict[str, Any]]) -> tuple[dict[str, Any], ...]:
     project_root = _project_root(task)
     bound: list[dict[str, Any]] = []
@@ -33,11 +49,13 @@ def bind_references(task: Any, references: list[dict[str, Any]]) -> tuple[dict[s
         manifest = reference.get("manifest") if isinstance(reference.get("manifest"), dict) else {}
         source_value = manifest.get("source")
         expected_sha256 = reference.get("expected_sha256")
+        allowed_root, storage_scope = _allowed_reference_root(task, reference, project_root)
         item: dict[str, Any] = {
             "resource_id": reference.get("resource_id"),
             "artifact_id": reference.get("artifact_id"),
             "role": reference.get("role"),
             "source": source_value,
+            "storage_scope": storage_scope,
             "immutable": reference.get("immutable") is True,
             "expected_sha256": expected_sha256,
             "status": "unbound",
@@ -47,12 +65,12 @@ def bind_references(task: Any, references: list[dict[str, Any]]) -> tuple[dict[s
         }
         if isinstance(source_value, str) and source_value.strip():
             source_path = Path(source_value)
-            resolved = source_path if source_path.is_absolute() else project_root / source_path
+            resolved = source_path if source_path.is_absolute() else allowed_root / source_path
             try:
                 resolved = resolved.resolve(strict=True)
-                resolved.relative_to(project_root.resolve())
+                relative = resolved.relative_to(allowed_root)
             except (FileNotFoundError, ValueError):
-                item["status"] = "missing-or-outside-project"
+                item["status"] = "missing-or-outside-allowed-root"
             else:
                 if resolved.is_file():
                     content = resolved.read_bytes()
@@ -63,7 +81,7 @@ def bind_references(task: Any, references: list[dict[str, Any]]) -> tuple[dict[s
                     item.update(
                         {
                             "status": status,
-                            "path": str(resolved.relative_to(project_root.resolve())),
+                            "path": str(relative),
                             "sha256": actual_sha256,
                             "size_bytes": len(content),
                         }
