@@ -6,7 +6,7 @@ GUIF is a local-first game UI production framework with configurable Hosts and T
 
 ## Status
 
-`v1.0.0-alpha.28` freezes the conversation-facing MVP and adds beta-readiness controls:
+`v1.0.0-beta.1` hardens the frozen conversation MVP without expanding the normal user workflow:
 
 ```text
 one-command bootstrap
@@ -18,16 +18,22 @@ one-command bootstrap
   -> semantic visual review
   -> independently approved Revision when needed
   -> Gated Export
-  -> verified private backup and recovery
+  -> verified private backup / restore
+  -> optional external backup protection
+  -> recorded alpha-to-beta upgrade assurance
 ```
 
-Alpha.28 does not expand the product into another large subsystem. It stabilizes the alpha.27 workflow, gives private data an explicit backup/migration contract, and defines the compatibility boundary that beta.1 must preserve.
+Beta.1 preserves public API version `1` and the conversation-facing stages/actions frozen in alpha.28. The package version is `1.0.0b1`.
 
-The bilingual living specification is maintained at [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md). Privacy migration and repository-history guidance remain in [`docs/PRIVACY_MIGRATION.md`](docs/PRIVACY_MIGRATION.md).
+Important documents:
 
-## One-command bootstrap
+- [Living product specification](docs/GUIF_PRODUCT_SPEC.md)
+- [Beta.1 release notes](docs/RELEASE_NOTES_BETA1.md)
+- [Beta.1 security review](docs/SECURITY_REVIEW_BETA1.md)
+- [Support policy](SUPPORT.md)
+- [Privacy migration guidance](docs/PRIVACY_MIGRATION.md)
 
-Install the development package:
+## Installation
 
 ```bash
 python -m venv .venv
@@ -38,7 +44,11 @@ source .venv/bin/activate
 pip install -e .[dev]
 ```
 
-Initialize a Project, create a ChatGPT Host credential, and open a private Conversation:
+CI builds a wheel and source distribution, installs the generated wheel, verifies `guif.__version__`, and runs a CLI contract smoke test on Python 3.10, 3.11, and 3.12.
+
+## One-command bootstrap
+
+Initialize a Project, create or validate a ChatGPT Host credential, and open a private Conversation:
 
 ```bash
 guif-ready start \
@@ -62,17 +72,9 @@ A newly issued Bearer token is displayed once. Store it in a protected secret ma
 export GUIF_HOST_TOKEN='guifh1....'
 ```
 
-The token is not written into Project Git, the Conversation record, backup manifests, diagnostics, or public output.
+The token is not written into Project Git, Conversation records, backup manifests, diagnostics, or public output.
 
 ## Conversation-first workflow
-
-After bootstrap, continue through the existing user-facing command:
-
-```bash
-guif-conversation open \
-  --project SampleGame \
-  --conversation conversation-001
-```
 
 A new Conversation begins at:
 
@@ -90,7 +92,7 @@ theme-derive     create an immutable new Theme version
 theme-unbound    explicitly continue without a Theme
 ```
 
-Real user Theme content remains in the private Theme Library outside framework and Project Git. Public repository examples use only wholly fictional fixtures.
+Real user Theme content remains in the private Theme Library outside framework and Project Git. Public examples use only wholly fictional fixtures.
 
 Submit a natural-language request:
 
@@ -110,18 +112,7 @@ guif-conversation approve \
   --conversation conversation-001
 ```
 
-The normal user view exposes only:
-
-```text
-conversation and project
-current stage and message
-private Theme summary
-contextual actions
-safe Artifact summaries
-recovery availability
-```
-
-Low-level identities remain enforced beneath the facade and are available only through explicit diagnostics or developer APIs.
+The normal view exposes only the Conversation/Project, public stage, message, private Theme summary, contextual actions, safe Artifact summaries, and recovery availability. Low-level identities remain enforced beneath the facade.
 
 ## Real image and visual loop
 
@@ -151,9 +142,9 @@ Task-scoped Host Work discovery
 -> next user-facing stage
 ```
 
-The local Python package does not fabricate pixels and cannot enter ChatGPT's internal tool runtime by itself. ChatGPT or another configured Host must embed the Host loop or consume the authenticated Gateway work endpoints.
+The local Python package does not fabricate pixels and cannot enter ChatGPT's internal tool runtime by itself. ChatGPT or another configured Host must embed `ChatGPTHostLoop` or consume the authenticated Gateway work API.
 
-Metadata review never claims that Theme consistency, composition, readability, or usability passed. Those conclusions require an authenticated semantic visual result.
+Metadata review never claims Theme consistency, composition, readability, or usability passed. Those conclusions require an authenticated semantic visual result.
 
 ## Controlled Revision
 
@@ -173,34 +164,13 @@ Create the default portable backup:
 guif-ready backup --workspace .
 ```
 
-The default destination is:
+Default destination:
 
 ```text
 <private-data-root>/backups/portable-<timestamp>.guif-private.zip
 ```
 
-The portable profile includes user-owned and recoverable production data such as:
-
-```text
-themes
-conversation-theme-bindings
-conversation-workflows
-project-theme-bindings
-runs
-plans
-host-work
-migrations
-privacy-reports
-```
-
-It deliberately excludes:
-
-```text
-Host credentials and credential verifiers
-operation-ledger signing keys
-Gateway request receipts
-operation-audit authentication material
-```
+The portable profile includes recoverable user-owned production data such as Themes, Conversation bindings/records, runs, plans, Host Work, migrations, and privacy reports. It deliberately excludes Host credential verifiers, operation-ledger signing keys, Gateway request receipts, and operation-audit authentication material.
 
 A `full-local` archive requires an explicit sensitive-material decision:
 
@@ -212,7 +182,7 @@ guif-ready backup \
   --output /protected/offline/location/full-local.guif-private.zip
 ```
 
-GUIF backup archives are integrity checked but are not encrypted at rest. Sensitive archives must be stored on protected encrypted media or in an encrypted secret-bearing backup system.
+Unprotected GUIF archives provide integrity verification but are not encrypted at rest.
 
 ### Backup verification
 
@@ -220,18 +190,7 @@ GUIF backup archives are integrity checked but are not encrypted at rest. Sensit
 guif-ready backup-verify /path/to/portable.guif-private.zip
 ```
 
-Verification checks:
-
-```text
-manifest schema and manifest hash
-canonical member paths
-no path traversal
-no duplicate members
-no symbolic-link members
-per-file size and SHA-256
-total extraction limit
-no unmanifested archive members
-```
+Verification checks manifest schema/hash, canonical member paths, path traversal, duplicate/unmanifested members, symbolic links, per-file size/SHA-256, and total extraction limits.
 
 ### Plan-first restore
 
@@ -246,7 +205,7 @@ Conflict policies:
 ```text
 fail      block on any different existing file
 skip      keep existing conflicting files
-replace   replace conflicts after creating a portable pre-restore backup
+replace   create a portable pre-restore backup, then replace conflicts
 ```
 
 Apply explicitly:
@@ -260,103 +219,146 @@ guif-ready backup-restore \
 
 Restore writes each file atomically and verifies its SHA-256 after materialization.
 
-## Recorded private schema migration
+## External backup protection boundary
 
-Scan private records without mutation:
+GUIF does not implement custom cryptography or bundle a specific encryption program. It can coordinate an explicitly configured external program using an argv array with `shell=False`.
+
+Configure the external adapter through environment variables. The command values must be JSON arrays and must include `{input}` and `{output}` placeholders:
 
 ```bash
-guif-ready migrate --workspace .
+export GUIF_BACKUP_PROTECTOR_ID='local-encryption-tool'
+export GUIF_BACKUP_PROTECT_COMMAND_JSON='["/path/to/protect-tool","encrypt","--input","{input}","--output","{output}"]'
+export GUIF_BACKUP_UNPROTECT_COMMAND_JSON='["/path/to/protect-tool","decrypt","--input","{input}","--output","{output}"]'
+export GUIF_BACKUP_PROTECT_TIMEOUT_SECONDS='300'
 ```
 
-Apply supported repairs explicitly:
+The external program should obtain keys/passphrases through its own protected mechanism. Do not put secrets directly in the JSON argv configuration.
+
+Protect a verified archive:
 
 ```bash
-guif-ready migrate \
+guif-ready backup-protect \
+  /path/to/portable.guif-private.zip \
+  /protected/location/portable.guif-private.zip.protected
+```
+
+Verify the protected file and secret-free receipt:
+
+```bash
+guif-ready backup-protection-verify \
+  /protected/location/portable.guif-private.zip.protected
+```
+
+Recover the original GUIF archive and verify it:
+
+```bash
+guif-ready backup-unprotect \
+  /protected/location/portable.guif-private.zip.protected \
+  /recovery/location/portable.guif-private.zip
+```
+
+The protection boundary:
+
+```text
+uses no shell
+requires explicit configuration
+has no unprotected fallback
+uses bounded execution time
+refuses destination/receipt overwrite
+publishes through temporary files
+binds original/protected size and SHA-256
+persists no command argv or secret environment value
+```
+
+Cryptographic strength, key custody, rotation, and disaster recovery remain the external program/operator's responsibility.
+
+## Supported alpha upgrade assurance
+
+Plan an upgrade from alpha.27 or alpha.28:
+
+```bash
+guif-ready upgrade \
   --workspace . \
+  --source-release 1.0.0-alpha.28
+```
+
+The default plan requires a portable backup and checks private schema compatibility. Apply only after review:
+
+```bash
+guif-ready upgrade \
+  --workspace . \
+  --source-release 1.0.0-alpha.28 \
   --apply \
   --actor local-owner
 ```
 
-Alpha.28 keeps Conversation Workflow schema version 1 compatible while adding missing frozen-MVP metadata such as privacy and compatibility markers. Every applied repair is recorded in the private migration history and a private migration report.
+Unknown source releases, blocked private schemas, and raw secret-like fields fail closed. Applied repairs and upgrade evidence are stored privately under `upgrade-reports/` and `migrations/`.
 
-Unknown future schemas, invalid JSON, and raw secret-like fields fail closed and require manual review.
+## Fault injection
 
-## Privacy-safe diagnostics
+Fault injection is test/development-only and disabled by default. Environment activation requires both:
+
+```bash
+export GUIF_FAULT_POINTS='backup-protection.before-publish'
+export GUIF_ALLOW_FAULT_INJECTION='1'
+```
+
+A fault-point variable without the explicit allow flag raises an error. Production environments should leave both variables unset.
+
+## Bounded soak checks
+
+Run repeatability and latency checks over non-mutating production reads:
+
+```bash
+guif-ready soak \
+  --workspace . \
+  --project SampleGame \
+  --conversation conversation-001 \
+  --iterations 100 \
+  --max-p95-ms 1000
+```
+
+Optional `--backup` adds repeated archive verification. Reports include counts, sanitized errors, total/mean/p50/p95/max timing, observed public stages, and threshold status. Reports stay private under `hardening-reports/`.
+
+## Diagnostics and acceptance
 
 ```bash
 guif-ready diagnose \
   --workspace . \
   --project SampleGame \
   --conversation conversation-001
-```
 
-Diagnostics check:
-
-```text
-Project structure and schemas
-private storage availability
-private schema migration state
-operation-ledger integrity
-Host credential capabilities
-Conversation stage and recovery
-portable backup presence
-frozen compatibility contract
-```
-
-The default report does not expose Task IDs, etags, lease tokens, claim tokens, Handoff IDs, Callback IDs, Bearer tokens, or private storage paths. Persisted reports live under:
-
-```text
-<private-data-root>/diagnostics/<project>/
-```
-
-## End-to-end acceptance gate
-
-```bash
 guif-ready acceptance \
   --workspace . \
   --project SampleGame \
   --conversation conversation-001
 ```
 
-The acceptance gate passes only when:
+The acceptance gate passes only when no blocking readiness check exists and the Conversation is `ready-to-export` or `completed`. `--require-completed` requires final Gated Export to have succeeded.
 
-```text
-no blocking readiness check exists
-and
-Conversation stage is ready-to-export or completed
-```
-
-Use `--require-completed` when final Gated Export must already have succeeded.
-
-The gate never generates a fake image or treats a metadata-only Artifact as visually accepted.
-
-## Frozen alpha.28 compatibility contract
+## Compatibility and support
 
 ```bash
 guif-ready contract
+guif-ready support
 ```
 
-The public API version is `1`. Beta.1 must preserve the frozen conversation stages and actions, or introduce a new public API version with an explicit migration path.
-
-Frozen user-facing stages include:
+The existing compatibility field remains:
 
 ```text
-theme-confirmation
-ready-for-request
-approval-required
-ready-to-produce
-image-production
-visual-review
-revision-approval-required
-revision-ready
-tool-configuration-required
-ready-to-export
-completed
-recoverable-error
-attention-required
+release: 1.0.0-alpha.28
 ```
 
-The explicit legacy `ProviderAdapter` path remains available for compatibility. Production Tool routing remains ChatGPT-first and configurable; `dry-run` remains test/development-only and is never a silent production fallback.
+because it identifies the origin of the frozen contract. Beta.1 adds:
+
+```text
+current_release: 1.0.0-beta.1
+channel: beta
+```
+
+Public API version remains `1`. Breaking product-facing changes require a new public API version and an explicit migration path. See [SUPPORT.md](SUPPORT.md).
+
+The explicit legacy `ProviderAdapter` path remains available. Production Tool routing remains ChatGPT-first and configurable; `dry-run` remains test/development-only and is never a silent production fallback.
 
 ## Private data boundary
 
@@ -373,46 +375,29 @@ The explicit legacy `ProviderAdapter` path remains available for compatibility. 
   operation-ledger/
   backups/
   diagnostics/
+  upgrade-reports/
+  hardening-reports/
   runs/
   plans/
   migrations/
   privacy-reports/
 ```
 
-Real Themes, prompts, Conversation decisions, approval evidence, Runtime state, Work claims, Attachments, image files, semantic findings, credentials, backup archives, and diagnostics remain outside framework and Project Git by default.
-
-## Existing production controls
-
-GUIF continues to provide:
-
-- private, versioned Theme Library and conversation bindings;
-- configurable Host and Tool discovery, connection, health, and routing;
-- model-neutral Prompt IR, contract QA, and persistent Approval gates;
-- Artifact identity, SHA-256, MIME, dimensions, immutable References, and provenance;
-- authenticated image generation/editing and semantic visual inspection work;
-- controlled Revision execution and review-gated supersession;
-- Gated Export, Engine manifests, backups, rollback, and Git Change Sets;
-- authenticated Actors, Task etags, exclusive leases, idempotency, and signed private operation evidence;
-- current-tree privacy audit and legacy Theme migration.
+Real Themes, prompts, Conversation decisions, approval evidence, Runtime state, Work claims, Attachments, image files, semantic findings, credentials, backup/protected archives, and reports remain outside framework and Project Git by default.
 
 ## Development
 
 ```bash
 pytest -q
+python -m build
 ```
-
-CI runs on Python 3.10, 3.11, and 3.12.
 
 ## Current limitations
 
-- ChatGPT product integration must still embed `ChatGPTHostLoop` or consume the Gateway work API; this repository cannot invoke ChatGPT internal image tools by itself.
-- Portable archives are integrity checked but not encrypted.
+- ChatGPT product integration must embed `ChatGPTHostLoop` or consume the Gateway work API; this repository cannot invoke ChatGPT internal image tools by itself.
+- GUIF verifies external protection evidence but cannot assess cryptographic strength or recover lost keys.
 - File-backed Work claims and Task leases are single-node coordination, not distributed consensus.
 - The built-in WSGI Gateway is not an internet-edge reverse proxy.
-- Remote private-data synchronization, retention policies, key rotation, and multi-device conflict resolution are not implemented.
+- Remote private-data synchronization, retention automation, and multi-device conflict resolution are not implemented.
 - Current-tree privacy audit cannot prove removal from Git history, forks, caches, or external clones.
-- Remote Git push, protected-branch negotiation, and server-side release orchestration remain outside the local Core.
-
-## Next phase
-
-The next release target is **beta.1: production hardening without expanding the frozen MVP**. Priorities are encrypted backup integration boundaries, upgrade testing from supported alpha versions, performance and failure-injection testing, packaged installation, release notes, and a documented support window.
+- Existing Pillow `Image.getdata()` deprecation warnings remain.
