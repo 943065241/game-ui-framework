@@ -45,7 +45,7 @@ def _score_record(query_tokens: set[str], text: str, *, base_score: int = 0) -> 
     record_tokens = tokenize(text)
     matched = sorted(query_tokens & record_tokens)
     if not matched:
-        return base_score, []
+        return 0, []
     score = base_score + len(matched) * 3
     lowered = text.lower()
     for token in matched:
