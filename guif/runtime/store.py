@@ -18,6 +18,13 @@ def _write_json(path: Path, payload: Any) -> None:
     temporary.replace(path)
 
 
+def _write_optional_json(path: Path, payload: Any) -> None:
+    if isinstance(payload, dict):
+        _write_json(path, payload)
+    elif path.exists():
+        path.unlink()
+
+
 class TaskStore:
     def __init__(self, workspace: Path) -> None:
         self.workspace = workspace
@@ -53,12 +60,10 @@ class TaskStore:
         else:
             _write_json(error_path, payload["error"])
 
-        approval_path = run_dir / "approvals.json"
-        approval_state = payload["state"].get("approval_state")
-        if isinstance(approval_state, dict):
-            _write_json(approval_path, approval_state)
-        elif approval_path.exists():
-            approval_path.unlink()
+        state = payload["state"]
+        _write_optional_json(run_dir / "approvals.json", state.get("approval_state"))
+        _write_optional_json(run_dir / "artifacts.json", state.get("artifact_registry"))
+        _write_optional_json(run_dir / "executions.json", state.get("provider_executions"))
 
         return run_dir
 
@@ -76,7 +81,16 @@ class TaskStore:
         summaries: list[dict[str, Any]] = []
         for task_path in sorted(runs_dir.glob("*/task.json")):
             payload = json.loads(task_path.read_text(encoding="utf-8"))
-            approval_state = payload.get("state", {}).get("approval_state", {})
+            state = payload.get("state", {})
+            approval_state = state.get("approval_state", {}) if isinstance(state, dict) else {}
+            artifact_registry = state.get("artifact_registry", {}) if isinstance(state, dict) else {}
+            execution_state = state.get("provider_executions", {}) if isinstance(state, dict) else {}
+            artifact_records = (
+                artifact_registry.get("records", []) if isinstance(artifact_registry, dict) else []
+            )
+            execution_attempts = (
+                execution_state.get("attempts", []) if isinstance(execution_state, dict) else []
+            )
             summaries.append(
                 {
                     **{
@@ -99,6 +113,10 @@ class TaskStore:
                     else None,
                     "pending_approval_count": len(approval_state.get("pending_ids", []))
                     if isinstance(approval_state, dict)
+                    else 0,
+                    "artifact_count": len(artifact_records) if isinstance(artifact_records, list) else 0,
+                    "provider_execution_count": len(execution_attempts)
+                    if isinstance(execution_attempts, list)
                     else 0,
                 }
             )
