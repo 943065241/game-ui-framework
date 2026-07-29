@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "game-ui-framework"
-version = "1.0.0a27"
-description = "Local-first game UI production framework with a private conversation-first workflow, recovery, and ChatGPT Host image loop"
+version = "1.0.0a28"
+description = "Local-first game UI production framework with a frozen conversation MVP, verified private backup, migration, diagnostics, and ChatGPT Host image loop"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -22,6 +22,7 @@ guif-ops = "guif.ops_cli:main"
 guif-gateway = "guif.gateway_cli:main"
 guif-ledger = "guif.ledger_cli:main"
 guif-conversation = "guif.conversation_cli:main"
+guif-ready = "guif.readiness_cli:main"
 
 [tool.setuptools.packages.find]
 include = ["guif*"]
