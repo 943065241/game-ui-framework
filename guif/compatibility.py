@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 MVP_API_VERSION = 1
-MVP_RELEASE = "1.0.0-beta.1"
+MVP_RELEASE = "1.0.0-beta.2"
 MVP_ORIGIN_RELEASE = "1.0.0-alpha.28"
 MINIMUM_PYTHON = "3.10"
 SUPPORTED_PRIVATE_SCHEMAS = {
@@ -48,7 +48,7 @@ FROZEN_CONVERSATION_ACTIONS = (
 
 
 def compatibility_contract() -> dict[str, Any]:
-    """Return the public beta.1 compatibility promise.
+    """Return the public beta compatibility promise.
 
     The existing ``release`` field remains the alpha.28 freeze origin for
     backward compatibility. ``current_release`` identifies the implementation
@@ -72,8 +72,8 @@ def compatibility_contract() -> dict[str, Any]:
             "default_view_hides_runtime_identifiers": True,
         },
         "compatibility_policy": {
-            "alpha_27_and_28_to_beta_1": "supported through explicit upgrade assurance",
-            "beta_1_public_facade": "backward-compatible with the alpha.28 frozen conversation facade",
+            "alpha_27_and_28_to_current_beta": "supported through explicit upgrade assurance",
+            "beta_2_public_facade": "backward-compatible with the alpha.28 frozen conversation facade",
             "breaking_changes": "require a new public API version and an explicit migration path",
             "private_schema_changes": "must be detected before mutation and applied through a recorded migration",
             "legacy_provider_adapter": "preserved as explicit compatibility mode",
