@@ -2,6 +2,7 @@ from guif.agents.base import Agent, ContractAgent
 from guif.agents.builtin import build_default_agents
 from guif.agents.director import StructuredDirectorAgent
 from guif.agents.planner import StructuredPlannerAgent
+from guif.agents.prompt import StructuredPromptAgent
 from guif.agents.resource import StructuredResourceAgent
 from guif.agents.theme import StructuredThemeAgent
 
@@ -10,6 +11,7 @@ __all__ = [
     "ContractAgent",
     "StructuredDirectorAgent",
     "StructuredPlannerAgent",
+    "StructuredPromptAgent",
     "StructuredResourceAgent",
     "StructuredThemeAgent",
     "build_default_agents",
