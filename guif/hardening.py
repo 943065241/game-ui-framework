@@ -15,6 +15,12 @@ from guif.private_data import PrivateDataLayout
 from guif.private_migration import PrivateSchemaMigrator
 from guif.runtime import Runtime
 
+SOAK_PROFILES = {
+    "quick": 10,
+    "standard": 100,
+    "extended": 1000,
+}
+
 
 class HardeningError(RuntimeError):
     pass
@@ -98,11 +104,17 @@ class HardeningService:
         *,
         conversation_id: str | None = None,
         backup_path: Path | None = None,
-        iterations: int = 100,
+        profile: str = "standard",
+        iterations: int | None = None,
         max_p95_ms: float | None = None,
         persist: bool = True,
+        report_path: Path | None = None,
     ) -> dict[str, Any]:
-        if iterations <= 0 or iterations > 10_000:
+        if profile not in SOAK_PROFILES:
+            raise ValueError(f"Unknown soak profile: {profile}")
+        resolved_iterations = SOAK_PROFILES[profile] if iterations is None else iterations
+        selected_profile = profile if iterations is None else "custom"
+        if resolved_iterations <= 0 or resolved_iterations > 10_000:
             raise ValueError("iterations must be between 1 and 10000")
         if max_p95_ms is not None and max_p95_ms <= 0:
             raise ValueError("max_p95_ms must be positive")
@@ -120,7 +132,7 @@ class HardeningService:
         errors: list[dict[str, Any]] = []
         observed_stages: set[str] = set()
         started = time.perf_counter()
-        for index in range(iterations):
+        for index in range(resolved_iterations):
             iteration_started = time.perf_counter()
             try:
                 project_errors = validate_project(self.workspace, project)
@@ -164,15 +176,23 @@ class HardeningService:
         p95 = _percentile(samples, 0.95)
         threshold_passed = max_p95_ms is None or p95 <= max_p95_ms
         status = "passed" if not errors and threshold_passed else "failed"
+        if errors:
+            failure_classification = "contract-check"
+        elif not threshold_passed:
+            failure_classification = "environment-performance-threshold"
+        else:
+            failure_classification = "none"
         report: dict[str, Any] = {
             "schema_version": 1,
             "status": status,
+            "profile": selected_profile,
+            "profile_requested": profile,
             "project": project,
             "conversation_checked": conversation_id is not None,
             "observed_stages": sorted(observed_stages),
             "backup_checked": backup_path is not None,
-            "iterations": iterations,
-            "successful_iterations": iterations - len(errors),
+            "iterations": resolved_iterations,
+            "successful_iterations": resolved_iterations - len(errors),
             "failed_iterations": len(errors),
             "timing_ms": {
                 "total": round(elapsed_ms, 3),
@@ -183,21 +203,34 @@ class HardeningService:
                 "threshold": max_p95_ms,
                 "threshold_passed": threshold_passed,
             },
+            "failure_classification": failure_classification,
+            "product_correctness_failed": bool(errors),
+            "performance_threshold_failed": not threshold_passed,
+            "threshold_interpretation": (
+                "A performance threshold failure is host/environment evidence requiring investigation; "
+                "it is not by itself proof of a GUIF product correctness failure."
+            ),
             "errors": errors[:20],
             "error_count_truncated": max(0, len(errors) - 20),
             "mutating_operations_performed": False,
             "production_state_mutated": False,
+            "machine_readable": True,
             "completed_at": _now(),
         }
-        if persist:
-            report_path = (
+        destination: Path | None = None
+        if report_path is not None:
+            destination = report_path.resolve()
+        elif persist:
+            destination = (
                 self.layout.hardening_reports
                 / project
                 / f"soak-{_timestamp()}.json"
             )
-            _write_json(report_path, report)
-            report["private_report_written"] = True
+        if destination is not None:
+            _write_json(destination, report)
+            report["report_written"] = True
+            report["private_report_written"] = report_path is None
         return report
 
 
-__all__ = ["HardeningError", "HardeningService"]
+__all__ = ["HardeningError", "HardeningService", "SOAK_PROFILES"]
