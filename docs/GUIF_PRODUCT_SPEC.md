@@ -1,7 +1,8 @@
 # GUIF Product Specification / GUIF 产品规格说明
 
 > Status / 状态: Living document / 持续迭代文档  
-> Baseline / 基线版本: `v1.0.0-alpha.28`  
+> Baseline / 基线版本: `v1.0.0-beta.1`  
+> Package / 包版本: `1.0.0b1`  
 > Public API / 公共 API: `1`  
 > Last reviewed / 最近审阅: 2026-07-29
 
@@ -11,7 +12,9 @@
 
 ### 0. 文档目的
 
-本文件定义 GUIF 的产品定位、alpha.28 已验证能力、冻结的 MVP 范围、隐私和安全边界、失败策略、兼容性、验收标准与下一阶段。Feature、Test、CI、中英文 README、Version Metadata 与本规格必须在同一个 Release 中保持一致。
+本文件定义 GUIF beta.1 的产品定位、冻结的 Conversation MVP、默认生产路径、Host / Tool 契约、私有数据边界、备份保护、升级保障、故障注入、稳定性检查、兼容与支持策略、验收标准和已知限制。
+
+Feature、Test、CI、中英文 README、Package Version、Release Notes、Security Review 与本规格必须在同一个 Release 中保持一致。
 
 ### 1. 产品定义
 
@@ -25,7 +28,8 @@ Planning / Direction / Contract / Prompt IR
 Approval / Tool Routing / Host Work Coordination
 Artifact / Provenance / Metadata Review / Semantic Review
 Revision / Supersession / Export / Rollback / Git Change
-Private Backup / Migration / Diagnostics / Recovery / Audit
+Private Backup / Protection Boundary / Migration / Recovery
+Diagnostics / Upgrade Assurance / Soak / Audit
 ```
 
 真实图片生成、图片修改和语义视觉理解由经过配置的 Host 与 Tool 执行。默认组合：
@@ -39,76 +43,57 @@ Visual Inspection     chatgpt-vision
 
 以上均为默认契约，不是不可替换的 Core 依赖。
 
-### 2. alpha.28 产品目标
+### 2. beta.1 目标与范围冻结
 
-alpha.28 不新增大型产品域，而是冻结 alpha.27 的日常 MVP，补齐进入 Beta 前必须存在的可靠性能力：
-
-```text
-一条命令完成初始化
-Conversation-first 默认入口
-Private Theme 确认
-自然语言需求幂等提交
-Initial / Revision Contextual Approval
-Task-scoped ChatGPT Host Work
-真实 Image / Edit / Vision Result
-Gated Export
-Private Backup / Verify / Plan-first Restore
-Recorded Private Schema Migration
-Privacy-safe Diagnostics
-End-to-end Acceptance Gate
-Public Compatibility Contract
-```
-
-### 3. 默认生产路径
+beta.1 不新增普通用户产品域，不改变 alpha.28 冻结的 Public API Version `1`，而是补齐生产加固能力：
 
 ```text
-guif-ready start
-  -> Project 初始化或复用
-  -> ChatGPT Host Credential 创建或验证
-  -> Private Conversation Record
-  -> Theme confirmation
-  -> Natural-language Request
-  -> Planner / Director / Resource / Prompt IR
-  -> Contract QA
-  -> Initial Approval
-  -> Tool Resolver
-  -> image-generation Host Work
-  -> Real Image Result
-  -> Artifact Registry
-  -> Deterministic Metadata Review
-  -> visual-inspection Host Work
-  -> Semantic Result
-       -> passed
-       -> review-required
-       -> blocked
-  -> Actionable Finding 形成 Revision Plan / Revision Job
-  -> Independent Revision Approval
-  -> image-editing Host Work
-  -> Replacement Review
-  -> Review-gated Supersession
-  -> Gated Export
-  -> Git Change Set / Commit / Revert
+External Backup Protection Boundary
+Supported alpha.27 / alpha.28 Upgrade Assurance
+Explicit Fault Injection Gate
+Bounded Repeatability / Latency Soak
+Wheel + Source Distribution Build / Install Verification
+Release Notes / Security Review / Support Window
 ```
 
-### 4. 核心产品原则
+正常用户仍沿用：
 
-1. Theme 是用户拥有的私有、可版本化长期数据，不属于框架 Git；
-2. ChatGPT 默认执行图片生成、修图和视觉理解，但 Host 与 Tool 可配置；
-3. GUIF 不伪造 Pixel，也不把 Dry-run Receipt 当成图片；
-4. Metadata Review 不能声明 Theme、构图、可读性或可用性通过；
-5. 语义视觉结论必须来自明确的 Visual Inspector Result；
-6. 生产任务缺少 Tool 时进入可恢复等待状态，不静默回退到 `dry-run`；
-7. Initial Approval 不自动授权 Revision；
-8. Replacement 只有通过最终视觉审查后才能 Supersede Source；
-9. Conversation 默认视图不暴露底层 Runtime Identity；
-10. Bearer、Lease、Claim 等 Secret 只在必要边界出现，不写入公共或普通用户视图；
-11. Private Backup 默认不包含 Host Credential 与 Ledger Signing Key；
-12. Restore 默认只生成计划，必须显式 `apply`；
-13. 未知未来 Schema、无效记录和 Raw Secret Field Fail Closed；
-14. Breaking Change 必须增加 Public API Version 并提供迁移路径；
-15. 公共仓库示例只使用完全虚构的 Fixture。
+```text
+开始 Conversation
+-> 确认、创建、派生或明确跳过 Private Theme
+-> 自然语言需求
+-> Initial Approval
+-> 真实图片生成
+-> Metadata Review
+-> Semantic Visual Review
+-> 必要时 Independent Revision Approval
+-> 真实图片编辑
+-> Review-gated Supersession
+-> Gated Export
+```
 
-### 5. Frozen Conversation MVP
+### 3. 核心产品原则
+
+1. Theme 是用户拥有的私有、可版本化长期数据，不属于 Framework Git 或 Project Git；
+2. 对话开始时必须确认 Theme，可选择历史 Theme、创建、派生或明确不绑定；
+3. ChatGPT 默认执行图片生成、修图和视觉理解，但 Host 与 Tool 均可配置或替换；
+4. GUIF 不伪造 Pixel，不把 Dry-run Receipt 当成图片；
+5. Metadata Review 不能声明 Theme、构图、可读性或可用性通过；
+6. 语义视觉结论必须来自明确的 Visual Inspector Result；
+7. 生产任务缺少 Tool 时进入可恢复等待状态，不静默回退到 `dry-run`；
+8. Initial Approval 不自动授权 Revision；
+9. Replacement 只有通过最终视觉审查后才能 Supersede Source；
+10. Conversation 默认视图不暴露底层 Runtime Identity 或 Private Path；
+11. Bearer、Lease、Claim、Signing Key 等 Secret 不写入公共输出；
+12. Portable Backup 默认排除 Host Credential Verifier 与 Ledger Signing Key；
+13. Restore 默认只生成计划，必须显式 Apply；
+14. GUIF 不实现自定义加密算法，不对外部加密工具的强度作虚假保证；
+15. External Protection 缺少配置时 Fail Closed，不回退到未保护复制；
+16. 未知 Source Release、未来 Schema、无效记录和 Raw Secret Field Fail Closed；
+17. Breaking Change 必须增加 Public API Version 并提供迁移路径；
+18. 公共仓库示例与测试只使用完全虚构的 Fixture。
+
+### 4. Frozen Conversation MVP
 
 Public API Version：
 
@@ -154,41 +139,23 @@ recover
 retry
 ```
 
-beta.1 必须保持以上名称与语义。破坏性变化要求新的 Public API Version。
-
-### 6. One-command Bootstrap Contract
-
-命令：
-
-```bash
-guif-ready start \
-  --workspace . \
-  --project SampleGame \
-  --conversation conversation-001
-```
-
-行为：
+Compatibility Contract 为保持既有字段语义，继续返回：
 
 ```text
-若 Project 不存在，则创建标准 Project 结构
-若未提供 GUIF_HOST_TOKEN，则签发 ChatGPT Host Credential
-创建或打开 Private Conversation Record
-返回 Theme Confirmation 或当前 Conversation Stage
+release: 1.0.0-alpha.28
 ```
 
-新 Bearer Token 只显示一次。Bootstrap 不将 Token 写入：
+并新增：
 
 ```text
-Project Git
-Conversation Record
-Diagnostics
-Backup Manifest
-Operation Summary
+current_release: 1.0.0-beta.1
+origin_release: 1.0.0-alpha.28
+channel: beta
 ```
 
-### 7. Conversation View Contract
+### 5. Conversation View 与隐私契约
 
-默认用户 View 至少包含：
+默认 View 至少包含：
 
 ```text
 schema_version
@@ -210,14 +177,15 @@ Task ID / Task Etag
 Approval ID / Revision ID
 Lease Token / Claim Token
 Work ID / Handoff ID / Callback ID
-Bearer Token
+Bearer Token / Signing Key
 Private Storage Path
 Raw Theme Content
+Artifact Bytes
 ```
 
-显式 Diagnostics 可提供必要开发信息，但 Secret 仍不得持久化或返回。
+显式开发 Diagnostics 可提供必要定位信息，但 Secret 仍不得返回或持久化。
 
-### 8. Private Theme Contract
+### 6. Private Theme Contract
 
 新 Conversation 在没有 Conversation-level Binding 时必须进入 `theme-confirmation`。
 
@@ -236,25 +204,9 @@ Raw Theme Content
 <private-data-root>/themes/
 ```
 
-Conversation 与 Project 只保存 Opaque Theme Reference 和 Snapshot Hash。
+Framework Git 只允许代码、Schema、通用文档和虚构 Fixture。
 
-### 9. Approval 与 Revision
-
-Initial Approval 只授权当前 Prompt Job。
-
-Semantic Finding 产生 Revision 后：
-
-```text
-Revision Plan
--> Versioned Revision Job
--> revision-approval-required
--> Approved
--> image-editing Work
-```
-
-Source Artifact 在 Replacement 通过前继续 Active。Simulation、Non-visual、Lineage Invalid 或 Semantic Review 未通过的 Replacement 不得 Supersede Source。
-
-### 10. Host Work 与 Tool Contract
+### 7. Host Work 与真实图片契约
 
 支持：
 
@@ -275,27 +227,24 @@ Exclusive Lease
 Actor-bound Claim
 Immutable Attachments
 Result Contract
+Idempotent Submission
 ```
 
-`ChatGPTHostLoop` 可嵌入 Host 环境。Local Package 本身不能调用 ChatGPT Internal Image Tool。
+`ChatGPTHostLoop` 可嵌入 ChatGPT 或其他 Host 环境。Local Python Package 本身不能进入 ChatGPT 产品内部调用 Image Tool。
 
-### 11. Artifact 与 Review Contract
-
-真实图片 Artifact 必须：
+真实图片 Artifact 必须满足：
 
 ```text
 visual = true
 simulation = false
 supported MIME
-file exists under allowed root
+file under allowed root
 SHA-256 matches
-actual dimensions and format verified
+actual dimensions / format verified
 Output Contract satisfied
 ```
 
-Metadata Review 通过后只进入 `not-run` Semantic State，不能伪造视觉通过。
-
-Semantic Result 允许：
+Metadata Review 通过后只进入 `not-run` Semantic State。Semantic Result 允许：
 
 ```text
 passed
@@ -303,15 +252,38 @@ review-required
 blocked
 ```
 
-### 12. Portable Private Backup
+### 8. Approval、Revision 与 Export
 
-默认 Profile：
+Initial Approval 只授权当前 Prompt Job。
+
+Semantic Finding 产生 Revision 后：
 
 ```text
-portable
+Revision Plan
+-> Versioned Revision Job
+-> revision-approval-required
+-> Approved
+-> image-editing Work
+-> Replacement Semantic Review
+-> Review-gated Supersession
 ```
 
-包含：
+Source Artifact 在 Replacement 通过前继续 Active。Simulation、Non-visual、Lineage Invalid 或 Semantic Review 未通过的 Replacement 不得 Supersede Source。
+
+Gated Export 必须保持：
+
+```text
+Contract QA passed
+Active visual Artifacts semantically passed
+Authenticated export capability
+Exclusive Task Lease
+Engine manifest / transaction evidence
+Rollback and Git Change controls
+```
+
+### 9. Portable 与 Full-local Backup
+
+Portable Profile 包含：
 
 ```text
 themes
@@ -325,7 +297,7 @@ migrations
 privacy-reports
 ```
 
-排除：
+Portable Profile 排除：
 
 ```text
 host-credentials
@@ -334,25 +306,15 @@ operation-audit
 gateway-requests
 backups
 diagnostics
+upgrade-reports
+hardening-reports
 ```
 
-排除原因：默认 Portable Archive 不应携带 Credential Verifier、Signing Key 或操作认证材料。
+`full-local` 只有显式 `include_sensitive=True` 或 CLI `--include-sensitive` 时允许创建。它可能包含 Credential Verifier、Signing Key 与 Authenticated Operational Evidence。
 
-### 13. Full-local Backup
+未保护 GUIF Archive 只提供完整性，不提供静态加密。
 
-`full-local` 只有在显式 `include_sensitive=True` 或 CLI `--include-sensitive` 时允许创建。
-
-该 Archive 可能包含：
-
-```text
-Credential Verifier
-Ledger Signing Key
-Authenticated Operational Evidence
-```
-
-GUIF 当前只提供完整性，不提供 Archive Encryption。Sensitive Archive 必须放入受保护的加密存储。
-
-### 14. Backup Manifest 与 Verification
+### 10. Backup Verification 与 Plan-first Restore
 
 Backup Manifest 至少包含：
 
@@ -376,15 +338,12 @@ Verification 必须检查：
 ```text
 Canonical Member Path
 No Absolute Path / Traversal
-No Duplicate Member
-No Symbolic Link
+No Duplicate / Unmanifested Member
+No Symbolic Link / Directory Member
 Manifest Hash
 Per-file SHA-256 / Size
 Total Extraction Limit
-No Unmanifested Member
 ```
-
-### 15. Plan-first Restore
 
 Restore 默认：
 
@@ -400,9 +359,7 @@ skip
 replace
 ```
 
-`replace` 在存在冲突时默认先创建 Portable Pre-restore Backup。
-
-应用 Restore 时：
+`replace` 默认先创建 Portable Pre-restore Backup。应用流程：
 
 ```text
 Verified Archive
@@ -413,88 +370,211 @@ Verified Archive
 -> Post-write SHA-256 Verification
 ```
 
-### 16. Private Schema Migration
+### 11. External Backup Protection Boundary
 
-alpha.28 保持 Conversation Workflow Schema Version `1` 兼容。
+GUIF beta.1 提供外部备份保护集成边界，不实现自定义密码学。
 
-Migrator 可补齐：
+环境配置：
 
 ```text
+GUIF_BACKUP_PROTECTOR_ID
+GUIF_BACKUP_PROTECT_COMMAND_JSON
+GUIF_BACKUP_UNPROTECT_COMMAND_JSON
+GUIF_BACKUP_PROTECT_TIMEOUT_SECONDS
+```
+
+Command 必须是 JSON argv Array，并包含：
+
+```text
+{input}
+{output}
+```
+
+执行规则：
+
+```text
+subprocess argv
+shell = false
+bounded timeout
+explicit configuration only
+no unprotected fallback
+non-empty regular output required
+existing destination / receipt rejected
+atomic temporary publication
+```
+
+Protection Receipt 只允许保存：
+
+```text
+schema_version
 status
-continue_unbound
-active_task_id
-request_records
-checkpoint
-history
-privacy metadata
-compatibility metadata
-migration_history
+adapter_id
+source filename / size / SHA-256
+protected filename / size / SHA-256
+created_at
+secret_material_persisted = false
+command_persisted = false
 ```
 
-Migrator 不静默处理：
+不得保存：
 
 ```text
-Unsupported Future Schema
-Invalid JSON
-Non-object Record
-Raw Bearer / Lease / Claim Secret Fields
+Command argv
+stdout / stderr
+Passphrase / Key
+Secret Environment Value
+Bearer / Lease / Claim
 ```
 
-每次 Apply 必须写入 Private Migration Report。
+Receipt 提供本地完整性证据，不等同于数字签名。可同时重写 Protected File 与 Receipt 的攻击者仍可伪造替代证据。长期真实性应依赖外部签名、加密或不可变备份系统。
 
-### 17. Privacy-safe Diagnostics
-
-Diagnostics 检查：
+新命令：
 
 ```text
-Project Contract
-Private Storage Writable
-Private Schema State
-Operation Ledger Integrity
-Host Credential Capabilities
-Conversation State
-Portable Backup Presence
-Compatibility Contract
+guif-ready backup-protect
+guif-ready backup-protection-verify
+guif-ready backup-unprotect
 ```
 
-默认 Report 不含底层 ID、Secret 或 Private Root Path。持久化位置：
+加密算法、Key Custody、Rotation、Recovery 与外部程序安全性由操作方和外部 Tool 负责。
+
+### 12. Supported Alpha Upgrade Assurance
+
+直接支持 Source Release：
 
 ```text
-<private-data-root>/diagnostics/<project>/
+1.0.0-alpha.27
+1.0.0-alpha.28
 ```
 
-### 18. Acceptance Gate
-
-默认通过条件：
+Target：
 
 ```text
-blocked readiness checks = 0
-and
-Conversation stage in {ready-to-export, completed}
+1.0.0-beta.1
 ```
 
-Strict 条件：
+默认 Upgrade Gate：
 
 ```text
---require-completed
-=> Conversation stage = completed
+Explicit Source Release
+-> Supported Source Check
+-> Portable Backup Required
+-> Private Schema Scan
+-> Block Unknown Schema / Raw Secret Field
+-> Explicit Apply
+-> Recorded Migration when needed
+-> Post-migration Current Check
+-> Public API Version 1 preserved
+-> Private Upgrade Report
 ```
 
-Acceptance 不调用 Fake Image Model，也不把 Metadata-only Artifact 视为 Visual Pass。
+未知 Source Release 不自动推断，也不静默迁移。
 
-### 19. Compatibility Policy
-
-alpha.28 到 beta.1：
+公共 Upgrade Result 不返回 Private Report Path 或 Secret；完整 Evidence 保存在：
 
 ```text
-Frozen Conversation Facade backward-compatible
-Private Schema change requires detection and migration
-Breaking user-facing change requires new Public API Version
-Legacy ProviderAdapter remains explicit compatibility mode
-Dry-run remains explicit test/development mode
+<private-data-root>/upgrade-reports/
 ```
 
-### 20. Private Data Layout
+### 13. Fault Injection Contract
+
+Fault Injection 只用于测试和开发，默认关闭。
+
+环境驱动必须同时设置：
+
+```text
+GUIF_FAULT_POINTS=<named points>
+GUIF_ALLOW_FAULT_INJECTION=1
+```
+
+只设置 `GUIF_FAULT_POINTS` 时必须报错，而不是启用故障。
+
+beta.1 已定义的保护流程 Fault Point：
+
+```text
+backup-protection.before-publish
+backup-protection.before-recovery-publish
+```
+
+故障测试必须证明：
+
+```text
+Original verified archive remains valid
+No incomplete protected/recovered destination published
+Temporary output removed
+No silent retry or fallback
+```
+
+### 14. Bounded Soak 与性能证据
+
+`HardeningService.soak()` 重复执行非变更型读取：
+
+```text
+Project validation
+Private schema scan
+Operation ledger verification
+Non-persisting Conversation stage derivation
+Optional backup verification
+```
+
+Iteration 范围：
+
+```text
+1..10000
+```
+
+Report 至少包含：
+
+```text
+iterations / successes / failures
+sanitized error types / codes
+total / mean / p50 / p95 / max timing
+optional p95 threshold
+observed public stages
+mutating_operations_performed = false
+production_state_mutated = false
+```
+
+Report 私有存储：
+
+```text
+<private-data-root>/hardening-reports/
+```
+
+Soak 不等同于完整负载测试、分布式一致性验证或 Host Tool SLA。
+
+### 15. Packaged Installation Contract
+
+CI 必须在 Python 3.10、3.11、3.12 上执行：
+
+```text
+install development dependencies
+pytest
+build wheel + source distribution
+install generated wheel
+verify guif.__version__ == 1.0.0b1
+run guif-ready contract smoke test
+```
+
+正式包不得依赖未提交的本地文件或真实用户数据。
+
+### 16. Support 与 Deprecation Contract
+
+`guif-ready support` 与 `SUPPORT.md` 定义：
+
+```text
+Current beta supported until superseded
+Previous beta security fixes for 30 days when practical
+No hosted SLA
+Supported direct upgrades: alpha.27 / alpha.28
+Breaking change requires new Public API Version
+Explicit migration path required
+Silent private schema mutation forbidden
+```
+
+公开 Security Report 不得包含 Credential、Secret、真实 Theme、图片、Private Record 或 Backup Archive。
+
+### 17. Private Data Layout
 
 ```text
 <private-data-root>/
@@ -509,71 +589,89 @@ Dry-run remains explicit test/development mode
   operation-ledger/
   backups/
   diagnostics/
+  upgrade-reports/
+  hardening-reports/
   runs/
   plans/
   migrations/
   privacy-reports/
 ```
 
-以上默认位于 Framework Git 与 Project Git 之外。
+Protected Archive 和 Secret-free Receipt 应保存在 Workspace 之外的受保护位置，不作为 Framework Fixture。
 
-### 21. Failure Strategy
+### 18. 安全与失败策略
+
+GUIF 对以下情况 Fail Closed：
 
 ```text
-Missing Theme                 -> theme-confirmation
-Missing Tool                  -> tool-configuration-required
-External Result Pending       -> image-production / visual-review
-Pipeline Failure              -> recoverable-error
-Approval Rejected             -> changes-required
-Revision Approval Pending     -> revision-approval-required
-Backup Integrity Failure      -> restore blocked
-Restore Conflict              -> plan blocked unless skip/replace
-Unsupported Private Schema    -> migration blocked
-Ledger Integrity Failure      -> authenticated mutation fail closed
+Missing / invalid Host Credential
+Capability mismatch
+Task Etag or Lease mismatch
+Work Claim mismatch
+Unknown Tool or incompatible Host
+Metadata / Semantic Review failure
+Invalid Artifact lineage
+Unsafe backup member or restore target
+Missing external protection configuration
+Protection output collision or tampering
+Unsupported upgrade source
+Blocked private schema
+Fault points configured without explicit allow flag
 ```
 
-### 22. alpha.28 验收标准
+GUIF 不承诺：
 
 ```text
-[ ] One-command Bootstrap creates or reuses Project safely
-[ ] Token shown once and not persisted in Conversation
-[ ] Theme confirmation remains mandatory unless explicitly unbound
-[ ] Normal user View hides Runtime identities
-[ ] Real image and semantic review loop remains functional
-[ ] Revision Approval remains independent
-[ ] Portable Backup excludes credentials and signing keys
-[ ] Backup tampering is detected
-[ ] Restore is plan-first and conflict-safe
-[ ] Supported private repairs are recorded
-[ ] Raw secret-like fields block migration
-[ ] Diagnostics are privacy-safe
-[ ] Acceptance reaches ready-to-export without manual Runtime IDs
-[ ] Public API Version and frozen Stage/Action contract are published
-[ ] Python 3.10 / 3.11 / 3.12 CI passes
-[ ] English README, Chinese README, version metadata, tests and spec are synchronized
+External encryption strength
+External key recovery
+Third-party Host / Tool availability
+Distributed consensus
+Internet-edge proxy security
+Removal of previously published data from forks / caches
 ```
 
-### 23. 当前限制
+### 19. beta.1 验收标准
 
-- Repository 无法自行进入 ChatGPT 产品内部调用图片 Tool；
-- Backup Archive 未加密；
-- File-backed Lease 与 Claim 不是 Distributed Consensus；
-- WSGI Gateway 不是 Internet Edge Proxy；
-- Remote Private Sync、Retention、Key Rotation 与 Multi-device Conflict 尚未实现；
-- Current-tree Privacy Audit 无法证明 Git History、Fork、Cache 或 Clone 已清理；
-- Remote Git Release Orchestration 仍位于 Local Core 之外。
-
-### 24. 下一阶段
-
-下一目标为 `beta.1`，不扩张冻结 MVP，只进行生产加固：
+Release 必须满足：
 
 ```text
-Encrypted Backup Integration Boundary
-Upgrade Tests from supported Alpha versions
-Failure Injection / Performance / Long-run Tests
-Packaged Installation
-Release Notes and Support Window
-Security Review and Key Rotation Guidance
+Public API Version remains 1
+Frozen Conversation stages/actions preserved
+Package version and docs synchronized
+All public fixtures wholly fictional
+No real Theme / Prompt / Image / Credential committed
+External protection has no shell and no silent fallback
+Protection round-trip and tamper rejection tested
+Fault interruption leaves original archive valid
+alpha.27 / alpha.28 upgrade path tested
+Unsupported source upgrade rejected
+Soak check performs non-mutating reads
+Wheel and sdist build/install smoke tests pass
+Python 3.10 / 3.11 / 3.12 CI pass
+Release Notes / Security Review / Support Policy published
+```
+
+### 20. 已知限制与下一阶段
+
+当前限制：
+
+- GUIF 无法自行进入 ChatGPT 产品内部调用 Image Tool；
+- GUIF 不评估外部加密算法强度，也不能恢复丢失 Key；
+- File-backed Lease 与 Work Claim 是单节点协调；
+- 内置 WSGI Gateway 不是 Internet-edge Reverse Proxy；
+- Remote Private-data Sync、Retention Automation 与 Multi-device Conflict Resolution 尚未实现；
+- Current-tree Privacy Audit 无法清除 Git History、Fork 或外部 Cache；
+- Pillow `Image.getdata()` Deprecation Warning 尚未清理。
+
+下一维护阶段保持 MVP 冻结，优先处理：
+
+```text
+Pillow deprecation maintenance
+larger supported-upgrade fixture corpus
+longer-duration soak evidence
+external protection adapter examples without bundled secrets
+release artifact provenance / signing boundary
+bug fixes and compatibility maintenance
 ```
 
 ---
@@ -582,11 +680,13 @@ Security Review and Key Rotation Guidance
 
 ### 0. Purpose
 
-This document defines GUIF's product position, verified alpha.28 capabilities, frozen MVP scope, privacy and security boundaries, failure strategy, compatibility contract, acceptance criteria, and next phase. Features, tests, CI, both READMEs, package version metadata, and this specification must remain synchronized in one release.
+This document defines GUIF beta.1: the frozen Conversation MVP, default production path, Host/Tool contracts, private-data boundary, backup protection, upgrade assurance, fault injection, hardening checks, compatibility/support policy, acceptance criteria, and known limitations.
+
+Features, tests, CI, both READMEs, package metadata, release notes, security review, and this specification must remain synchronized in each release.
 
 ### 1. Product Definition
 
-GUIF is a local-first, natural-language-first, configurable Host and Tool framework for end-to-end game UI production.
+GUIF is a local-first, natural-language-first executable AI framework for end-to-end game UI production with configurable Hosts and Tools.
 
 GUIF Core owns:
 
@@ -596,7 +696,8 @@ Planning / Direction / Contract / Prompt IR
 Approval / Tool Routing / Host Work Coordination
 Artifact / Provenance / Metadata Review / Semantic Review
 Revision / Supersession / Export / Rollback / Git Change
-Private Backup / Migration / Diagnostics / Recovery / Audit
+Private Backup / Protection Boundary / Migration / Recovery
+Diagnostics / Upgrade Assurance / Soak / Audit
 ```
 
 Default replaceable contracts:
@@ -608,103 +709,121 @@ Image Editing         chatgpt-image
 Visual Inspection     chatgpt-vision
 ```
 
-### 2. Alpha.28 Goal
+### 2. Beta.1 Scope
 
-Alpha.28 freezes the alpha.27 daily-use MVP and adds the reliability contracts required before beta:
-
-```text
-one-command bootstrap
-conversation-first default path
-private Theme confirmation
-idempotent natural-language requests
-contextual Initial and Revision approval
-Task-scoped ChatGPT Host work
-real image/edit/vision results
-Gated Export
-verified private backup and plan-first restore
-recorded private schema migration
-privacy-safe diagnostics
-end-to-end acceptance gate
-public compatibility contract
-```
-
-### 3. Frozen Public Contract
-
-Public API version:
+Beta.1 does not add a new normal-user product domain. It preserves public API version `1` and adds:
 
 ```text
-1
+External Backup Protection Boundary
+Supported alpha.27 / alpha.28 Upgrade Assurance
+Explicit Fault Injection Gate
+Bounded Repeatability / Latency Soak
+Wheel + Source Distribution Build / Install Verification
+Release Notes / Security Review / Support Window
 ```
 
-Beta.1 must preserve the published conversation stages and actions. A breaking change requires a new public API version and an explicit migration path.
+### 3. Immutable Product Principles
 
-### 4. Bootstrap
+- Theme is private, user-owned, versioned data outside framework/project Git.
+- A Conversation confirms, creates, derives, or explicitly skips Theme before production.
+- ChatGPT image/vision capabilities are defaults, not hard-coded dependencies.
+- GUIF never fabricates pixels or treats dry-run evidence as an image.
+- Metadata review never claims semantic visual quality.
+- Initial Approval never authorizes Revision.
+- No silent production fallback to `dry-run` or unprotected backup copying.
+- Normal views hide runtime identities, secrets, private paths, and raw Theme content.
+- Unknown schemas, raw secret fields, unsupported releases, unsafe paths, and tampering fail closed.
+- Breaking changes require a new public API version and explicit migration path.
+- Public fixtures are wholly fictional.
 
-`guif-ready start` creates or reuses the Project, validates or issues the ChatGPT Host credential, and opens the private Conversation. A new Bearer token is visible once and is never persisted in Project Git or the Conversation record.
+### 4. Frozen Conversation Contract
 
-### 5. Private Theme
+Public API version: `1`.
 
-A Conversation without a Conversation-level Theme binding must enter `theme-confirmation`. The user may select history, create a Theme, derive an immutable version, or explicitly continue unbound. Real Theme content remains outside framework and Project Git.
+Frozen stages and actions are exactly those listed in the Chinese section above and returned by `guif-ready contract`.
 
-### 6. Conversation View
-
-The default view contains the current user-facing stage, message, private Theme summary, contextual actions, safe Artifact summaries, and recovery status. It excludes Task IDs, etags, Approval IDs, Revision IDs, leases, claims, Handoffs, callbacks, Bearer tokens, private paths, and raw Theme content.
-
-### 7. Real Tool Boundary
-
-GUIF coordinates authenticated, Task-scoped Host Work. It does not fabricate pixels and cannot invoke ChatGPT's internal image tool from the local package. Semantic visual conclusions require an authenticated inspector result; metadata alone is never a semantic pass.
-
-### 8. Revision Safety
-
-Initial Approval does not authorize editing. A replacement may supersede its source only after real visual output, valid lineage, deterministic metadata checks, and passing semantic review.
-
-### 9. Backup Profiles
-
-`portable` includes private Themes, bindings, Conversation records, Runs, Plans, Host Work, migrations, and privacy reports. It excludes credentials, credential verifiers, operation-ledger signing keys, Gateway receipts, and operation-audit authentication material.
-
-`full-local` requires explicit sensitive-material consent. GUIF archives are integrity checked but not encrypted at rest.
-
-### 10. Verification and Restore
-
-Verification rejects path traversal, absolute or non-canonical paths, duplicates, symbolic links, size/hash mismatches, excessive extraction size, and unmanifested members.
-
-Restore is plan-only by default. Explicit apply supports `fail`, `skip`, and `replace`. Replace creates a portable pre-restore backup by default, writes atomically, and verifies SHA-256 after materialization.
-
-### 11. Private Migration
-
-Alpha.28 preserves Conversation Workflow schema version 1 while repairing missing frozen-MVP metadata. Unsupported future schemas, invalid JSON, and raw secret-like fields fail closed. Every applied repair is recorded.
-
-### 12. Diagnostics and Acceptance
-
-Privacy-safe diagnostics inspect Project validity, private storage, private schema state, operation-ledger integrity, credential capabilities, Conversation recovery, backup presence, and compatibility. Default reports do not expose low-level IDs, secrets, or private roots.
-
-The acceptance gate passes only when no blocking readiness check exists and the Conversation is `ready-to-export` or `completed`. Strict mode requires `completed`.
-
-### 13. Private Layout
+For backward compatibility:
 
 ```text
-<private-data-root>/
-  themes/
-  conversation-theme-bindings/
-  conversation-workflows/
-  project-theme-bindings/
-  host-credentials/
-  host-work/
-  gateway-requests/
-  operation-audit/
-  operation-ledger/
-  backups/
-  diagnostics/
-  runs/
-  plans/
-  migrations/
-  privacy-reports/
+release: 1.0.0-alpha.28
+current_release: 1.0.0-beta.1
+origin_release: 1.0.0-alpha.28
+channel: beta
 ```
 
-### 14. Limitations
+### 5. Host, Artifact, Review, Revision, and Export
 
-The repository cannot invoke ChatGPT internal tools by itself; backup encryption, distributed coordination, remote private sync, retention, key rotation, multi-device conflict resolution, internet-edge proxying, and remote Git release orchestration are not included in alpha.28.
+Production Host Work requires authenticated capability, task scope, etag, exclusive lease, actor-bound claim, immutable attachments, and a result contract.
 
-### 15. Next Phase
+A valid visual Artifact is real, non-simulation, located under an allowed root, and verified for SHA-256, MIME, dimensions, format, and output contract.
 
-`beta.1` hardens the frozen MVP through encrypted-backup integration boundaries, supported-version upgrade tests, failure injection, performance and long-run tests, packaged installation, release notes, support-window commitments, and security guidance.
+Semantic visual status is one of:
+
+```text
+passed
+review-required
+blocked
+```
+
+A source Artifact remains active until an independently approved, lineage-valid, real replacement passes semantic review. Gated Export never bypasses QA, lease, Engine transaction, rollback, or Git controls.
+
+### 6. Backup and Restore
+
+Portable backups include recoverable user production data and exclude credential verifiers, ledger signing keys, and authenticated operational material. Full-local backups require an explicit sensitive-material decision.
+
+Archives are integrity checked through manifest and per-file evidence. Restore is plan-first and requires explicit apply. Replace mode creates a portable pre-restore backup by default, writes atomically, and re-verifies SHA-256.
+
+### 7. External Backup Protection
+
+GUIF supplies an integration boundary, not cryptography.
+
+The external adapter:
+
+```text
+uses argv with shell=false
+requires {input} and {output}
+has a bounded timeout
+requires explicit configuration
+has no unprotected fallback
+refuses existing destination / receipt
+requires non-empty regular output
+publishes atomically
+persists only filename / size / SHA-256 evidence
+```
+
+It never persists command argv, stdout/stderr, passphrases, keys, or secret environment values.
+
+The external program/operator owns algorithm selection, key custody, rotation, and recovery.
+
+### 8. Upgrade Assurance
+
+Supported direct source releases:
+
+```text
+1.0.0-alpha.27
+1.0.0-alpha.28
+```
+
+The default gate requires a portable backup, scans private schemas, blocks unsupported/secret-bearing records, applies only recorded supported repairs, verifies current schemas, and preserves public API version `1`.
+
+### 9. Fault Injection and Soak
+
+Fault injection is disabled by default and requires both named points and `GUIF_ALLOW_FAULT_INJECTION=1`.
+
+Soak checks repeat non-mutating Project, schema, ledger, Conversation-stage, and optional backup reads. Reports contain aggregate timings and sanitized errors only and remain private.
+
+### 10. Packaging and Support
+
+CI tests Python 3.10, 3.11, and 3.12, builds wheel/sdist, installs the wheel, verifies the package version, and runs a CLI contract smoke test.
+
+The current beta is supported until superseded. When practical and safe, the previous beta may receive security fixes for 30 days. This is not a hosted SLA.
+
+### 11. Acceptance
+
+Beta.1 is acceptable only when the frozen public contract is preserved, privacy fixtures remain fictional, protection/upgrade/fault/soak tests pass, package artifacts install successfully, all Python matrix jobs pass, and synchronized release/security/support documentation is published.
+
+### 12. Limitations
+
+GUIF cannot invoke ChatGPT internal image tools by itself, assess external cryptographic strength, recover lost external keys, provide distributed consensus, act as an internet-edge proxy, synchronize private data across devices, or erase content already copied into Git history/forks/caches.
+
+The next maintenance phase remains scope-frozen and focuses on deprecation cleanup, broader upgrade fixtures, longer soak evidence, safe external-adapter examples, release provenance boundaries, and compatibility-preserving bug fixes.
