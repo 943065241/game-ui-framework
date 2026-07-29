@@ -2,260 +2,210 @@
 
 [English](README.md) | **简体中文**
 
-GUIF 是一个本地优先、Host 与 Tool 均可配置的游戏 UI 生产框架。默认 Host 是 ChatGPT；图片生成、修图、视觉检查、Git Operation 和 Export 都是可替换的 Tool 能力。
+GUIF 是一个本地优先、Host 与 Tool 均可配置的游戏 UI 生产框架。默认 Host 是 ChatGPT，默认图片生成与修图 Tool 是 `chatgpt-image`，但二者都不是 GUIF Core 的硬编码依赖。
 
 ## 当前状态
 
-`v1.0.0-alpha.21` 新增了可审阅、可持久化的 Host / Tool Discovery 与 Connection Workflow。
+`v1.0.0-alpha.22` 新增第一版真正执行生产写入的 **Gated Export Agent**。
 
-GUIF 现在明确区分：
+现在，Tool 返回图片并不代表它可以直接进入 Project Truth。GUIF 会在任何生产文件写入前检查持久化 Task、初始 Approval、Contract QA、聚合 Visual Review、Active Artifact 身份、已批准 Resource Contract、目标 Engine 兼容性以及 Revision 是否已经解决。
 
 ```text
-registered   当前 Runtime 已注册 Adapter
-available    当前 Host 或本地 Runtime 现在可以使用
-installable  Catalog 中存在，但尚未注册 Adapter
+Prompt / Revision Job
+  -> Tool 执行或 ChatGPT Handoff
+  -> Artifact Registry
+  -> Metadata 与 Semantic Visual Review
+  -> Active Reviewed Artifact
+  -> Gated Export Plan                 不修改 Project
+  -> Gated Export Execute
+       -> 写入 Project Truth
+       -> Engine-specific Export
+       -> Export Manifest
+       -> Transaction Audit 与 Backup
+  -> 可选的冲突检测 Rollback
 ```
 
-遇到 Tool 缺失时仍然 Fail Closed。对于符合条件的 `waiting-for-tool` 状态，Runtime 会关联一份 Connection Request，而不会静默安装 Plugin、明文索取 Secret，或者自动退回 `dry-run`。
+中英文双语持续迭代产品规格维护在 [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md)。
 
-alpha.20 的受控修图闭环保持不变：Revision Plan 转换为独立审批的 Edit Job；Source Artifact 不可变并进行 SHA-256 校验；Replacement 只有通过 Semantic Visual Review 后才能替代 Source。
+## Export Gate
 
-## 产品规格
+`Runtime.prepare_gated_export()` 只生成并持久化可审阅计划，不修改任何 Project 文件。
 
-中英文双语持续迭代产品规格维护在 [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md)。Feature、Test、CI、中英文 README、Version Metadata 和产品规格必须保持一致，Release 才算完成。
+计划检查：
 
-## Host Discovery
+- Task 状态必须为 `completed`；
+- 初始 Approval 必须为 `approved` 或 `not-required`；
+- Contract QA 必须为 `passed`；
+- 聚合 `qa_report.export_gate.allowed` 必须为 true；
+- 至少存在一个 Active `production-asset` Artifact；
+- 所有选中 Artifact 必须是真实视觉文件、已经通过 Review，并且不是 Simulation；
+- Artifact 文件必须仍位于 Run Directory 内，且 SHA-256 与登记记录一致；
+- Artifact Output Contract 必须与已批准 Resource Manifest Candidate 完全一致；
+- 同一个 Resource 不得存在多个未完成 Supersession 的 Active Artifact；
+- 所有 Revision Plan 必须为 `resolved` 或 `rejected`；
+- Resource Target 必须兼容目标 Engine。
+
+任何检查失败都会生成并持久化 `blocked` Export Record。GUIF 不会复制生产文件，也不会自动使用其他 Artifact 或 `dry-run` 回退。
+
+## 写入 Project Truth
+
+Ready Export 会把已批准资源写入：
+
+```text
+projects/<project>/production-assets/files/<output-name>
+projects/<project>/production-assets/<resource-id>.resource.json
+```
+
+Materialized Resource Manifest 会指向由 GUIF 管理的 Project Source File。覆盖已有文件前会先创建 Backup。
+
+只有 Active `production-asset` Artifact 会进入 Project Truth。Effect Image、Simulation、Receipt、Stale Artifact 和未完成 Review 的结果只保留作 Provenance，不会进入生产资源集合。
+
+## Engine Export
+
+每次执行都会创建独立输出目录：
+
+```text
+projects/<project>/exports/<engine>/<export-id>/
+  <approved assets>
+  <engine adapter metadata>
+  export-manifest.json
+```
+
+继续支持 Unity、Godot、Unreal 和 Generic Adapter。Export Manifest 会记录：
+
+- Task 与 Export Identity；
+- Target Engine 和 Actor；
+- Gate Snapshot；
+- Source Artifact、Job、Review 与 SHA-256；
+- Project Truth Materialization Path；
+- Engine Output Path 与 SHA-256；
+- Adapter Output 与 Import Hint。
+
+旧的 `guif export` 命令仍可用于校验并导出已经存在于 Project Truth 中的 Resource 文件。新的 AI 生产流程应使用与 Task 绑定的 Gated Export API。
+
+## Transaction Audit 与 Rollback
+
+每个完成的 Export 都会保存：
+
+```text
+projects/<project>/export-history/<export-id>/
+  transaction.json
+  backups/
+```
+
+Transaction 会记录每一次 Project Truth 变更、文件之前是否存在、旧 Hash、Backup Path 和 Export 后 Hash。
+
+Rollback 会检测冲突。GUIF 会比较当前 Project 文件和本次 Export 写入时的 Hash；若文件之后发生过修改，默认 Rollback 会 Fail Closed，避免覆盖更新内容。Force Rollback 必须明确提供 Actor 和 Reason，并写入 Audit。
+
+## Runtime API
 
 ```python
 runtime = Runtime(workspace)
-report = runtime.discover_host()
-```
 
-报告使用 `guif-host-capability-discovery-v1`，包括：
-
-- Host Identity；
-- Host 声明的 Capability；
-- 当前 Available Tool ID；
-- Host Metadata；
-- Discovery Timestamp。
-
-默认 ChatGPT Host 会声明 `chatgpt-image`、图片生成、图片编辑、Protected Region Editing、透明输出、视觉检查和 Git Operation 能力。
-
-## Tool Discovery
-
-```python
-tools = runtime.discover_tools(project="LeekParty")
-```
-
-每个 Tool Discovery Record 包含：
-
-- `status` 与完整 `states`；
-- Registered、Available、Installable、Ready 状态；
-- Tool Manifest 或 Catalog Metadata；
-- Host 与 Execution Mode；
-- 当前 Health Check；
-- Project 最新 Connection Status；
-- Permission、Data Scope、External Call、Cost、Credential 和 Host Support Disclosure。
-
-Workspace 可在以下文件声明 Installable Tool：
-
-```text
-.guif/tool-catalog.json
-```
-
-示例：
-
-```json
-{
-  "tools": [
-    {
-      "tool_id": "custom-image",
-      "name": "Custom Image Tool",
-      "version": "1.0",
-      "capabilities": ["image-generation", "image-editing"],
-      "install_method": "plugin-manager",
-      "source": "trusted-workspace-catalog",
-      "permissions": ["network-access"],
-      "data_scopes": ["prompt-job", "approved-reference-images"],
-      "external_call": true,
-      "billable": true,
-      "requires_credentials": true,
-      "credential_kind": "api-key-reference"
-    }
-  ]
-}
-```
-
-Catalog Entry 只代表“可以安装”，不会自动安装或注册 Tool。
-
-## Connection Workflow
-
-```text
-Tool 缺失或不可用
-  -> Connection Request
-  -> 审阅 Disclosure
-  -> Approve 或 Reject
-  -> installation-required / waiting-for-credentials / waiting-for-host-support
-  -> Health Check Retry
-  -> connected
-  -> 继续执行同一个 Persisted Job
-```
-
-创建并批准连接：
-
-```python
-request = runtime.request_tool_connection(
+plan = runtime.prepare_gated_export(
     "LeekParty",
-    "image-generation",
-    "chatgpt-image",
-    requested_by="ChatGPT Host",
+    task_id,
+    target_engine="unity",
 )
 
-connected = runtime.approve_tool_connection(
+record = runtime.execute_gated_export(
     "LeekParty",
-    request["request_id"],
+    task_id,
+    target_engine="unity",
     actor="project-owner@example.com",
-    comment="已审阅权限和数据范围。",
+)
+
+exports = runtime.list_gated_exports("LeekParty", task_id)
+record = runtime.get_gated_export("LeekParty", task_id, record["export_id"])
+
+rolled_back = runtime.rollback_gated_export(
+    "LeekParty",
+    task_id,
+    record["export_id"],
+    actor="project-owner@example.com",
+    reason="恢复上一个已批准生产资源集合。",
 )
 ```
-
-Reject 不会修改 Project Tool Configuration。
-
-批准一个只有 Installable 状态的 Tool，会得到 `installation-required`；GUIF 不会自动安装。需要 Credential 的 Tool 在没有 Credential Reference 时会保持 `waiting-for-credentials`。
-
-## Credential Policy
-
-GUIF Connection State 只保存引用，例如：
-
-```text
-env://CUSTOM_IMAGE_API_KEY
-secret-manager://projects/leek-party/custom-image
-```
-
-不会保存 Credential Secret 本身：
-
-```json
-{
-  "credential": {
-    "required": true,
-    "kind": "api-key-reference",
-    "reference": "env://CUSTOM_IMAGE_API_KEY",
-    "secret_stored_by_guif": false
-  }
-}
-```
-
-Credential 解析和 Secret 保存由 Host、Plugin、运行环境或 Secret Manager 负责。
-
-## Health Retry
-
-```python
-retry = runtime.retry_tool_health("LeekParty", "chatgpt-image")
-```
-
-Health Retry 会追加写入 `tool-connections.json`。已经 Approved 的 Request 在 Host、Tool 或 Credential 配置恢复健康后，可以转换为 `connected`。
-
-## Tool Adapter Contract Test
-
-```python
-report = runtime.run_tool_contract_tests("chatgpt-image")
-```
-
-Runner 不会进行外部调用，检查：
-
-- Manifest Schema 与 Identity；
-- Capability Declaration；
-- Input / Output Contract；
-- Execution Mode 对应的 `prepare()` 或 `execute()` 实现；
-- Permission、Data Scope、Cost 和 Credential Disclosure；
-- Health Check Identity 与 Status Shape。
-
-Adapter Scaffold 现在会提示开发者补齐 Disclosure，并运行：
-
-```bash
-guif tool-contract-test <tool-id>
-```
-
-Contract Test Passed 不代表 Plugin 已安装、可信、签名或自动注册。
-
-## 默认 ChatGPT 路径
-
-```text
-用户
-  -> ChatGPT Host
-  -> GUIF Runtime
-  -> Approval
-  -> Tool Resolver
-  -> chatgpt-image
-  -> External Handoff
-  -> ChatGPT 生成图片或修图
-  -> Host 提交真实文件
-  -> Artifact Registry
-  -> Visual Review / Controlled Revision
-  -> Gated Export
-```
-
-ChatGPT Host 与 `chatgpt-image` 是默认值，不是 GUIF Core 的硬编码依赖。`dry-run` 仍然只能显式用于 Contract Test，绝不会成为生产环境的隐式回退。
 
 ## CLI
 
 ```bash
-guif host-discover
-
-guif tool-discover --project LeekParty
-
-guif tool-connect-request image-generation chatgpt-image \
+guif run-export-plan <task-id> \
   --project LeekParty \
-  --requested-by "ChatGPT Host"
+  --target unity
 
-guif tool-connect-list --project LeekParty
-
-guif tool-connect-approve <request-id> \
+guif run-export-execute <task-id> \
   --project LeekParty \
+  --target unity \
   --actor project-owner@example.com
 
-guif tool-connect-reject <request-id> \
+guif run-export-list <task-id> --project LeekParty
+guif run-export-show <task-id> <export-id> --project LeekParty
+
+guif run-export-rollback <task-id> <export-id> \
   --project LeekParty \
-  --actor project-owner@example.com
-
-guif tool-health-retry chatgpt-image --project LeekParty
-
-guif tool-contract-test chatgpt-image
+  --actor project-owner@example.com \
+  --reason "恢复上一个已批准生产资源集合。"
 ```
 
-原有的 `run-execute`、`run-tool-submit`、`run-revision-create`、`run-revision-approve`、`run-revision-execute` 和 `run-artifact-review` 等生产命令继续保留。
+只有在人工确认 Post-export Conflict 后才应使用 `--force`。
 
-## 持久化
+## 持久化状态
 
-Project 级 Tool Discovery 和 Connection Evidence 保存于：
+Task Run Directory 现在可能包含：
 
 ```text
-projects/<project>/tool-connections.json
+approvals.json
+artifacts.json
+executions.json
+tool-resolution.json
+tool-handoffs.json
+visual-reviews.json
+revision-plans.json
+revision-execution.json
+gated-exports.json
 ```
 
-其中包括 Connection Request、Decision、Disclosure Snapshot、Credential Reference、Status Transition 和 Health Check History。Task 级 Tool Resolution 与 Handoff 仍保存在对应 Run Directory 中。
+`run-list` 新增 `gated_export_count`、`completed_export_count` 和 `latest_export_status`。
+
+## 已有生产能力
+
+GUIF 还包括：
+
+- Workflow-driven Planner、Director、Theme、Resource、Prompt 和 Semantic QA Agent；
+- 基于相关性的 Project Context Selection；
+- 持久化 Initial Approval 与 Revision Approval；
+- Host 与 Tool 可配置，默认使用 ChatGPT；
+- Registered、Available、Installable Tool Discovery；
+- 可审阅 Tool Connection Request 与 Opaque Credential Reference；
+- ChatGPT 图片生成和修图 External Handoff；
+- Artifact Identity、Provenance、SHA-256、MIME、Dimension 与 Reference；
+- Deterministic Metadata Review 与可选 Semantic Visual Inspector；
+- Immutable Source Binding、独立 Approval 和 Review-gated Supersession 的 Controlled Revision；
+- Protected Pixel Composition Check；
+- 旧版 Deterministic Resource Export。
+
+## 开发
+
+```bash
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS / Linux
+source .venv/bin/activate
+pip install -e .[dev]
+pytest -q
+```
 
 ## 当前限制
 
-- GUIF 尚不会自动安装 Plugin，也不会动态加载新安装的 Adapter。
-- Host 和 Approval Actor 仍未经过身份认证。
-- GUIF Core 不负责解析 Credential Reference。
-- Workspace Catalog 尚无签名和远程可信校验。
-- ChatGPT 产品侧自动消费 Handoff 并回传结果的 Wiring 仍在 GUIF Core 之外。
-- 默认 Semantic Visual Inspector Registry 仍为空。
-- 内置 Export Agent 仍为 Contract-only。
-
-## 运行原则
-
-1. Discovery 是证据，不等于安装。
-2. Connection 必须显式审批。
-3. 连接前必须披露 Permission、Data Scope、External Call、Cost 和 Credential。
-4. GUIF 只保存 Credential Reference，不保存 Secret。
-5. 生产 Tool 异常必须 Fail Closed。
-6. Contract Test 不得执行外部调用。
-7. ChatGPT 是默认 Host 和图片 Tool，不是硬编码依赖。
-8. Revision Source 保持不可变，Replacement 必须通过 Review 后才能 Supersede。
+- ChatGPT 产品侧仍需要自动消费 External Handoff 并提交文件；
+- 默认 Semantic Visual Inspector Registry 仍为空；
+- 当前 Gated Export 只 Materialize 生成的 `production-asset` Artifact，已批准复用 Resource 的统一打包属于后续扩展；
+- Rollback 目前基于文件，不会自动创建 Git Branch 或 Commit；
+- Export Actor 仍是字符串，不是经过认证的 Host Identity；
+- Remote Object Storage、Retention、并发 Export Lock 和 Signed Manifest 尚未实现。
 
 ## 下一阶段
 
-下一优先级是 **alpha.22：Gated Export Agent**。Export Agent 将消费 Active Artifact、Contract QA、Visual Review、Revision Resolution 和 Project Resource Contract，再把 Approved Production Asset Materialize 到 Project Truth 和对应 Engine Export Output。
+下一优先级是 **alpha.23：Authenticated Host API 与 Git Change Management**，包括稳定 Host Result Protocol、Authenticated Actor、Optimistic Concurrency、Git Change Set、Branch、Commit、Rollback Integration、Cancellation 和 Execution Summary。

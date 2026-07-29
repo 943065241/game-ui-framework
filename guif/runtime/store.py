@@ -69,6 +69,7 @@ class TaskStore:
         _write_optional_json(run_dir / "revision-execution.json", state.get("revision_execution"))
         _write_optional_json(run_dir / "tool-resolution.json", state.get("tool_resolution"))
         _write_optional_json(run_dir / "tool-handoffs.json", state.get("tool_handoffs"))
+        _write_optional_json(run_dir / "gated-exports.json", state.get("gated_exports"))
 
         return run_dir
 
@@ -96,6 +97,7 @@ class TaskStore:
             qa_report = state.get("qa_report", {}) if isinstance(state, dict) else {}
             tool_resolution = state.get("tool_resolution", {}) if isinstance(state, dict) else {}
             handoff_state = state.get("tool_handoffs", {}) if isinstance(state, dict) else {}
+            gated_export_state = state.get("gated_exports", {}) if isinstance(state, dict) else {}
             artifact_records = (
                 artifact_registry.get("records", []) if isinstance(artifact_registry, dict) else []
             )
@@ -120,6 +122,15 @@ class TaskStore:
                 if isinstance(item, dict) and item.get("status") == "pending"
             ] if isinstance(revision_approvals, dict) else []
             handoffs = handoff_state.get("records", []) if isinstance(handoff_state, dict) else []
+            gated_exports = (
+                gated_export_state.get("records", []) if isinstance(gated_export_state, dict) else []
+            )
+            completed_exports = [
+                item
+                for item in gated_exports
+                if isinstance(item, dict) and item.get("status") == "completed"
+            ] if isinstance(gated_exports, list) else []
+            latest_export = gated_exports[-1] if isinstance(gated_exports, list) and gated_exports else {}
             artifact_review = (
                 qa_report.get("artifact_review", {}) if isinstance(qa_report, dict) else {}
             )
@@ -167,6 +178,13 @@ class TaskStore:
                     if isinstance(tool_resolution, dict)
                     else None,
                     "tool_handoff_count": len(handoffs) if isinstance(handoffs, list) else 0,
+                    "gated_export_count": len(gated_exports)
+                    if isinstance(gated_exports, list)
+                    else 0,
+                    "completed_export_count": len(completed_exports),
+                    "latest_export_status": latest_export.get("status")
+                    if isinstance(latest_export, dict)
+                    else None,
                 }
             )
         summaries.sort(
