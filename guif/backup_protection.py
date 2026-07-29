@@ -42,8 +42,12 @@ def _private_permissions(path: Path) -> None:
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
+    if path.is_symlink():
+        raise BackupProtectionError("Protection receipt must not be a symbolic link")
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
+    if temporary.is_symlink() or (temporary.exists() and not temporary.is_file()):
+        raise BackupProtectionError("Protection receipt temporary path is unsafe")
     temporary.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
@@ -77,9 +81,9 @@ def _validate_destination(path: Path, label: str) -> Path:
     raw = path.expanduser()
     if raw.is_symlink():
         raise BackupProtectionError(f"{label} must not be a symbolic link")
+    if raw.exists():
+        raise BackupProtectionError(f"{label} already exists; GUIF will not overwrite it")
     resolved = raw.resolve()
-    if resolved.exists() and not resolved.is_file():
-        raise BackupProtectionError(f"{label} must be a regular file path")
     resolved.parent.mkdir(parents=True, exist_ok=True)
     return resolved
 
@@ -190,8 +194,10 @@ class BackupProtectionService:
         source = _validate_regular(archive_path, "Backup archive")
         destination = _validate_destination(protected_path, "Protected backup destination")
         receipt_path = _receipt_path(destination)
-        if receipt_path.is_symlink():
-            raise BackupProtectionError("Protection receipt destination must not be a symbolic link")
+        if receipt_path.exists() or receipt_path.is_symlink():
+            raise BackupProtectionError(
+                "Protection receipt destination already exists; GUIF will not overwrite it"
+            )
         temporary = destination.with_suffix(destination.suffix + ".protect.tmp")
         if temporary.exists() or temporary.is_symlink():
             temporary.unlink()
