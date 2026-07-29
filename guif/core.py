@@ -9,6 +9,7 @@ from guif.paths import project_root
 from guif.project_schema import validate_project_config_file
 from guif.resource import validate_resource_file
 from guif.theme import validate_theme_file
+from guif.tools.config import DEFAULT_EXECUTION_CONFIG
 from guif.workflow import load_workflow, validate_workflow_file
 
 PROJECT_DIRS = (
@@ -59,9 +60,13 @@ def init_project(workspace: Path, project: str) -> Path:
         "name": project,
         "status": "active",
         "current_theme": None,
+        "execution": json.loads(json.dumps(DEFAULT_EXECUTION_CONFIG)),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    (root / "project.json").write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (root / "project.json").write_text(
+        json.dumps(config, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
     return root
 
 
