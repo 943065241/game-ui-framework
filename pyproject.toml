@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "game-ui-framework"
-version = "1.0.0a21"
+version = "1.0.0a22"
 description = "Local-first, configurable-host game UI production framework"
 readme = "README.md"
 requires-python = ">=3.10"
