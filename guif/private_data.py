@@ -15,13 +15,7 @@ def _workspace_key(workspace: Path) -> str:
 
 
 def default_private_data_root(workspace: Path) -> Path:
-    """Return GUIF's private data root, deliberately outside the framework repository.
-
-    GUIF_DATA_HOME is authoritative when set. Otherwise data is placed in a hidden
-    sibling directory of the workspace, not below the workspace itself. This keeps
-    personal Theme data and Runtime evidence out of a public framework Git tree while
-    remaining deterministic and isolated for temporary test workspaces.
-    """
+    """Return GUIF's private data root, deliberately outside framework Git."""
 
     configured = os.environ.get("GUIF_DATA_HOME")
     if configured and configured.strip():
@@ -56,9 +50,16 @@ class PrivateDataLayout:
     def runs(self, project: str) -> Path:
         return self.root / "runs" / project
 
+    def plans(self, project: str) -> Path:
+        return self.root / "plans" / project
+
     @property
     def migrations(self) -> Path:
         return self.root / "migrations"
+
+    @property
+    def privacy_reports(self) -> Path:
+        return self.root / "privacy-reports"
 
 
 __all__ = ["PrivateDataLayout", "default_private_data_root"]
