@@ -2,11 +2,11 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-GUIF is a local-first, AI-agnostic framework for planning, directing, contracting, reviewing, exporting, and evolving game UI production work.
+GUIF is a local-first, AI-agnostic framework for planning, directing, contracting, prompting, reviewing, exporting, and evolving game UI production work.
 
 ## Status
 
-`v1.0.0-alpha.13` — Workflow-driven Runtime Pipelines, real deterministic Planner, Director, Theme, and Resource Agents, relevance-based Context selection, persisted and resumable Task Runs, Engine Adapter exports, deterministic validation, protected editing, and Git-friendly Project knowledge.
+`v1.0.0-alpha.14` — Workflow-driven Runtime Pipelines, real deterministic Planner, Director, Theme, Resource, and Prompt Agents, relevance-based Context selection, persisted and resumable Task Runs, Engine Adapter exports, deterministic validation, protected editing, and Git-friendly Project knowledge.
 
 ## Product specification
 
@@ -21,8 +21,9 @@ It defines GUIF's expected product, verified current state, missing capabilities
 - `guif run "<requirement>" --project <project>` resolves a Workflow, selects relevant Context, executes Agents, and persists checkpoints.
 - `planner` creates a validated structured UI Production Plan.
 - `director` reviews composition, hierarchy, Theme constraints, Resource reuse, Memory constraints, conflicts, and approval points.
-- `theme` resolves an active Project Theme or produces a reviewable inferred Theme contract.
-- `resource` converts Plan and Director decisions into validated Resource manifest candidates without silently modifying Project files.
+- `theme` resolves an active Project Theme or creates a reviewable inferred Theme contract.
+- `resource` creates validated Resource manifest candidates without silently modifying Project files.
+- `prompt` creates a versioned, provider-independent Prompt IR with generation jobs, constraints, references, output contracts, approval points, and blockers.
 - Runtime ranks Project Memory, Resource manifests, and Project Workflow manifests against the current Requirement and active Theme.
 - Project Workflow manifests can override built-in Workflows and declare executable `agents`.
 - Workflow schema v1 remains readable through the legacy `manager` mapping.
@@ -79,6 +80,7 @@ print(task.state["plan"])
 print(task.state["direction"])
 print(task.state["theme_contract"])
 print(task.state["resource_contracts"])
+print(task.state["prompt_ir"])
 ```
 
 Equivalent CLI command:
@@ -103,7 +105,8 @@ Workflow schema v2 contains human-readable steps and an executable Agent sequenc
     "Create a structured UI production plan",
     "Review art direction and resource reuse",
     "Resolve theme constraints",
-    "Resolve production resource contracts"
+    "Resolve production resource contracts",
+    "Build model-neutral generation instructions"
   ],
   "agents": ["planner", "director", "theme", "resource", "prompt", "qa", "export"]
 }
@@ -127,34 +130,21 @@ Built-in executable Workflows:
 
 Runtime loads the complete Project Context snapshot and creates a deterministic, budgeted selection for the current Requirement.
 
-The selection ranks:
+It ranks Markdown Memory records, Production Resource manifests, and Project Workflow manifests. English tokens and Chinese character n-grams are supported. Generic English stop words are removed, and unrelated records are excluded.
 
-- Markdown Memory records from `memory/**/*.md`;
-- Production Resource manifests;
-- Project Workflow manifests.
-
-English tokens and Chinese character n-grams are supported. Generic English stop words are removed, and unrelated records are excluded. The result is stored in:
+The result is stored in:
 
 ```python
 task.state["context_selection"]
 ```
 
-It contains selected records, scores, matched terms, budgets, total counts, and omitted counts. Resume uses the persisted selection rather than silently rebuilding the failed Task against new Project knowledge.
+It contains selected records, scores, matched terms, budgets, total counts, and omitted counts. Resume uses the persisted selection instead of silently rebuilding the failed Task against changed Project knowledge.
 
-## Structured Planner Agent
+## Structured production Agents
 
-The deterministic Planner creates:
+### Planner
 
-- Page type, orientation, and canvas dimensions;
-- target Engine;
-- active Theme information and constraints;
-- reusable Resource candidates with scores and reasons;
-- missing Resource suggestions;
-- Deliverables and QA criteria;
-- execution dependencies;
-- risks, open questions, and Context summary.
-
-Outputs:
+The deterministic Planner creates Page type, orientation, canvas dimensions, target Engine, active Theme constraints, Resource reuse candidates, missing Resource suggestions, Deliverables, QA criteria, dependencies, risks, open questions, and a Context summary.
 
 ```python
 task.state["plan"]
@@ -164,21 +154,11 @@ task.state["plan"]
 ui-production-plan
 ```
 
-## Structured Director Agent
+### Director
 
-The Director consumes the Plan and creates:
-
-- page-specific composition zones;
-- focal order and interaction hierarchy;
-- Theme palette, materials, lighting, required elements, and exclusions;
-- relevant Memory constraints;
-- Resource reuse decisions;
-- blocking conflicts and approval points;
-- handoff instructions for later Agents.
+The Director creates page-specific composition zones, focal order, interaction hierarchy, relevant Memory constraints, Resource reuse decisions, blocking conflicts, approval points, and handoff instructions.
 
 Its status is `ready`, `needs-review`, or `blocked`.
-
-Outputs:
 
 ```python
 task.state["direction"]
@@ -188,15 +168,9 @@ task.state["direction"]
 art-direction-review
 ```
 
-## Structured Theme Agent
+### Theme
 
-The Theme Agent consumes the Plan and Director review.
-
-When an active Project Theme exists, it produces a validated `ready` contract using that Theme. When no active Theme exists, it can infer a reviewable deterministic preset for recognized directions such as medieval harbor, natural trading, soft-neon party, or minimal UI. Unknown directions remain `blocked` rather than receiving invented production values.
-
-Memory-derived constraints are merged into `must_include` or `avoid`, and contradictory constraints are exposed as blocking conflicts.
-
-Outputs:
+The Theme Agent resolves the active Project Theme or infers a reviewable deterministic preset for recognized directions such as medieval harbor, natural trading, soft-neon party, or minimal UI. Unknown directions remain `blocked`. Memory constraints are merged into `must_include` or `avoid`, and contradictions become explicit conflicts.
 
 ```python
 task.state["theme_contract"]
@@ -206,29 +180,13 @@ task.state["theme_contract"]
 resolved-theme-contract
 ```
 
-Theme contract status:
+Status: `ready`, `review-required`, or `blocked`.
 
-```text
-ready
-review-required
-blocked
-```
+An inferred Theme is not automatically activated or written into `projects/<project>/themes/`.
 
-An inferred Theme is not automatically activated or written into `projects/<project>/themes/`. It requires explicit review.
+### Resource
 
-## Structured Resource Agent
-
-The Resource Agent consumes the Plan, Director review, Theme contract, and Project Resource manifests. It produces:
-
-- approved existing Resource reuse;
-- reuse candidates that still require review;
-- validated Resource manifest candidates for missing assets;
-- proposed dimensions with explicit provenance such as `plan`, `canvas`, or `layout-proposal`;
-- Engine-specific import hints;
-- unresolved items, blocking conflicts, and approval points;
-- Prompt, QA, and Export handoff instructions.
-
-Outputs:
+The Resource Agent identifies approved existing reuse, unresolved reuse candidates, validated manifests for missing assets, dimension provenance, Engine import hints, blocking conflicts, approval points, and handoff instructions.
 
 ```python
 task.state["resource_contracts"]
@@ -238,7 +196,42 @@ task.state["resource_contracts"]
 resource-contract-bundle
 ```
 
-The generated manifests conform to the existing Resource schema, but Runtime uses a `review-before-write` policy. It does not overwrite or create Project Resource files without explicit approval. This avoids turning deterministic layout proposals into unreviewed production truth.
+Generated manifests use `review-before-write`; Runtime does not create or overwrite Project Resource files without explicit approval.
+
+### Prompt
+
+The Prompt Agent converts Plan, Director review, Theme contract, and Resource bundle into a model-neutral Prompt IR.
+
+```python
+task.state["prompt_ir"]
+```
+
+```text
+model-neutral-prompt-ir
+```
+
+Prompt IR schema v1 contains:
+
+- provider binding fields, initially `provider_id: null` and `model_id: null`;
+- a global page, composition, Theme, and negative-constraint contract;
+- one Effect Image job and zero or more Production Asset jobs;
+- structured instruction groups for objective, composition, visual direction, content, and technical constraints;
+- approved Resource references and exact output contracts;
+- per-job acceptance criteria;
+- required capabilities such as `image-generation`, `image-editing`, `protected-region-editing`, or `transparent-output`;
+- Approval Points, Blockers, Handoff, and full Provenance.
+
+Status:
+
+```text
+ready
+review-required
+blocked
+```
+
+Jobs are executable only when Prompt IR status is `ready`. A review-required or blocked IR remains inspectable and persisted, but a Provider Adapter must not execute it automatically.
+
+Prompt IR is not an OpenAI, image-model, or Figma payload. A later Provider Adapter may translate it, but must preserve instructions, negative constraints, references, output contracts, acceptance criteria, and provenance.
 
 ## Persisted Task Runs
 
@@ -272,13 +265,6 @@ guif run "Create a 1080x2340 portrait medieval harbor shop page for Unity" \
 guif run-list --project LeekParty
 guif run-show <task-id> --project LeekParty
 
-guif resource-create trade-button-long button 264 134 png \
-  --project LeekParty \
-  --target-engine unity \
-  --source source/trade-button-long.png \
-  --import-settings '{"spriteMode":"Single","mipmapEnabled":false}'
-
-guif export LeekParty --target unity
 guif validate LeekParty
 ```
 
@@ -311,11 +297,12 @@ These JSON Sidecars are deterministic GUIF metadata, not native Engine-generated
 6. Agents do not directly invoke one another.
 7. Runtime Runs must be inspectable, persisted, and recoverable.
 8. Inferred Theme and Resource proposals require review before Project files are changed.
-9. Effect Images and Production Assets remain separate.
-10. Engine-specific behavior belongs in Adapters, not Framework Core.
-11. Local edits preserve non-target pixels through mask-based composition.
-12. A release is complete only when Feature, Test, CI, both READMEs, Version Metadata, and the Product Specification agree.
+9. Prompt IR is provider-independent and requires approval before execution.
+10. Effect Images and Production Assets remain separate.
+11. Engine-specific behavior belongs in Adapters, not Framework Core.
+12. Local edits preserve non-target pixels through mask-based composition.
+13. A release is complete only when Feature, Test, CI, both READMEs, Version Metadata, and the Product Specification agree.
 
 ## Repository direction
 
-The next priority is a model-neutral Prompt IR Agent that converts Plan, Director, Theme, and Resource contracts into a versioned, provider-independent generation instruction. Generation tool integration should begin only after that contract is stable. Priorities and acceptance criteria are maintained in [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md).
+The next priority is a real Semantic QA Agent that evaluates Prompt IR and future Artifacts against Plan, composition, Theme, Resource contracts, and acceptance criteria. Generation Tool integration should remain Adapter-based and must not bypass Approval Points. Priorities and acceptance criteria are maintained in [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md).
