@@ -54,6 +54,14 @@ class PrivateDataLayout:
         return self.root / "plans" / project
 
     @property
+    def host_credentials(self) -> Path:
+        return self.root / "host-credentials"
+
+    @property
+    def operation_audit(self) -> Path:
+        return self.root / "operation-audit"
+
+    @property
     def migrations(self) -> Path:
         return self.root / "migrations"
 
