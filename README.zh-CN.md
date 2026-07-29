@@ -6,7 +6,7 @@ GUIF 是一个本地优先、模型无关的游戏 UI 工作框架，用于规�
 
 ## 当前状态
 
-`v1.0.0-alpha.14` — 已具备 Workflow 驱动的 Runtime Pipeline、真实可工作的确定性 Planner、Director、Theme、Resource 与 Prompt Agent、基于相关性的 Context Selection、可持久化和恢复的 Task Run、Engine Adapter 导出、确定性校验、保护性编辑，以及 Git-friendly 的 Project Knowledge。
+`v1.0.0-alpha.15` — 已具备 Workflow 驱动的 Runtime Pipeline、真实可工作的确定性 Planner、Director、Theme、Resource、Prompt 与 Semantic QA Agent、基于相关性的 Context Selection、可持久化和恢复的 Task Run、Engine Adapter 导出、确定性校验、保护性编辑，以及 Git-friendly 的 Project Knowledge。
 
 ## 产品规格
 
@@ -23,7 +23,8 @@ GUIF 是一个本地优先、模型无关的游戏 UI 工作框架，用于规�
 - `director` 审阅 Composition、Hierarchy、Theme Constraint、Resource Reuse、Memory Constraint、Conflict 和 Approval Point。
 - `theme` 解析 Active Project Theme，或生成需要人工审阅的推导 Theme Contract。
 - `resource` 生成经过校验的 Resource Manifest Candidate，同时不会静默修改 Project File。
-- `prompt` 生成有版本、与 Provider 无关的 Prompt IR，其中包含 Generation Job、Constraint、Reference、Output Contract、Approval Point 和 Blocker。
+- `prompt` 生成有版本、与 Provider 无关的 Prompt IR，其中包含 Job、Constraint、Reference、Output Contract、Approval Point、Blocker 和 Provenance。
+- `qa` 执行确定性的 Semantic Contract QA，检查跨 Agent 一致性、执行安全和 Export Gate。
 - Runtime 会依据当前 Requirement 与 Active Theme，对 Project Memory、Resource Manifest 和 Project Workflow Manifest 做相关性排序。
 - Project Workflow Manifest 可以覆盖 Built-in Workflow，并通过 `agents` 声明可执行顺序。
 - Workflow schema v1 仍可通过旧版 `manager` 映射读取。
@@ -58,7 +59,7 @@ pytest -q
        -> Theme
        -> Resource
        -> Prompt
-       -> QA
+       -> Semantic QA
        -> Export
   -> 已持久化的 Task 与 Output
 ```
@@ -81,6 +82,7 @@ print(task.state["direction"])
 print(task.state["theme_contract"])
 print(task.state["resource_contracts"])
 print(task.state["prompt_ir"])
+print(task.state["qa_report"])
 ```
 
 对应的 CLI 命令：
@@ -106,7 +108,8 @@ Workflow schema v2 同时包含供人审阅的步骤与可执行 Agent 顺序：
     "Review art direction and resource reuse",
     "Resolve theme constraints",
     "Resolve production resource contracts",
-    "Build model-neutral generation instructions"
+    "Build model-neutral generation instructions",
+    "Run semantic and technical QA"
   ],
   "agents": ["planner", "director", "theme", "resource", "prompt", "qa", "export"]
 }
@@ -233,6 +236,44 @@ blocked
 
 Prompt IR 不是 OpenAI、图片模型或 Figma 的原生 Payload。后续 Provider Adapter 可以进行转换，但必须保留 Instruction、Negative Constraint、Reference、Output Contract、Acceptance Criteria 和 Provenance。
 
+### Semantic QA
+
+alpha.15 的 QA Agent 会在 Provider 或 Export 之前执行确定性的 Contract QA，当前检查：
+
+- Prompt IR Schema 是否有效；
+- 上游 Output Provenance Chain 是否完整；
+- Plan 与 Prompt IR 的 Page Type、Orientation 和 Canvas 是否一致；
+- Theme `must_include` 与 `avoid` 是否完整保留；
+- Resource Manifest Candidate 与 Production Asset Job 是否一一对应；
+- Resource Output Contract 是否有效且完全一致；
+- Reference 是否来自已批准的 Existing Resource；
+- `review-before-execute` Gate 是否被绕过；
+- Provider Capability Requirement 是否完整。
+
+```python
+task.state["qa_report"]
+```
+
+```text
+semantic-qa-report
+```
+
+QA 状态：
+
+```text
+passed
+review-required
+blocked
+```
+
+报告包含 Check、Finding、Revision Request、Artifact Review、Provenance、Handoff，以及显式的：
+
+```python
+task.state["qa_report"]["export_gate"]
+```
+
+alpha.15 尚未实现视觉 Semantic QA Adapter。没有登记 Generated Artifact 时，报告会明确记录 `artifact_review.status: "not-run"`，并说明没有得出任何视觉质量结论。因此，即使 Contract Check 通过，Export Gate 仍会保持关闭，防止把“契约检查通过”误写成“视觉结果已验证”。
+
 ## 持久化 Task Run
 
 每一次 Runtime 执行都会保存到：
@@ -264,7 +305,6 @@ guif run "制作 1080x2340 竖屏中世纪港口商店页面并面向 Unity" \
 
 guif run-list --project LeekParty
 guif run-show <task-id> --project LeekParty
-
 guif validate LeekParty
 ```
 
@@ -298,11 +338,13 @@ Exporter
 7. Runtime Run 必须可检查、可持久化并可恢复。
 8. 推导 Theme 与 Resource Proposal 必须 Review Before Write。
 9. Prompt IR 必须与 Provider 无关，并在执行前通过 Approval。
-10. Effect Image 与 Production Asset 必须分离。
-11. Engine-specific 行为属于 Adapter，而不是 Framework Core。
-12. 局部编辑通过 Mask Composition 保护非目标像素。
-13. 只有 Feature、Test、CI、中英文 README、Version Metadata 和 Product Specification 一致时，一次 Release 才算完成。
+10. 没有检查视觉 Artifact 时，Contract QA 不得声称完成视觉 QA。
+11. Export 必须通过显式 Export Gate。
+12. Effect Image 与 Production Asset 必须分离。
+13. Engine-specific 行为属于 Adapter，而不是 Framework Core。
+14. 局部编辑通过 Mask Composition 保护非目标像素。
+15. 只有 Feature、Test、CI、中英文 README、Version Metadata 和 Product Specification 一致时，一次 Release 才算完成。
 
 ## 仓库下一步方向
 
-下一优先级是实现真实 Semantic QA Agent，使其能够根据 Plan、Composition、Theme、Resource Contract、Prompt IR 和 Acceptance Criteria 审阅未来 Artifact。Generation Tool Integration 应继续通过 Adapter 实现，并且不能绕过 Approval Point。具体优先级和验收标准维护在 [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md)。
+下一优先级是实现明确的 Approval API 与状态转换契约。它需要处理 Director、Theme、Resource 和 Prompt 的 Approval Point，同时不得隐式修改 Project Truth，也不得在未批准时开启 Provider 执行。随后再开发 Provider Adapter、Artifact Registration、视觉 Semantic QA、Revision Loop 和真实 Export Agent。具体优先级与验收标准维护在 [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md)。
