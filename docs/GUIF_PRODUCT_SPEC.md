@@ -1,7 +1,7 @@
 # GUIF Product Specification / GUIF 产品规格说明
 
 > Status / 状态: Living document / 持续迭代文档  
-> Baseline / 基线版本: `v1.0.0-alpha.24`  
+> Baseline / 基线版本: `v1.0.0-alpha.25`  
 > Last reviewed / 最近审阅: 2026-07-29
 
 ---
@@ -10,580 +10,465 @@
 
 ### 0. 文档目的
 
-本文件定义 GUIF 的产品定位、已验证能力、安全与隐私边界、失败策略、兼容性和下一阶段。Feature、Test、CI、中英文 README、Version Metadata 与本规格必须在同一个 Release 中保持一致。
+本文件定义 GUIF 的产品定位、alpha.25 已验证能力、安全与隐私边界、失败策略、兼容性和下一阶段。Feature、Test、CI、中英文 README、Version Metadata 与本规格必须在同一个 Release 中保持一致。
 
 ### 1. 产品定义
 
 GUIF 是一个本地优先、以自然语言为主要入口、Host 与 Tool 均可配置、面向游戏 UI 全生产流程的可执行 AI 工作框架。
 
-alpha.24 的默认生产路径：
+默认生产路径：
 
 ```text
 用户与私有 Theme
-  -> Planner / Director / Theme / Resource / Prompt
+  -> Planner / Director / Resource / Prompt
   -> Approval Gate
   -> Tool Discovery / Handoff
   -> Authenticated Host Actor
   -> Task Etag + Exclusive Lease
-  -> Authenticated Callback
+  -> Production Host Gateway
+  -> Image Generation / Editing Result Callback
   -> Artifact Registry
   -> Visual Review / Revision
   -> Gated Export
-  -> Git Change Set Plan / Diff
-  -> Dedicated Branch / Commit
-  -> Optional Revert Commit
+  -> Git Change Set / Commit / Revert
+  -> Signed Private Operation Ledger
 ```
 
 核心原则：
 
-1. Theme、Credential、Task Evidence 与 Callback Evidence 默认属于私有数据；
-2. Host 写操作必须能关联到明确、可验证的 Actor；
-3. Authentication 与 Authorization 分离：有效 Credential 不代表拥有所有 Capability；
-4. 所有关键写操作必须检查当前 Task Etag；
-5. 独占操作必须使用有过期时间、绑定 Actor 的 Task Lease；
-6. Callback 必须绑定已存在的 Handoff、Tool、Execution、Content Hash 与 Host Identity；
-7. Git 写入必须先 Plan 和 Diff，再创建独立 Branch 与 Commit；
-8. Git HEAD 或 Task State 发生变化时 Fail Closed；
-9. Revert 必须生成正常 Git Commit，不直接隐藏或覆盖历史；
-10. 旧版字符串 Actor API 暂时保留兼容性，但不声明具备 alpha.24 认证保证。
+1. Theme、Credential、Task Evidence、Gateway Receipt 与 Ledger 默认属于私有数据；
+2. ChatGPT 是默认 Host，但 Host 与 Tool 均可替换；
+3. 图片生成与修图由 Host 侧 GPT 或配置的 Tool 执行，GUIF 负责治理、状态和证据；
+4. Authentication 与 Authorization 分离；
+5. 关键写操作必须校验 Task Etag；
+6. 独占写操作必须使用绑定 Actor、Credential 与 Task State 的 Expiring Lease；
+7. Gateway POST 必须使用 Idempotency-Key；
+8. 一次性 Secret 不得进入 Gateway Receipt 或 Ledger；
+9. Callback 必须绑定已有 Handoff、Host、Tool、Execution、Content Hash 与 Task State；
+10. Operation Ledger 必须能发现内容修改、链断裂和尾部删除；
+11. Git 写入必须先 Plan 与 Diff，再创建独立 Branch 和 Commit；
+12. 用户真实 Theme 不得进入公开框架 Git。
 
-### 2. alpha.24 已验证能力
+### 2. alpha.25 已验证能力
 
-#### 2.1 Private Host Credential Store
+#### 2.1 Production Host Gateway
 
-`HostCredentialStore` 将 Credential 保存到 Private Data Root：
-
-```text
-<private-data-root>/host-credentials/<credential-id>.json
-```
-
-Registration 输入：
+新增 WSGI Entry Point：
 
 ```text
-actor_id
-host_id
-capabilities
-roles
-created_by
-optional expires_at
+guif-gateway
 ```
 
-Registration 输出：
+默认：
 
 ```text
-credential metadata
-one-time bearer token
-secret_visible_once = true
+host = 127.0.0.1
+port = 8765
+max body = 32 MiB
+CORS = disabled
+Cache-Control = no-store
 ```
 
-Bearer Token 格式：
+非 Loopback Bind 必须同时满足：
 
 ```text
-guifh1.<credential-id>.<secret>
+--allow-remote
+--tls-cert
+--tls-key
+TLS >= 1.2
 ```
 
-持久化 Record 不保存原始 Secret，只保存：
+缺少任一条件时拒绝启动。
+
+已实现 Endpoint：
 
 ```text
-PBKDF2-HMAC-SHA256 verifier
-random salt
-iteration count
-status and lifecycle metadata
+GET  /health
+GET  /v1/descriptor
+GET  /v1/tasks/{project}/{task_id}/summary
+POST /v1/tasks/{project}/{task_id}/lease
+POST /v1/tasks/{project}/{task_id}/approvals/{approval_id}
+POST /v1/tasks/{project}/{task_id}/callbacks/{handoff_id}
+POST /v1/tasks/{project}/{task_id}/exports
+GET  /v1/ledger/verify
+GET  /v1/ledger/entries?limit=100
 ```
 
-支持：
+`/health` 不要求认证；其他 `/v1` Endpoint 必须使用 GUIF Bearer Credential。
+
+#### 2.2 Capability Authorization
+
+Gateway Capability：
 
 ```text
-register
-list
-get
-revoke
-rotate
-authenticate
-```
-
-`authenticate()` 使用 Constant-time Compare，并检查：
-
-- Token Format；
-- Credential 是否存在；
-- Schema；
-- Active / Revoked Status；
-- Expiration；
-- Expected Host Identity；
-- Secret Verifier；
-- Required Capability。
-
-#### 2.2 Authenticated Actor Contract
-
-成功认证后生成：
-
-```json
-{
-  "schema_version": 1,
-  "actor_id": "production-host",
-  "host_id": "chatgpt",
-  "credential_id": "cred-...",
-  "capabilities": ["task:lease", "tool-result:submit"],
-  "roles": ["operator"],
-  "issuer": "guif-local",
-  "authentication_method": "private-bearer-token",
-  "authenticated_at": "...",
-  "authenticated": true
-}
-```
-
-Actor Snapshot 会进入 Approval、Callback、Export 和 Git Change Evidence。
-
-#### 2.3 Task Etag
-
-`task_etag()` 对持久化安全的 `Task.to_dict()` 进行 Canonical JSON SHA-256：
-
-```text
-task-sha256:<digest>
-```
-
-Etag 覆盖 Task Status、Context Reference、State、Output、Event、Error 与时间字段。完整私有 Theme Content 已在 `RuntimeContext.to_dict()` 中 Redact，因此不会因 Etag 计算而进入 Task 文件。
-
-所有 alpha.24 写操作都接收 `expected_task_etag`。不匹配时抛出 `ConcurrencyError`，不执行写入。
-
-#### 2.4 Exclusive Task Lease
-
-Lease Record：
-
-```text
-<private-data-root>/runs/<project>/<task-id>/task-lease.json
-```
-
-Lease Token：
-
-```text
-guifl1.<lease-id>.<secret>
-```
-
-Lease 绑定：
-
-```text
-project
-task_id
-lease_id
-purpose
-authenticated actor
-base_task_etag
-token hash
-acquired_at
-expires_at
-ttl_seconds
-status
-```
-
-状态：
-
-```text
-active
-expired
-released
-consumed
-```
-
-限制：
-
-- TTL 最短 15 秒、最长 3600 秒；
-- 同一 Task 同时只能存在一个 Active Lease；
-- Lease Token 只显示一次；
-- Token Hash、Actor、Credential、Task Etag 和 Expiration 必须全部匹配；
-- 成功写操作消费 Lease；
-- 读取操作不需要 Lease；
-- Lease 可显式 Renew 或 Release。
-
-#### 2.5 Stable Authenticated Host Callback
-
-`submit_authenticated_tool_result()` 是 alpha.24 的生产 Host Result Contract。
-
-输入：
-
-```text
-project
-task_id
-handoff_id
-bearer_token
-lease_token
-expected_task_etag
-content
-filename
-mime_type
-optional content_sha256
-optional dimensions / model / tool / request_id / metadata
-```
-
-校验顺序：
-
-1. 读取 Persisted Handoff；
-2. 根据 Handoff Host ID 认证 Credential；
-3. 检查 `tool-result:submit` Capability；
-4. 校验 Content SHA-256；
-5. 校验 Tool ID、Execution ID 与 Handoff Status；
-6. 计算 Deterministic Callback ID；
-7. 检查 Idempotency；
-8. 校验 Lease 与 Task Etag；
-9. 调用既有 Tool Result Registration；
-10. Persist Callback Evidence；
-11. Consume Lease。
-
-Callback Record：
-
-```text
-host-callbacks.json
-```
-
-包含：
-
-```text
-callback_id
-status
-authenticated actor
-lease snapshot
-envelope
-content_sha256
-execution / handoff / tool identity
-artifact_id
-completed_at
-```
-
-Callback ID 由 Project、Task、Handoff、Execution、Tool、Request、Credential、Content Hash、Filename 与 MIME 共同确定。
-
-#### 2.6 Authenticated Approval
-
-`decide_approval_authenticated()` 要求：
-
-```text
+gateway:read
+task:read
+ledger:read
+task:lease
 approval:decide
-task:lease
-matching task etag
-active lease
-```
-
-支持：
-
-```text
-approved
-rejected
-changes-requested
-```
-
-Approval Record 与 History 会附加：
-
-```text
-authenticated_actor
-lease_id
-```
-
-旧版 `approve()`、`reject()` 与 `request_changes()` 继续存在，但只保留兼容性。
-
-#### 2.7 Authenticated Gated Export
-
-`execute_gated_export_authenticated()` 要求：
-
-```text
+tool-result:submit
 export:execute
-task:lease
-matching task etag
-active lease
-existing Gated Export rules
 ```
 
-完成后，Export Record 与 Transaction 会关联 Authenticated Actor 与 Lease ID。
+Credential 有效但缺少对应 Capability 时，操作被拒绝。
 
-`rollback_gated_export_authenticated()` 要求 `export:rollback`，并继续执行既有 Hash Conflict Check、Backup Check 与 Force Reason Audit。
+#### 2.3 Request Boundary
 
-#### 2.8 Git Change Set Plan
-
-`prepare_export_git_change()` 只接受 Completed Gated Export。
-
-Plan 阶段：
-
-- 校验 `git:prepare` Capability；
-- 校验 Task Etag；
-- 解析本地 Git Repository Root；
-- 确认 Project 位于 Repository 内；
-- 加载 Export Transaction；
-- 收集 Transaction Mutation Path；
-- 收集 Engine Output Files；
-- 纳入 Transaction Record；
-- 记录 Base HEAD 与 Current Branch；
-- 校验 Proposed Branch Name；
-- 记录 Selected Path 的 Working Tree Status；
-- Persist `git-changes.json`；
-- 不修改 Git Branch、Index 或 Commit。
-
-Git Change Set Record 包含：
+Gateway 对请求执行：
 
 ```text
-change_set_id
-task_id
-project
-export_id
+Content-Length validation
+maximum body size
+UTF-8 JSON object validation
+safe path segment validation
+Task Etag format validation
+required header validation
+raw callback body handling
+```
+
+Error Mapping：
+
+```text
+AuthenticationError -> 401
+Invalid Request -> 400
+Not Found -> 404
+Concurrency / Lease / Idempotency Conflict -> 409
+Oversized Body -> 413
+Rejected Callback / Export -> 422
+Invalid Ledger -> 503
+Unexpected Error -> 500 without internal traceback disclosure
+```
+
+#### 2.4 Idempotency
+
+每个 POST 必须提供：
+
+```text
+Idempotency-Key: 1-128 visible ASCII characters
+```
+
+Private Receipt：
+
+```text
+<private-data-root>/gateway-requests/request-<hash>.json
+```
+
+Receipt 保存：
+
+```text
+request id
+idempotency key hash
+method + path
+request fingerprint
+status
+HTTP status
+sanitized response or error
+created / completed time
+```
+
+不保存：
+
+```text
+Bearer Token
+Lease Token
+Raw Image Bytes
+Credential Verifier
+```
+
+Lease Token 是一次性 Secret。同一个 Lease Request 的重复调用不会再次返回 Token。Callback、Approval 与 Export 的安全重复调用返回已保存的非敏感 Receipt，不重复执行写入。
+
+#### 2.5 Raw Image Callback
+
+Callback Body 直接使用图片 Bytes，不要求 Base64：
+
+```text
+Authorization: Bearer ...
+Idempotency-Key: ...
+If-Match or X-GUIF-Task-Etag
+X-GUIF-Lease-Token
+X-GUIF-Filename
+Content-Type
+optional X-GUIF-Content-SHA256
+optional width / height / model / tool / request id
+```
+
+校验：
+
+1. Bearer Credential；
+2. `tool-result:submit` Capability；
+3. Persisted Handoff；
+4. Host 与 Tool Identity；
+5. Active Lease Ownership；
+6. Task Etag；
+7. Body Size；
+8. Content SHA-256；
+9. Handoff Status；
+10. Deterministic Callback Identity；
+11. Artifact Registration；
+12. Lease Consumption。
+
+#### 2.6 Signed Operation Ledger
+
+Private Layout：
+
+```text
+<private-data-root>/operation-ledger/
+  signing-key.json
+  entries.jsonl
+  head.json
+```
+
+算法：
+
+```text
+HMAC-SHA256 chain v1
+random 256-bit private key
+canonical JSON
+payload SHA-256
+entry SHA-256
+previous entry hash
+signed head checkpoint
+```
+
+Entry：
+
+```text
+schema_version
+sequence
+entry_id
+operation_id
+occurred_at
+operation
 status
 actor
-repository_root
-project_root
-base_head
-base_branch
-branch
-message
-paths
-working_tree_status
-transaction path and sha256
-prepared_from_task_etag
-commit
-revert
-error
+scope
+details
+previous_entry_hash
+key_id
+payload_hash
+entry_hash
+signature
 ```
 
-状态：
+Authenticated Runtime Operation 写入：
 
 ```text
-ready
-no-changes
-failed
-committed
-reverted
+started
+completed or failed
 ```
 
-#### 2.9 Git Diff
-
-`diff_git_change()` 返回：
+Gateway Request 写入：
 
 ```text
-tracked working-tree diff
-untracked file no-index diff
-working-tree status
-diff SHA-256
-selected paths
-base HEAD
+gateway.request completed or failed
 ```
 
-Diff 为 Read-only 操作，不创建 Branch、不修改 Index。
-
-#### 2.10 Git Commit
-
-`execute_git_change()` 要求：
+验证可以发现：
 
 ```text
-git:commit
-task:lease
-matching task etag
-active lease
-Change Set status = ready
-current Git HEAD = planned base_head
-proposed branch does not exist
-current branch has a name
+invalid JSON entry
+sequence mismatch
+previous hash mismatch
+payload modification
+entry hash modification
+signature mismatch
+key identity mismatch
+missing head
+head mismatch
+missing tail entry
 ```
 
-执行步骤：
+Ledger 不保存 Bearer Token、Lease Token、Raw Image Bytes 或 Credential Secret。
 
-1. 创建 Dedicated Branch；
-2. Stage 仅 Selected Paths；
-3. 确认 Selected Staged Set 非空；
-4. 计算 Staged Diff SHA-256；
-5. Commit 仅 Selected Paths；
-6. Persist Commit SHA、Parent、Branch、Message、Paths 与时间；
-7. 将 Commit 关联回 Gated Export；
-8. Consume Lease。
+#### 2.7 Ledger Inspection
 
-若执行失败，GUIF 尝试 Unstage、切回 Original Branch 并删除未成功提交的 Branch，同时保存 Failed Record。Project Working Tree 内容不会被静默删除。
-
-#### 2.11 Git Revert
-
-`revert_git_change()` 要求：
+CLI：
 
 ```text
-git:revert
-task:lease
-matching task etag
-active lease
-Change Set status = committed
-selected paths clean
+guif-ledger descriptor
+guif-ledger verify
+guif-ledger list
 ```
 
-执行正常 `git revert --no-edit <commit>`，保存 Revert Commit、Actor、Reason 与时间，并关联回 Export。
+Runtime API：
 
-若 Selected Paths 有新的 Uncommitted Change，操作 Fail Closed。
+```python
+runtime.operation_ledger_descriptor()
+runtime.verify_operation_ledger()
+runtime.list_operation_ledger(limit=100)
+```
 
-#### 2.12 Operational CLI
+Ledger Verification 失败时，新的 Authenticated Runtime Mutation Fail Closed。
 
-新增独立 Entry Point：
+#### 2.8 Authenticated Runtime Coverage
+
+alpha.25 Ledger-backed Operation：
 
 ```text
-guif-ops
+host.credential.register
+host.credential.revoke
+host.credential.rotate
+task.lease.acquire
+task.lease.renew
+task.lease.release
+host.callback.submit
+approval.decide
+export.execute
+export.rollback
+git.change.prepare
+git.change.commit
+git.change.revert
 ```
 
-Bearer Token 默认从：
+#### 2.9 Existing Governance
+
+alpha.25 继续保留并验证：
 
 ```text
-GUIF_HOST_TOKEN
+Private Theme Library
+Conversation Theme Resolution
+Prompt IR
+Approval Gate
+Tool Discovery and Connection
+ChatGPT Host Handoff
+Artifact Registry
+Metadata Visual Review
+Controlled Revision
+Gated Export
+Rollback
+Git Change Set
+Privacy Audit
 ```
 
-Lease Token 默认从：
+### 3. 私有数据边界
 
 ```text
-GUIF_TASK_LEASE
+<private-data-root>/
+  themes/
+  conversation-theme-bindings/
+  project-theme-bindings/
+  host-credentials/
+  gateway-requests/
+  operation-ledger/
+  runs/<project>/<task-id>/
+  plans/
+  migrations/
+  privacy-reports/
 ```
 
-因此 Secret 不需要作为普通命令参数进入 Shell History。
-
-命令组：
+公开 Framework Git 允许：
 
 ```text
-credential-create / list / revoke / rotate
-task-etag
-lease-show / acquire / renew / release
-callback-submit / list / show
-approval-decide
-export-execute / export-rollback
-git-plan / list / show / diff / commit / revert
-summary
+Code
+Schema
+Generic Contract
+Fictional Fixture
+Generic Documentation
 ```
 
-#### 2.13 Private Runtime Evidence
-
-Task Run Directory 新增：
+公开 Framework Git 禁止：
 
 ```text
-task-lease.json
-host-callbacks.json
-git-changes.json
+真实用户 Theme
+真实视觉规则与对话迭代
+Bearer / Lease Secret
+Credential Verifier
+Private Runtime Evidence
+Raw User Artifact
 ```
 
-`run-list` 新增：
+### 4. 安全边界
+
+#### 4.1 已保证
+
+- Local Bearer Authentication；
+- Capability Authorization；
+- Constant-time Credential Verification；
+- Task Optimistic Concurrency；
+- Exclusive Expiring Lease；
+- Callback Identity and Hash Validation；
+- POST Idempotency；
+- Loopback Default；
+- Remote TLS Requirement；
+- Request Body Limit；
+- Private Receipt；
+- Local HMAC Chain Tamper Evidence；
+- No Secret Persistence in Gateway Receipt or Ledger。
+
+#### 4.2 未保证
+
+- OIDC；
+- mTLS Client Identity；
+- Hardware-backed Key；
+- Distributed Lock；
+- Cross-process Ledger Lock；
+- Public-key Non-repudiation；
+- External Timestamp Authority；
+- Remote Immutable Audit Log；
+- Internet-edge DDoS Protection；
+- Automated Certificate Rotation；
+- Encryption at Rest；
+- Automatic ChatGPT Product Integration；
+- Remote Git Push / PR / Protected Branch Negotiation。
+
+### 5. 失败策略
 
 ```text
-authenticated_callback_count
-task_lease_status
-git_change_count
-committed_git_change_count
-latest_git_change_status
+Missing Credential -> reject
+Missing Capability -> reject
+Stale Etag -> reject
+Invalid or Expired Lease -> reject
+Missing Idempotency-Key -> reject
+Reused Key with different request -> reject
+One-time Secret replay -> reject
+Oversized Body -> reject
+Invalid Callback Identity -> reject
+Invalid Ledger -> reject new authenticated mutation
+Remote bind without TLS -> refuse startup
 ```
 
-### 3. Security Boundary
+不允许静默回退到 `dry-run`。
 
-#### 3.1 认证保证覆盖
+### 6. 兼容性
 
-alpha.24 保证：
+旧版未认证 Runtime API 继续存在，以避免 Alpha 期间破坏已有调用方；它们不具备 alpha.25 的 Gateway、Lease 与 Ledger Guarantee。新生产集成应使用 Gateway 或 Authenticated Runtime API。
 
-- Bearer Secret 不以明文持久化；
-- Credential 可吊销和轮换；
-- Capability 不足时拒绝操作；
-- Host Callback 与 Handoff Host Identity 一致；
-- Task Etag 阻止 Stale Write；
-- Lease 阻止遵循新协议的并发写操作；
-- Callback Content 可通过 SHA-256 验证；
-- Git Commit 与 Revert 具有明确 Actor、Task、Export 与 Diff Provenance。
+### 7. alpha.25 Release Acceptance
 
-#### 3.2 不在保证范围
-
-alpha.24 不保证：
-
-- OIDC、mTLS 或 Hardware-backed Key；
-- OS-level、Database 或 Distributed Lock；
-- Legacy API 自动遵守 Lease；
-- Network Callback Authentication；
-- Remote Git Server 身份与权限；
-- Protected Branch Policy；
-- Signed Manifest 或 Non-repudiation；
-- Private File Encryption-at-rest。
-
-### 4. Privacy Boundary
-
-以下内容必须位于 Private Data Store：
-
-- Host Credential Verifier；
-- Lease Token Hash 与 Actor Snapshot；
-- Callback Envelope 与 Result Evidence；
-- Task、Prompt、Review、Revision 与 Approval Evidence；
-- 完整 Theme Content；
-- 自然语言 Plan。
-
-Project Git 只应接收用户明确批准的 Project Truth、Engine Output 与相关 Transaction Record。
-
-### 5. Compatibility and Migration
-
-- Task Schema 未因 alpha.24 强制升级；Etag 从现有安全序列化结果计算；
-- 旧 Task Run 仍可加载；
-- `submit_tool_result()`、字符串 Actor Approval 与字符串 Actor Export API 继续存在；
-- 新生产集成应迁移到 Authenticated API；
-- Existing Gated Export 可在完成后生成 Git Change Set；
-- Existing Project 不需要自动创建 Git Repository；缺少 Git 时显式报错；
-- Existing Remote 不会被自动修改或 Push。
-
-### 6. Failure Strategy
-
-统一 Fail-closed 条件：
-
-```text
-invalid or revoked credential
-missing capability
-wrong host identity
-stale task etag
-missing / expired / wrong-owner lease
-content hash mismatch
-handoff not waiting
-Git repository missing
-Git HEAD changed
-branch already exists
-selected paths have revert conflicts
-no staged selected changes
-```
-
-失败必须：
-
-- 不伪造成功状态；
-- 保存 Error Type 与 Message；
-- 保留 Task、Artifact、Export 与 Git Provenance；
-- 不自动改用 Legacy API；
-- 不自动 Push Remote；
-- 不自动 Force Revert。
-
-### 7. 当前边界
-
-- Host Credential Store 为本地文件系统；
-- Bearer Token Rotation 不会自动通知外部 Host；
-- Lease 不是跨进程强锁；
-- Callback 仍由本地 API / CLI 接收；
-- Git Change Service 依赖本地 Git 与已配置 Author；
-- Git Branch 与 Commit 只在本地创建；
-- Remote Push、PR、Server Check 与 Protected Branch Integration 尚未实现；
-- Signed Callback / Export / Git Receipt 尚未实现；
-- Crash Recovery 目前依赖 Persisted Record，尚无 Operation Journal Replay；
-- 默认 Semantic Visual Inspector Registry 为空；
-- Current-tree Privacy Audit 无法证明历史或外部副本已清理。
+- Gateway 可启动；
+- Loopback Health Endpoint 可用；
+- Remote Bind 无 TLS 时拒绝；
+- Bearer + Capability 生效；
+- Lease Endpoint 返回一次性 Token；
+- Lease Replay 不泄露 Token；
+- Raw Image Callback 登记一个 Artifact；
+- Callback Replay 不创建重复 Artifact；
+- Body Limit 生效；
+- Ledger 能验证正常 Chain；
+- Ledger 能发现内容篡改；
+- Ledger 能发现尾部删除；
+- Python 3.10 / 3.11 / 3.12 CI 通过；
+- README、中文 README、Version 与本规格一致。
 
 ### 8. 下一阶段
 
-#### alpha.25：Production Host Gateway 与 Signed Operation Ledger
+**alpha.26：Real ChatGPT Image Loop + Default Visual Inspector**
 
 目标：
 
-- Network Callback Transport；
-- OIDC 或 Pluggable Identity Provider；
-- Cross-process Lock 与 Lease Fencing Token；
-- Signed Callback Receipt；
-- Signed Export / Git Manifest；
-- Durable Operation Journal 与 Crash Recovery；
-- Remote Git Push 与 PR Creation；
-- Protected Branch、Required Check 与 Merge Policy；
-- Remote Failure Retry、Pause、Cancel 与 Timeout Summary。
+```text
+Host 自动读取 Handoff
+-> ChatGPT/GPT 执行 Image Generation or Editing
+-> Gateway 自动回传
+-> Default Semantic Visual Inspector
+-> Revision Plan
+-> User Approval
+-> Automatic Editing Retry
+-> Review-gated Supersession
+-> Gated Export
+```
 
-### 9. 迭代记录
-
-- `alpha.16`：Persistent Approval；
-- `alpha.17`：Provider Adapter 与 Artifact Registry；
-- `alpha.18`：Visual Review 与 Revision Plan；
-- `alpha.19`：Configurable Host / Tool 与 ChatGPT Handoff；
-- `alpha.20`：Controlled Revision Execution；
-- `alpha.21`：Tool Discovery 与 Connection Workflow；
-- `alpha.22`：Gated Export 与 Transaction Rollback；
-- `alpha.23`：Private Theme Library、Conversation Theme Resolution 与 Privacy Boundary；
-- `alpha.24`：Authenticated Actor、Task Etag、Lease、Host Callback 与 Git Change Set。
+必须增加真实 End-to-end Acceptance Test，并停止扩大非核心架构范围。
 
 ---
 
@@ -591,59 +476,61 @@ no staged selected changes
 
 ### 0. Purpose
 
-This file defines GUIF's product direction, verified capabilities, security and privacy boundaries, failure behavior, compatibility, and next phase. Features, tests, CI, both READMEs, version metadata, and this specification must agree in the same release.
+This living specification defines GUIF's product position, verified alpha.25 behavior, security and privacy boundaries, failure policy, compatibility, and next milestone. Features, tests, CI, both READMEs, version metadata, and this specification must remain synchronized.
 
-### 1. Product definition
+### 1. Product Definition
 
-GUIF is a local-first executable AI work framework for end-to-end game UI production. Hosts and Tools are configurable; ChatGPT remains the default Host.
+GUIF is a local-first executable AI work framework for end-to-end game UI production. Natural language is the primary entry point. Hosts and Tools are configurable; ChatGPT and `chatgpt-image` are defaults, not Core dependencies.
 
-Alpha.24 adds an authenticated operational boundary around persisted Task writes and Project Git changes.
+```text
+private user Theme
+  -> planning / contracts / Approval
+  -> Tool handoff
+  -> authenticated Host actor
+  -> Task etag + exclusive lease
+  -> Production Host Gateway
+  -> image generation/editing callback
+  -> Artifact / review / revision
+  -> Gated Export
+  -> Git change / commit / revert
+  -> signed private Operation Ledger
+```
 
-### 2. Verified alpha.24 capabilities
+### 2. Verified alpha.25 Behavior
 
-- private file-backed Host credentials with one-time bearer secrets;
-- PBKDF2-HMAC-SHA256 secret verifiers, revocation, rotation, and expiration;
-- normalized authenticated actor snapshots with roles and capabilities;
-- deterministic Task etags over privacy-safe Task serialization;
-- exclusive expiring Task leases bound to actor, credential, purpose, and base etag;
-- stable authenticated external Tool result callbacks;
-- callback Host, Tool, Execution, Handoff, lease, etag, and content-hash validation;
-- idempotent Callback identity and persisted callback evidence;
-- authenticated Approval and Gated Export wrappers;
-- Task-bound Git Change Set planning from completed Gated Exports;
-- read-only tracked and untracked diff generation;
-- base-HEAD guarded dedicated-branch commit execution;
-- Export-to-Commit linkage and staged-diff SHA-256;
-- normal Git revert commits with selected-path conflict checks;
-- private persisted `task-lease.json`, `host-callbacks.json`, and `git-changes.json`;
-- separate `guif-ops` CLI using secret environment variables.
+The release provides:
 
-### 3. Security boundary
+- a runnable loopback-first WSGI Host Gateway;
+- explicit TLS requirements for non-loopback binding;
+- bearer authentication and capability authorization;
+- Task summary, lease, Approval, callback, Export, and ledger endpoints;
+- raw binary image callbacks;
+- request body limits and structured error mapping;
+- required POST idempotency keys;
+- private idempotency receipts without bearer, lease, or image secrets;
+- one-time lease secret semantics;
+- callback replay without duplicate Artifact creation;
+- a private HMAC-SHA256 append-only chain;
+- a signed head checkpoint that detects tail deletion;
+- ledger-backed authenticated Runtime operations;
+- `guif-gateway` and `guif-ledger` commands.
 
-Alpha.24 verifies local bearer credentials, explicit capabilities, Host identity, Task etags, logical exclusive leases, callback content hashes, and Git base HEAD. It does not yet provide OIDC, mTLS, hardware-backed keys, distributed locks, a network callback server, remote Git authorization, protected-branch negotiation, or cryptographically signed receipts.
+### 3. Operation Ledger Boundary
 
-Legacy unauthenticated APIs remain available for compatibility and can bypass the new logical lease boundary. Production integrations should use authenticated methods.
+The ledger is local tamper evidence. It is not a public-key signature, third-party timestamp, remote immutable log, or defense against an attacker who possesses the private HMAC key and can rewrite the full private store.
 
-### 4. Git boundary
+### 4. Privacy Boundary
 
-Git Change Set preparation is non-mutating. It records the repository root, Project root, completed Export, transaction hash, base HEAD, selected paths, proposed branch, commit message, and working-tree status.
+Real Themes, conversations, credentials, Gateway receipts, ledger keys and entries, Task Runs, callback evidence, and user Artifacts remain outside framework Git by default. The public repository contains only implementation, contracts, generic documentation, and fictional fixtures.
 
-Execution requires a fresh Task lease and unchanged base HEAD. GUIF creates a dedicated local branch, stages only selected paths, commits them, and links the commit to the Export. It does not push a remote or create a pull request.
+### 5. Fail-closed Policy
 
-Revert creates a normal Git revert commit and fails closed if selected paths contain newer uncommitted changes.
-
-### 5. Privacy boundary
-
-Credential verifiers, leases, callback evidence, Task Runtime evidence, natural-language Plans, and complete Theme content remain in private storage. Project Git receives only explicitly approved Project truth, Engine output, and selected transaction evidence.
+Authenticated mutations are rejected for missing capability, stale Task state, invalid lease, invalid callback identity, missing idempotency, request replay conflicts, oversized content, invalid ledger integrity, or unsafe remote binding.
 
 ### 6. Compatibility
 
-Task schema compatibility is preserved. Existing Runs and legacy Actor APIs remain readable and callable. Missing Git repositories or Git author configuration produce explicit failures. GUIF never creates or pushes a remote automatically.
+Legacy unauthenticated Runtime methods remain during the Alpha period, but they do not carry alpha.25 Gateway, lease, or ledger guarantees. New production integration must use the Gateway or authenticated Runtime APIs.
 
-### 7. Current limitations
+### 7. Next Milestone
 
-The credential and lease stores are local files. Leases are not OS or distributed locks. Callback transport is local API/CLI only. Git operations are local. Signed manifests, remote push/PR integration, protected-branch checks, operation-journal replay, encryption-at-rest, and authenticated remote identities are not implemented.
-
-### 8. Next phase
-
-**alpha.25: Production Host Gateway and Signed Operation Ledger** will add network callback transport, OIDC or pluggable identity verification, cross-process lock fencing, signed Callback/Export/Git receipts, durable recovery, remote Git push and pull-request integration, protected-branch checks, and remote operation lifecycle controls.
+**alpha.26: Real ChatGPT Image Loop + Default Visual Inspector** will automate Host-side handoff consumption, GPT image generation/editing, Gateway submission, default semantic visual inspection, approval-driven revision retry, and an end-to-end runnable project acceptance test.
