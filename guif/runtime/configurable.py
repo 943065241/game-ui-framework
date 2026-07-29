@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -18,11 +19,17 @@ from guif.runtime.runtime import Runtime as LegacyProviderRuntime
 from guif.runtime.store import TaskStore
 from guif.runtime.task import Task
 from guif.tool_execution import ToolExecutionError
-from guif.tools import HostProfile, ToolRegistry, create_tool_scaffold
+from guif.tools import (
+    HostProfile,
+    ToolCatalogEntry,
+    ToolDiscoveryService,
+    ToolRegistry,
+    create_tool_scaffold,
+)
 
 
 class Runtime(LegacyProviderRuntime):
-    """GUIF Runtime with configurable Host, Tool, and Revision routing."""
+    """GUIF Runtime with configurable Host, Tool, discovery, and Revision routing."""
 
     def __init__(
         self,
@@ -34,6 +41,7 @@ class Runtime(LegacyProviderRuntime):
         providers: ProviderRegistry | None = None,
         tools: ToolRegistry | None = None,
         host: HostProfile | None = None,
+        tool_catalog: Iterable[ToolCatalogEntry] | None = None,
     ) -> None:
         super().__init__(
             workspace,
@@ -47,6 +55,12 @@ class Runtime(LegacyProviderRuntime):
             store=self.store,
             tools=tools,
             host=host,
+        )
+        self.tool_discovery = ToolDiscoveryService(
+            workspace,
+            tools=self.tool_execution.tools,
+            host=self.tool_execution.host,
+            catalog=tool_catalog,
         )
 
     def execute_job(
@@ -67,18 +81,41 @@ class Runtime(LegacyProviderRuntime):
                 job_id,
                 provider_id=provider_id,
             )
-        return self.tool_execution.prepare_or_execute(
+        task = self.tool_execution.prepare_or_execute(
             project,
             task_id,
             job_id,
             tool_id=tool_id,
         )
+        resolution = task.state.get("tool_resolution")
+        if (
+            task.status == "waiting-for-tool"
+            and isinstance(resolution, dict)
+            and not resolution.get("connection_request_id")
+            and "reference files" not in str(resolution.get("reason") or "")
+        ):
+            request = self.tool_discovery.create_connection_request(
+                project,
+                str(resolution.get("capability") or "tool-capability"),
+                resolution.get("selected_tool_id")
+                if isinstance(resolution.get("selected_tool_id"), str)
+                else None,
+                requested_by="runtime",
+                reason=str(resolution.get("reason") or "Tool resolution requires user action."),
+                required_capabilities=tuple(
+                    str(item) for item in resolution.get("required_capabilities", [])
+                ),
+            )
+            resolution["connection_request_id"] = request["request_id"]
+            resolution["connection_status"] = request["status"]
+            self.store.save(task)
+        return task
 
     def resume(self, project: str, task_id: str) -> Task:
         task = self.store.load(project, task_id)
         if task.status == "waiting-for-tool":
             raise ValueError(
-                "Task is waiting for Tool configuration; bind or explicitly select a Tool, then execute the pending job again"
+                "Task is waiting for Tool configuration; resolve its connection request, bind or explicitly select a Tool, then execute the pending job again"
             )
         if task.status == "waiting-for-tool-result":
             raise ValueError(
@@ -91,8 +128,19 @@ class Runtime(LegacyProviderRuntime):
     def get_host_profile(self) -> dict[str, Any]:
         return self.tool_execution.host.to_dict()
 
+    def discover_host(self) -> dict[str, Any]:
+        return self.tool_discovery.discover_host()
+
     def list_tools(self) -> tuple[dict[str, Any], ...]:
         return self.tool_execution.list_tools()
+
+    def discover_tools(
+        self,
+        *,
+        project: str | None = None,
+        mode: str | None = None,
+    ) -> tuple[dict[str, Any], ...]:
+        return self.tool_discovery.discover_tools(project=project, mode=mode)
 
     def tool_health(
         self,
@@ -109,8 +157,94 @@ class Runtime(LegacyProviderRuntime):
             explicit=explicit,
         )
 
+    def retry_tool_health(self, project: str, tool_id: str) -> dict[str, Any]:
+        return self.tool_discovery.retry_health(project, tool_id)
+
+    def run_tool_contract_tests(
+        self,
+        tool_id: str,
+        *,
+        mode: str = "production",
+    ) -> dict[str, Any]:
+        return self.tool_discovery.run_contract_tests(tool_id, mode=mode)
+
     def bind_project_tool(self, project: str, capability: str, tool_id: str) -> Path:
         return self.tool_execution.bind_project_tool(project, capability, tool_id)
+
+    def request_tool_connection(
+        self,
+        project: str,
+        capability: str,
+        tool_id: str | None,
+        *,
+        requested_by: str = "host",
+        reason: str | None = None,
+        required_capabilities: tuple[str, ...] = (),
+    ) -> dict[str, Any]:
+        return self.tool_discovery.create_connection_request(
+            project,
+            capability,
+            tool_id,
+            requested_by=requested_by,
+            reason=reason,
+            required_capabilities=required_capabilities,
+        )
+
+    def list_tool_connections(self, project: str) -> tuple[dict[str, Any], ...]:
+        return self.tool_discovery.list_connection_requests(project)
+
+    def decide_tool_connection(
+        self,
+        project: str,
+        request_id: str,
+        decision: str,
+        *,
+        actor: str,
+        comment: str | None = None,
+        credential_ref: str | None = None,
+    ) -> dict[str, Any]:
+        return self.tool_discovery.decide_connection(
+            project,
+            request_id,
+            decision,
+            actor=actor,
+            comment=comment,
+            credential_ref=credential_ref,
+        )
+
+    def approve_tool_connection(
+        self,
+        project: str,
+        request_id: str,
+        *,
+        actor: str,
+        comment: str | None = None,
+        credential_ref: str | None = None,
+    ) -> dict[str, Any]:
+        return self.decide_tool_connection(
+            project,
+            request_id,
+            "approved",
+            actor=actor,
+            comment=comment,
+            credential_ref=credential_ref,
+        )
+
+    def reject_tool_connection(
+        self,
+        project: str,
+        request_id: str,
+        *,
+        actor: str,
+        comment: str | None = None,
+    ) -> dict[str, Any]:
+        return self.decide_tool_connection(
+            project,
+            request_id,
+            "rejected",
+            actor=actor,
+            comment=comment,
+        )
 
     def submit_tool_result(
         self,
