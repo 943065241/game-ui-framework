@@ -2,77 +2,27 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-GUIF is a local-first game UI production framework with configurable Hosts and Tools. ChatGPT is the default Host, `chatgpt-image` is the default image generation/editing Tool, and `chatgpt-vision` is the default semantic visual inspector. All three remain replaceable contracts rather than hard-coded Core dependencies.
+GUIF is a local-first game UI production framework with configurable Hosts and Tools. ChatGPT is the default Host, `chatgpt-image` is the default image generation/editing Tool, and `chatgpt-vision` is the default semantic visual inspector. All remain replaceable contracts rather than hard-coded Core dependencies.
 
 ## Status
 
-`v1.0.0-alpha.26` adds a claimable ChatGPT-first Host work loop for real image generation, image editing, and semantic visual inspection.
+`v1.0.0-alpha.27` adds a private conversation-first workflow that hides Task IDs, etags, leases, work claims, handoffs, and callbacks from the normal user path.
 
 ```text
-private Theme selection
-  -> Prompt / Approval / Tool handoff
-  -> image-generation or image-editing Host work
-  -> authenticated claim + Task lease
-  -> real Host image Tool invocation
-  -> Artifact registration
-  -> deterministic metadata review
-  -> chatgpt-vision semantic inspection work
-  -> pass, review-required, or blocked
-  -> controlled Revision Job when needed
-  -> Gated Export / Git Change Set
+open conversation
+  -> confirm, create, derive, or explicitly skip private Theme
+  -> describe the requested screen in natural language
+  -> review and approve the generated production contract
+  -> ChatGPT Host performs image generation or editing
+  -> deterministic image metadata review
+  -> chatgpt-vision semantic review
+  -> independent revision approval when needed
+  -> gated export
 ```
 
 The bilingual living specification is maintained at [`docs/GUIF_PRODUCT_SPEC.md`](docs/GUIF_PRODUCT_SPEC.md). Privacy migration and repository-history guidance remain in [`docs/PRIVACY_MIGRATION.md`](docs/PRIVACY_MIGRATION.md).
 
-## What alpha.26 makes runnable
-
-A persisted `chatgpt-image` handoff is now exposed as private Host work:
-
-```text
-image-generation
-image-editing
-visual-inspection
-```
-
-Each work item includes:
-
-- Project, Task, Tool, Handoff, and Artifact identity;
-- the approved Prompt Job or Visual Inspection Request;
-- required capability and submission contract;
-- immutable downloadable attachments with SHA-256 identity;
-- available, claimed, or completed state;
-- a one-time claim secret bound to an authenticated Actor;
-- a result receipt linked to the registered Artifact or Visual Review.
-
-Work records are stored outside framework and Project Git:
-
-```text
-<private-data-root>/host-work/<project>/work-*.json
-```
-
-The stored record never contains the raw claim token.
-
-## Production Gateway workflow
-
-Start the Gateway:
-
-```bash
-pip install -e .[dev]
-guif-gateway --workspace . --host 127.0.0.1 --port 8765
-```
-
-Remote binding still requires explicit opt-in and TLS:
-
-```bash
-guif-gateway \
-  --host 0.0.0.0 \
-  --port 8765 \
-  --allow-remote \
-  --tls-cert server.crt \
-  --tls-key server.key
-```
-
-Create a Host credential with the work-loop capabilities:
+## Conversation-first API
 
 ```python
 from pathlib import Path
@@ -80,106 +30,141 @@ from guif.runtime import Runtime
 
 runtime = Runtime(Path.cwd())
 issued = runtime.register_host_credential(
-    actor_id="production-host",
+    actor_id="conversation-host",
     host_id="chatgpt",
     capabilities=(
-        "gateway:read",
-        "task:read",
+        "approval:decide",
+        "export:execute",
         "host-work:read",
         "host-work:claim",
         "host-work:complete",
+        "revision:decide",
         "task:lease",
+        "task:resume",
+        "tool:execute",
         "tool-result:submit",
         "visual-inspection:submit",
-        "export:execute",
     ),
 )
 
-bearer_token = issued["bearer_token"]  # shown once
+conversation = runtime.conversation_workflow(
+    bearer_token=issued["bearer_token"],
+)
+
+view = conversation.open(
+    "SampleGame",
+    "conversation-001",
+)
 ```
 
-### Discover work
+A default user view contains:
 
-```http
-GET /v1/work?project=SampleGame&status=available
-Authorization: Bearer guifh1....
+```text
+conversation_id
+project
+stage
+message
+theme summary
+contextual actions
+safe Artifact summaries
+recovery status
 ```
 
-### Claim work
+It does not contain Task IDs, Task etags, lease tokens, work claim tokens, Handoff IDs, Callback IDs, private file paths, or raw Theme content. Diagnostics can be requested explicitly for development and support.
 
-```http
-POST /v1/work/SampleGame/work-image-123/claim
-Authorization: Bearer guifh1....
-Content-Type: application/json
-Idempotency-Key: claim-001
+## Theme confirmation
 
-{"ttl_seconds": 300}
-```
+A new conversation starts at `theme-confirmation` unless it already has a private Theme binding.
 
-The response returns `guifw1.<work-id>.<secret>` once. Claim ownership is bound to the authenticated Actor and Credential.
-
-### Download an immutable attachment
-
-```http
-GET /v1/work/SampleGame/work-visual-123/attachments/attachment-456
-Authorization: Bearer guifh1....
-X-GUIF-Work-Claim: guifw1....
-```
-
-GUIF rechecks path confinement, existence, and SHA-256 before returning bytes. Image-editing work can expose its immutable source Artifact this way; visual-inspection work exposes the Artifact being reviewed.
-
-### Submit an image result
-
-Acquire a Task lease through the existing `/lease` endpoint, then submit raw image bytes:
-
-```http
-POST /v1/work/SampleGame/work-image-123/result
-Authorization: Bearer guifh1....
-Idempotency-Key: image-result-001
-If-Match: "task-sha256:..."
-X-GUIF-Lease-Token: guifl1....
-X-GUIF-Work-Claim: guifw1....
-X-GUIF-Filename: fictional-screen.png
-X-GUIF-Content-SHA256: <sha256>
-X-GUIF-Width: 1080
-X-GUIF-Height: 2340
-X-GUIF-Model-ID: chatgpt-image
-Content-Type: image/png
-
-<raw PNG bytes>
-```
-
-The result is registered through the authenticated callback contract. GUIF then automatically runs Artifact eligibility, file-integrity, dimensions, format, alpha, and registered-metadata checks. A passing metadata review creates `visual-inspection` work.
-
-### Submit semantic visual inspection
-
-```http
-POST /v1/work/SampleGame/work-visual-123/result
-Authorization: Bearer guifh1....
-Idempotency-Key: visual-result-001
-If-Match: "task-sha256:..."
-X-GUIF-Lease-Token: guifl1....
-X-GUIF-Work-Claim: guifw1....
-Content-Type: application/json
-
-{
-  "inspector_id": "chatgpt-vision",
-  "status": "review-required",
-  "summary": "The hierarchy requires a controlled edit.",
-  "findings": [
+```python
+view = conversation.create_theme(
+    "SampleGame",
+    "conversation-001",
+    "Fictional Orbital Fixture",
     {
-      "id": "hierarchy-1",
-      "severity": "review",
-      "category": "composition-and-hierarchy",
-      "code": "primary-action-too-weak",
-      "message": "Increase the prominence of the fictional primary action.",
-      "evidence": {"region": "lower-center"}
-    }
-  ]
-}
+        "description": "A wholly fictional orbital kiosk interface.",
+        "palette": ["test violet", "test silver"],
+        "materials": ["matte composite"],
+        "lighting": "soft synthetic daylight",
+        "must_include": ["circular menu"],
+        "avoid": ["real brands"],
+    },
+)
 ```
 
-Accepted statuses are:
+Other supported paths are:
+
+```text
+select_theme       choose a historical private Theme
+create_theme       create and bind a new Theme
+derive_theme       create and bind a new immutable Theme version
+continue_unbound   explicitly continue without a Theme for this conversation
+```
+
+Real Theme content stays in the private Theme Library outside framework and Project Git.
+
+## Submit a natural-language request
+
+```python
+view = conversation.submit(
+    "SampleGame",
+    "conversation-001",
+    "Create a 1080x2340 fictional orbital shop page and export Unity",
+    request_key="chat-turn-001",
+)
+```
+
+`request_key` provides idempotency. Repeating the same key and request returns the existing conversation state. Reusing it for different content fails closed instead of creating duplicate Tasks.
+
+The initial result normally enters:
+
+```text
+approval-required
+```
+
+Approve without handling an Approval ID or Task lease:
+
+```python
+view = conversation.approve(
+    "SampleGame",
+    "conversation-001",
+    comment="Proceed with the approved production contract.",
+)
+```
+
+The service resolves the current approval context, obtains and consumes the required private lease, records the authenticated actor, and prepares the correct image work.
+
+## Real image and visual loop
+
+The ChatGPT product or another configured Host supplies the actual Tool callables:
+
+```python
+view = conversation.run_host_until_blocked(
+    "SampleGame",
+    "conversation-001",
+    image_executor=call_chatgpt_image_tool,
+    visual_inspector=call_chatgpt_visual_inspection,
+)
+```
+
+The service automatically scopes work to the active conversation Task and coordinates:
+
+```text
+Host Work discovery
+-> Task etag
+-> exclusive Task lease
+-> Actor-bound one-time Work claim
+-> immutable Attachment retrieval
+-> image or semantic result submission
+-> Artifact registration
+-> metadata review
+-> semantic review
+-> next user-facing stage
+```
+
+No work from another conversation is consumed by this call.
+
+A semantic result can be:
 
 ```text
 passed
@@ -187,40 +172,93 @@ review-required
 blocked
 ```
 
-A real semantic conclusion is claimed only after an authenticated inspector result is submitted. Metadata alone never becomes a semantic visual pass.
+Metadata alone never creates a semantic pass.
 
-When actionable findings exist, GUIF automatically creates a versioned Revision Job. The Revision Job remains `approval-pending`; the initial generation Approval does not authorize editing.
+## Controlled revision
 
-## Embeddable ChatGPT Host loop
+Actionable semantic findings create a Revision Plan and versioned Revision Job. The initial generation approval does not authorize editing.
 
-A Host integration can run the same flow without HTTP by supplying real image and vision callables:
+The user-facing stage becomes:
+
+```text
+revision-approval-required
+```
+
+Calling `conversation.approve(...)` at that stage authorizes only the current Revision and prepares `image-editing` work. The original Artifact remains active until the replacement passes semantic review.
+
+## Gated export
+
+After contract QA and every active visual Artifact pass, the view becomes:
+
+```text
+ready-to-export
+```
 
 ```python
-from guif.chatgpt_host_loop import ChatGPTHostLoop
-
-loop = ChatGPTHostLoop(runtime, bearer_token=bearer_token)
-
-loop.run_once(
+view = conversation.export(
     "SampleGame",
-    image_executor=call_chatgpt_image_tool,
-    visual_inspector=call_chatgpt_visual_inspection,
+    "conversation-001",
+    target_engine="unity",
 )
 ```
 
-`ChatGPTHostLoop` handles discovery, Task etag, Task lease, claim ownership, immutable attachment retrieval, result submission, Artifact registration, and failure-safe lease release. The supplied callables perform the actual pixel generation/editing and semantic inspection.
+The service obtains the private export lease and invokes the existing authenticated Gated Export. Export still does not bypass Engine manifests, transaction evidence, backups, rollback, or Git Change controls.
 
-## Important execution boundary
+## Recovery
 
-The local Python package cannot invoke ChatGPT's internal image tool by itself. Alpha.26 provides the production work queue, authenticated transport, attachment binding, and embeddable Host SDK required for ChatGPT or another Host to invoke its own tools and return the result.
-
-Therefore:
+Conversation records and checkpoints are private:
 
 ```text
-GUIF does not fabricate pixels.
-GUIF does not infer a semantic pass from metadata.
-dry-run does not become a production fallback.
-The Host must supply the actual image and vision capabilities.
+<private-data-root>/conversation-workflows/<project>/conversation-<sha256>.json
 ```
+
+Each checkpoint records the user-facing stage, persisted Task status, Task etag, Artifact count, and timestamp. Raw secrets are never written into the conversation record.
+
+```python
+view = conversation.recover("SampleGame", "conversation-001")
+```
+
+Recovery reconciles the private conversation record with persisted Tasks and Host Work. An orphaned session reference can be restored by matching the Task's private conversation binding. Failed pipeline work can be retried through `conversation.retry(...)` from its stored agent checkpoint.
+
+## Command-line workflow
+
+Set the Host token once in the environment:
+
+```bash
+export GUIF_HOST_TOKEN='guifh1....'
+```
+
+Then use conversation-level commands:
+
+```bash
+guif-conversation open \
+  --project SampleGame \
+  --conversation conversation-001
+
+guif-conversation theme-list \
+  --project SampleGame \
+  --conversation conversation-001
+
+guif-conversation submit \
+  --project SampleGame \
+  --conversation conversation-001 \
+  --request-key chat-turn-001 \
+  "Create a fictional orbital shop page and export Unity"
+
+guif-conversation approve \
+  --project SampleGame \
+  --conversation conversation-001
+
+guif-conversation status \
+  --project SampleGame \
+  --conversation conversation-001
+
+guif-conversation recover \
+  --project SampleGame \
+  --conversation conversation-001
+```
+
+The CLI intentionally does not implement a fake image model. Actual image and vision execution still comes from the configured Host Tool integration or the authenticated Gateway work endpoints.
 
 ## Private data boundary
 
@@ -228,6 +266,7 @@ The Host must supply the actual image and vision capabilities.
 <private-data-root>/
   themes/
   conversation-theme-bindings/
+  conversation-workflows/
   project-theme-bindings/
   host-credentials/
   host-work/
@@ -239,20 +278,7 @@ The Host must supply the actual image and vision capabilities.
   privacy-reports/
 ```
 
-Real user Themes, conversation decisions, prompts, work claims, attachments, Runtime evidence, callback receipts, and semantic findings remain outside framework and Project Git by default. Public tests and examples use only fictional fixtures.
-
-## Existing production controls
-
-GUIF continues to provide:
-
-- private, versioned Theme Library and conversation-first Theme selection;
-- configurable Host and Tool discovery, connection, and routing;
-- contract QA and persistent Approval gates;
-- Artifact identity, SHA-256, MIME, dimensions, and immutable References;
-- controlled Revision execution and review-gated supersession;
-- Gated Export, Engine manifests, backups, rollback, and Git Change Sets;
-- authenticated Actors, Task etags, exclusive leases, idempotency, and signed private operation evidence;
-- current-tree privacy audit and legacy Theme migration.
+Real Themes, prompts, conversation decisions, work claims, attachments, Artifacts, findings, and runtime evidence remain outside framework and Project Git by default. Public tests and examples use only wholly fictional fixtures.
 
 ## Development
 
@@ -268,14 +294,13 @@ pytest -q
 
 ## Current limitations
 
-- The ChatGPT product must embed `ChatGPTHostLoop` or consume the Gateway work endpoints; the repository cannot wire itself into ChatGPT's internal tool runtime.
-- The built-in semantic inspector is an authenticated external result contract, not an autonomous local vision model.
-- Work claims and Task leases are local file-backed coordination, not distributed consensus locks.
-- The built-in WSGI server is a single-node Host boundary, not an internet-edge reverse proxy.
+- The ChatGPT product must embed the conversation/Host loop or consume the Gateway work endpoints; this repository cannot wire itself into ChatGPT's internal Tool runtime.
+- The semantic inspector is an authenticated external result contract, not an autonomous local vision model.
+- Conversation, Work, and Task coordination is local file-backed coordination, not distributed consensus.
 - Private storage does not yet provide encryption at rest, remote synchronization, retention policy, or multi-device conflict resolution.
-- Remote Git push, pull-request creation, protected-branch negotiation, and server-side check orchestration are not automated.
+- The conversation CLI manages state and approvals but cannot invoke ChatGPT-internal image tools from a standalone terminal.
 - Current-tree privacy audit cannot prove removal from Git history, forks, caches, or external clones.
 
 ## Next phase
 
-The next priority is **alpha.27: Conversation-first User Workflow and Recovery**: one-command initialization, conversation session state, automatic Theme confirmation, project selection, generation/revision progress, resumable failed work, private backup and schema migration, and a user-facing flow that does not expose Task IDs, etags, leases, claims, or callback identifiers.
+The next priority is **alpha.28: Usability Freeze and Beta Readiness**: one-command onboarding, private backup/restore, schema migration, failure diagnostics, end-to-end sample validation, compatibility guarantees, and an MVP scope freeze before `beta.1`.
