@@ -181,7 +181,7 @@ def test_approve_runs_real_image_and_visual_loop_without_manual_ids(tmp_path: Pa
             "height": 2340,
         }
     ]
-    assert runtime.verify_operation_ledger()["status"] == "valid"
+    assert runtime.verify_operation_ledger()["status"] == "verified"
 
 
 def test_visual_finding_requires_separate_revision_approval(tmp_path: Path) -> None:
