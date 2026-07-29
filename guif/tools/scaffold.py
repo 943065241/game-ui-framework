@@ -37,9 +37,19 @@ def create_tool_scaffold(
         "execution_mode": execution_mode,
         "input_contract": "prompt-ir-job-v1",
         "output_contract": "artifact-submission-v1",
+        "permissions": [],
+        "data_scopes": [],
+        "external_call": execution_mode == "external-callback",
+        "billable": None,
         "configuration": {
             "requires_credentials": False,
+            "credential_kind": None,
             "requires_host_support": execution_mode == "external-callback",
+        },
+        "installation": {
+            "method": "manual",
+            "source": str(root),
+            "auto_install_allowed": False,
         },
         "implementation_ready": False,
     }
@@ -57,6 +67,8 @@ def create_tool_scaffold(
         "        version='0.1.0',\n"
         f"        capabilities=frozenset({cleaned!r}),\n"
         f"        execution_mode={execution_mode!r},\n"
+        "        permissions=(),\n"
+        "        data_scopes=(),\n"
         "    )\n\n"
         "    # Implement prepare() for external-callback or execute() for direct mode.\n",
         encoding="utf-8",
@@ -74,16 +86,19 @@ def create_tool_scaffold(
         encoding="utf-8",
     )
     (root / "tests" / "test_contract.py").write_text(
-        "def test_adapter_contract_is_not_implemented_yet():\n"
-        "    # Replace with manifest, capability, health, input, output, error, timeout,\n"
-        "    # cancellation, credential-isolation, and idempotency contract tests.\n"
+        "def test_adapter_contract_requires_implementation():\n"
+        "    # Register the completed Adapter and run: guif tool-contract-test <tool-id>\n"
+        "    # The runner validates identity, capabilities, execution method, disclosures,\n"
+        "    # credential declaration, and Health Check shape without external calls.\n"
         "    assert True\n",
         encoding="utf-8",
     )
     (root / "README.md").write_text(
         f"# {manifest['name']}\n\n"
-        "This scaffold is not registered or production-ready. Implement the adapter,\n"
-        "add contract tests, run a health check, and explicitly register it before use.\n",
+        "This scaffold is not registered or production-ready. Complete permission, data-scope,\n"
+        "cost, external-call, and credential disclosures; implement the Adapter; run the GUIF\n"
+        "contract-test runner and Health Check; then explicitly register or publish it. GUIF\n"
+        "never auto-installs this scaffold or stores a credential secret.\n",
         encoding="utf-8",
     )
     return root
