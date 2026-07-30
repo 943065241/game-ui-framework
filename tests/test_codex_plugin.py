@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from PIL import Image
+
 
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN_ROOT = ROOT / "plugins" / "game-ui-framework"
@@ -94,7 +96,7 @@ def test_codex_bridge_compiles() -> None:
     py_compile.compile(str(SCRIPT), doraise=True)
 
 
-def test_codex_bridge_bootstraps_privately_and_reaches_real_host_handoff(
+def test_codex_bridge_runs_private_natural_language_image_and_visual_loop(
     tmp_path: Path,
 ) -> None:
     workspace = tmp_path / "fictional-game-workspace"
@@ -165,18 +167,57 @@ def test_codex_bridge_bootstraps_privately_and_reaches_real_host_handoff(
     approved = _run(workspace, plugin_data, "approve")
     assert approved["stage"] == "image-production"
 
-    prepared = _run(workspace, plugin_data, "host-prepare")
-    assert prepared["status"] == "prepared"
-    assert prepared["kind"] == "image-generation"
-    assert prepared["completion_contract"].startswith("Submit a real image")
-    assert "claim_token" not in json.dumps(prepared, ensure_ascii=False)
-    assert "lease_token" not in json.dumps(prepared, ensure_ascii=False)
+    image_work = _run(workspace, plugin_data, "host-prepare")
+    assert image_work["status"] == "prepared"
+    assert image_work["kind"] == "image-generation"
+    assert image_work["completion_contract"].startswith("Submit a real image")
+    assert "claim_token" not in json.dumps(image_work, ensure_ascii=False)
+    assert "lease_token" not in json.dumps(image_work, ensure_ascii=False)
 
-    aborted = _run(
+    image_path = plugin_data / "input" / "fictional-output.png"
+    Image.new("RGBA", (1080, 2340), (80, 90, 120, 255)).save(image_path)
+    image_completed = _run(
         workspace,
         plugin_data,
-        "host-abort",
+        "host-complete-image",
         "--session",
-        str(prepared["host_session"]),
+        str(image_work["host_session"]),
+        "--image",
+        str(image_path),
+        "--model-id",
+        "fictional-test-image-tool",
     )
-    assert aborted["status"] == "aborted"
+    assert image_completed["status"] == "completed"
+    assert image_completed["artifact_created"] is True
+
+    visual_work = _run(workspace, plugin_data, "host-prepare")
+    assert visual_work["status"] == "prepared"
+    assert visual_work["kind"] == "visual-inspection"
+    assert len(visual_work["attachments"]) == 1
+    assert Path(str(visual_work["attachments"][0]["path"])).is_file()
+
+    visual_result = plugin_data / "input" / "fictional-visual-result.json"
+    visual_result.write_text(
+        json.dumps(
+            {
+                "status": "passed",
+                "summary": "The fictional test artifact satisfies the fixture dimensions.",
+                "findings": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    visual_completed = _run(
+        workspace,
+        plugin_data,
+        "host-complete-visual",
+        "--session",
+        str(visual_work["host_session"]),
+        "--result-file",
+        str(visual_result),
+        "--inspector-id",
+        "fictional-test-vision-tool",
+    )
+    assert visual_completed["status"] == "completed"
+    assert visual_completed["conversation"]["stage"] == "ready-to-export"
+    assert visual_completed["conversation"]["artifacts"][0]["review_status"] == "passed"
