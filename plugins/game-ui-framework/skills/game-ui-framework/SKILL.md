@@ -9,10 +9,12 @@ Act as the natural-language front end for GUIF. The user talks about the desired
 
 ## Runtime
 
-Use the bundled bridge script:
+Resolve `scripts/guif_codex.py` relative to this SKILL.md file, whose absolute path Codex provides when the Skill is loaded. When `PLUGIN_ROOT` is available, the equivalent canonical path is `$PLUGIN_ROOT/skills/game-ui-framework/scripts/guif_codex.py`.
+
+Invoke the bundled bridge internally:
 
 ```bash
-python "$PLUGIN_ROOT/skills/game-ui-framework/scripts/guif_codex.py" --workspace "$PWD" <command>
+python <resolved-skill-directory>/scripts/guif_codex.py --workspace "$PWD" <command>
 ```
 
 Treat all bridge invocations as internal implementation details. Summarize only the user-facing stage, design plan, approval decision, artifact result, visual findings, revision request, or export result.
