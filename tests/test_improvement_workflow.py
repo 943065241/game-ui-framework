@@ -215,7 +215,7 @@ def test_unknown_figma_tool_becomes_integration_candidate_without_fake_trial(
     assert tool_trial["stable_configuration_changed"] is False
     assert project_file.read_text(encoding="utf-8") == before
 
-    with pytest.raises(ImprovementCaseError, match="executable Tool trial"):
+    with pytest.raises(ImprovementCaseError, match="candidate-ready status"):
         service.start_improvement_candidate(PROJECT, conversation)
 
 
