@@ -24,6 +24,8 @@ Codex Plugin Version 为 `1.0.0-beta.3`。Python Package 仍为 `1.0.0b2`；Publ
 重要文档：
 
 - [持续迭代产品规格](docs/GUIF_PRODUCT_SPEC.md)
+- Beta.3 发布说明：[English](docs/RELEASE_NOTES_BETA3.md) | [简体中文](docs/RELEASE_NOTES_BETA3.zh-CN.md)
+- Beta.3 安全审查：[English](docs/SECURITY_REVIEW_BETA3.md) | [简体中文](docs/SECURITY_REVIEW_BETA3.zh-CN.md)
 - [Support Policy](SUPPORT.md)
 - [Privacy Migration Guidance](docs/PRIVACY_MIGRATION.md)
 
