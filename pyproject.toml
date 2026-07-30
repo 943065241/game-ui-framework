@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "game-ui-framework"
-version = "1.0.0b2"
-description = "Local-first game UI production framework with a frozen conversation MVP, hash provenance, private backup protection boundary, upgrade assurance, and production hardening controls"
+version = "1.0.0b3"
+description = "Local-first game UI production framework with protected source registration, private candidate changes, isolated Tool trials, and two-stage adoption controls"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
