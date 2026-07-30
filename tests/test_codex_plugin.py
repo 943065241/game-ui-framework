@@ -100,7 +100,7 @@ def test_codex_plugin_manifest_marketplace_and_bundled_runtime_contract() -> Non
         (ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8")
     )
     assert manifest["name"] == "game-ui-framework"
-    assert manifest["version"] == "1.0.0-beta.2"
+    assert manifest["version"] == "1.0.0-beta.3"
     assert manifest["skills"] == "./plugins/game-ui-framework/skills/"
     assert manifest["repository"] == "https://github.com/943065241/game-ui-framework"
     assert manifest["interface"]["displayName"] == "Game UI Framework"
@@ -120,6 +120,8 @@ def test_codex_plugin_manifest_marketplace_and_bundled_runtime_contract() -> Non
     assert "Legacy ProviderAdapter" in skill
     assert "source-import-required" in skill
     assert "Do not choose silently" in skill
+    assert "improvement-trial-approval-required" in skill
+    assert "Trial approval never implies adoption" in skill
     assert "relative to this SKILL.md" in skill
     assert "$PLUGIN_ROOT/plugins/game-ui-framework" in skill
 
@@ -144,6 +146,7 @@ def test_codex_bridge_runs_private_natural_language_image_and_visual_loop(
         "credential": "stored-in-plugin-private-data",
         "framework_data": "outside-project-git",
         "source_images": "private-source-library-outside-project-git",
+        "improvement_cases": "private-candidate-change-records-outside-project-git",
     }
 
     contexts = list((plugin_data / "workspaces").glob("*/context.json"))
