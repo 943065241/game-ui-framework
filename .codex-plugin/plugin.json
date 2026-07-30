@@ -1,0 +1,21 @@
+{
+  "name": "game-ui-framework",
+  "version": "1.0.0-beta.2",
+  "description": "Natural-language Codex front end for GUIF game UI production workflows.",
+  "repository": "https://github.com/943065241/game-ui-framework",
+  "license": "MIT",
+  "keywords": ["game-ui", "image-generation", "visual-review", "workflow"],
+  "skills": "./plugins/game-ui-framework/skills/",
+  "interface": {
+    "displayName": "Game UI Framework",
+    "shortDescription": "Create and review game UI through natural language",
+    "longDescription": "Use GUIF from Codex for private Theme management, approval-gated real image work, semantic visual review, controlled revisions, and gated export.",
+    "developerName": "GUIF Contributors",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "defaultPrompt": [
+      "Use GUIF to create a game UI from my natural-language description.",
+      "Use GUIF to review and revise this game UI image."
+    ]
+  }
+}
