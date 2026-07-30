@@ -1,0 +1,6 @@
+{
+  "name": "game-ui-framework",
+  "version": "1.0.0-beta.2",
+  "description": "Natural-language Codex front end for GUIF game UI production workflows.",
+  "skills": "./skills/"
+}
