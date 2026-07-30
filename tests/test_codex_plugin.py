@@ -11,9 +11,9 @@ from PIL import Image
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PLUGIN_ROOT = ROOT / "plugins" / "game-ui-framework"
+PLUGIN_FEATURE_ROOT = ROOT / "plugins" / "game-ui-framework"
 SCRIPT = (
-    PLUGIN_ROOT
+    PLUGIN_FEATURE_ROOT
     / "skills"
     / "game-ui-framework"
     / "scripts"
@@ -52,7 +52,7 @@ def _run(
     return value
 
 
-def test_codex_plugin_manifest_marketplace_and_skill_contract() -> None:
+def test_codex_plugin_manifest_marketplace_and_bundled_runtime_contract() -> None:
     marketplace = json.loads(
         (ROOT / ".agents" / "plugins" / "marketplace.json").read_text(
             encoding="utf-8"
@@ -63,7 +63,7 @@ def test_codex_plugin_manifest_marketplace_and_skill_contract() -> None:
     assert plugin["name"] == "game-ui-framework"
     assert plugin["source"] == {
         "source": "local",
-        "path": "./plugins/game-ui-framework",
+        "path": ".",
     }
     assert plugin["policy"] == {
         "installation": "AVAILABLE",
@@ -72,24 +72,29 @@ def test_codex_plugin_manifest_marketplace_and_skill_contract() -> None:
     assert plugin["category"] == "Productivity"
 
     manifest = json.loads(
-        (PLUGIN_ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8")
+        (ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8")
     )
     assert manifest["name"] == "game-ui-framework"
     assert manifest["version"] == "1.0.0-beta.2"
-    assert manifest["skills"] == "./skills/"
+    assert manifest["skills"] == "./plugins/game-ui-framework/skills/"
     assert manifest["repository"] == "https://github.com/943065241/game-ui-framework"
     assert manifest["interface"]["displayName"] == "Game UI Framework"
     assert "Read" in manifest["interface"]["capabilities"]
     assert "Write" in manifest["interface"]["capabilities"]
 
+    assert (ROOT / "guif" / "__init__.py").is_file()
+    assert SCRIPT.is_file()
+    assert not (PLUGIN_FEATURE_ROOT / ".codex-plugin" / "plugin.json").exists()
+
     skill = (
-        PLUGIN_ROOT / "skills" / "game-ui-framework" / "SKILL.md"
+        PLUGIN_FEATURE_ROOT / "skills" / "game-ui-framework" / "SKILL.md"
     ).read_text(encoding="utf-8")
     assert skill.startswith("---\nname: game-ui-framework\n")
     assert "Do not make the user install GUIF" in skill
     assert "Never fabricate pixels" in skill
     assert "Legacy ProviderAdapter" in skill
     assert "relative to this SKILL.md" in skill
+    assert "$PLUGIN_ROOT/plugins/game-ui-framework" in skill
 
 
 def test_codex_bridge_compiles() -> None:

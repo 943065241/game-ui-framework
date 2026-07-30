@@ -8,7 +8,7 @@
       "name": "game-ui-framework",
       "source": {
         "source": "local",
-        "path": "./plugins/game-ui-framework"
+        "path": "."
       },
       "policy": {
         "installation": "AVAILABLE",

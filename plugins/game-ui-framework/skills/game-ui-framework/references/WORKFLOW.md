@@ -4,8 +4,10 @@ The Skill invokes the bridge internally. The user should not be asked to copy th
 
 ## Common invocation
 
+Resolve the bridge relative to the loaded SKILL.md. With `PLUGIN_ROOT`, its bundled-root path is:
+
 ```bash
-python "$PLUGIN_ROOT/skills/game-ui-framework/scripts/guif_codex.py" \
+python "$PLUGIN_ROOT/plugins/game-ui-framework/skills/game-ui-framework/scripts/guif_codex.py" \
   --workspace "$PWD" \
   <command>
 ```
@@ -42,7 +44,7 @@ Run `host-prepare` only after approval when GUIF reports that Host work is avail
 3. Submit it:
 
 ```bash
-python "$PLUGIN_ROOT/skills/game-ui-framework/scripts/guif_codex.py" \
+python "$PLUGIN_ROOT/plugins/game-ui-framework/skills/game-ui-framework/scripts/guif_codex.py" \
   --workspace "$PWD" \
   host-complete-image \
   --session SESSION \
@@ -67,7 +69,7 @@ The real vision result file must be a JSON object:
 A non-passing result contains concrete structured findings. Submit it with:
 
 ```bash
-python "$PLUGIN_ROOT/skills/game-ui-framework/scripts/guif_codex.py" \
+python "$PLUGIN_ROOT/plugins/game-ui-framework/skills/game-ui-framework/scripts/guif_codex.py" \
   --workspace "$PWD" \
   host-complete-visual \
   --session SESSION \

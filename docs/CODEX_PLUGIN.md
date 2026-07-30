@@ -1,6 +1,6 @@
 # Codex plugin integration
 
-GUIF includes a skills-only Codex plugin under `plugins/game-ui-framework` and a repository marketplace at `.agents/plugins/marketplace.json`.
+GUIF includes a skills-only Codex plugin, a root plugin manifest, and a repository marketplace.
 
 ## Intended user experience
 
@@ -18,26 +18,30 @@ The user is not expected to run `guif-ready` or `guif-conversation`, manage a Be
 natural-language Codex conversation
   -> GUIF Codex Skill
   -> private bundled bridge
+  -> bundled GUIF Python runtime
   -> ConversationWorkflowService
   -> real Codex image / vision capability
   -> authenticated GUIF Host Work completion
   -> Artifact / semantic review / Revision / gated export
 ```
 
-This is not an internet service and does not require an HTTPS deployment. The plugin executes the bundled Python framework locally in the Codex environment.
+This is not an internet service and does not require an HTTPS deployment. The marketplace installs the repository root as the plugin snapshot, so the Skill and the `guif/` runtime are present together. No separate GUIF package installation is required from the user.
 
 ## Plugin files
 
 ```text
+.codex-plugin/plugin.json
 .agents/plugins/marketplace.json
+guif/
 plugins/game-ui-framework/
-  .codex-plugin/plugin.json
   README.md
   skills/game-ui-framework/
     SKILL.md
     references/WORKFLOW.md
     scripts/guif_codex.py
 ```
+
+The Marketplace local source is the repository root (`.`). The root Manifest points Codex to `./plugins/game-ui-framework/skills/`. A subdirectory-only plugin source is intentionally not used because it would omit the bundled `guif/` runtime.
 
 ## Private data boundary
 
@@ -67,10 +71,11 @@ Install `game-ui-framework` from the Codex Plugins interface and start a new ses
 
 `tests/test_codex_plugin.py` verifies:
 
-- marketplace, plugin manifest, and Skill discovery contracts;
+- root Marketplace source and Manifest packaging;
+- the installed plugin source contains both `guif/` and the Skill bridge;
 - bridge syntax;
 - private first-use bootstrap without Token disclosure;
 - no Host Token in Project Git workspace files;
 - natural-language request submission and approval;
-- creation of real image Host work without a fake completion;
-- safe abort and lease release for an unfinished Host session.
+- image Host Work completion and Artifact registration;
+- semantic visual completion and transition to `ready-to-export`.

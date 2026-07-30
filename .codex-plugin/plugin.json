@@ -5,7 +5,7 @@
   "repository": "https://github.com/943065241/game-ui-framework",
   "license": "MIT",
   "keywords": ["game-ui", "image-generation", "visual-review", "workflow"],
-  "skills": "./skills/",
+  "skills": "./plugins/game-ui-framework/skills/",
   "interface": {
     "displayName": "Game UI Framework",
     "shortDescription": "Create and review game UI through natural language",

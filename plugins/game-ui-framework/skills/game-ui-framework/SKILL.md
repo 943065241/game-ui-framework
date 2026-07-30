@@ -9,7 +9,7 @@ Act as the natural-language front end for GUIF. The user talks about the desired
 
 ## Runtime
 
-Resolve `scripts/guif_codex.py` relative to this SKILL.md file, whose absolute path Codex provides when the Skill is loaded. When `PLUGIN_ROOT` is available, the equivalent canonical path is `$PLUGIN_ROOT/skills/game-ui-framework/scripts/guif_codex.py`.
+Resolve `scripts/guif_codex.py` relative to this SKILL.md file, whose absolute path Codex provides when the Skill is loaded. When `PLUGIN_ROOT` is available, the equivalent canonical path is `$PLUGIN_ROOT/plugins/game-ui-framework/skills/game-ui-framework/scripts/guif_codex.py`.
 
 Invoke the bundled bridge internally:
 
