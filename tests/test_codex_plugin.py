@@ -25,6 +25,8 @@ def _run(
     workspace: Path,
     plugin_data: Path,
     *arguments: str,
+    project: str = "FictionalObservatory",
+    conversation: str = "codex-fictional-001",
 ) -> dict[str, object]:
     env = dict(os.environ)
     env["GUIF_CODEX_PLUGIN_DATA"] = str(plugin_data)
@@ -36,9 +38,9 @@ def _run(
             "--workspace",
             str(workspace),
             "--project",
-            "FictionalObservatory",
+            project,
             "--conversation",
-            "codex-fictional-001",
+            conversation,
             *arguments,
         ],
         check=False,
@@ -52,6 +54,32 @@ def _run(
     return value
 
 
+def _theme_file(plugin_data: Path) -> Path:
+    path = plugin_data / "input" / "fictional-theme.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "description": "A wholly fictional orbital kiosk interface.",
+                "palette": ["test violet", "test silver"],
+                "materials": ["matte composite"],
+                "lighting": "soft synthetic daylight",
+                "must_include": ["circular menu"],
+                "avoid": ["real brands"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _source_image(plugin_data: Path, name: str = "fictional-source.png") -> Path:
+    path = plugin_data / "input" / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGBA", (1080, 2340), (70, 80, 100, 255)).save(path)
+    return path
+
+
 def test_codex_plugin_manifest_marketplace_and_bundled_runtime_contract() -> None:
     marketplace = json.loads(
         (ROOT / ".agents" / "plugins" / "marketplace.json").read_text(
@@ -61,10 +89,7 @@ def test_codex_plugin_manifest_marketplace_and_bundled_runtime_contract() -> Non
     assert marketplace["interface"]["displayName"] == "Game UI Framework"
     plugin = marketplace["plugins"][0]
     assert plugin["name"] == "game-ui-framework"
-    assert plugin["source"] == {
-        "source": "local",
-        "path": ".",
-    }
+    assert plugin["source"] == {"source": "local", "path": "."}
     assert plugin["policy"] == {
         "installation": "AVAILABLE",
         "authentication": "ON_INSTALL",
@@ -93,6 +118,8 @@ def test_codex_plugin_manifest_marketplace_and_bundled_runtime_contract() -> Non
     assert "Do not make the user install GUIF" in skill
     assert "Never fabricate pixels" in skill
     assert "Legacy ProviderAdapter" in skill
+    assert "source-import-required" in skill
+    assert "Do not choose silently" in skill
     assert "relative to this SKILL.md" in skill
     assert "$PLUGIN_ROOT/plugins/game-ui-framework" in skill
 
@@ -116,6 +143,7 @@ def test_codex_bridge_runs_private_natural_language_image_and_visual_loop(
     assert started["privacy"] == {
         "credential": "stored-in-plugin-private-data",
         "framework_data": "outside-project-git",
+        "source_images": "private-source-library-outside-project-git",
     }
 
     contexts = list((plugin_data / "workspaces").glob("*/context.json"))
@@ -128,21 +156,7 @@ def test_codex_bridge_runs_private_natural_language_image_and_visual_loop(
         if path.is_file()
     )
 
-    theme_file = plugin_data / "input" / "fictional-theme.json"
-    theme_file.parent.mkdir(parents=True)
-    theme_file.write_text(
-        json.dumps(
-            {
-                "description": "A wholly fictional orbital kiosk interface.",
-                "palette": ["test violet", "test silver"],
-                "materials": ["matte composite"],
-                "lighting": "soft synthetic daylight",
-                "must_include": ["circular menu"],
-                "avoid": ["real brands"],
-            }
-        ),
-        encoding="utf-8",
-    )
+    theme_file = _theme_file(plugin_data)
     themed = _run(
         workspace,
         plugin_data,
@@ -225,4 +239,192 @@ def test_codex_bridge_runs_private_natural_language_image_and_visual_loop(
     )
     assert visual_completed["status"] == "completed"
     assert visual_completed["conversation"]["stage"] == "ready-to-export"
-    assert visual_completed["conversation"]["artifacts"][0]["review_status"] == "passed"
+    assert visual_completed["conversation"]["artifacts"][-1]["review_status"] == "passed"
+
+
+def test_unregistered_edit_proposes_choices_then_imports_protected_source(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "edit-workspace"
+    workspace.mkdir()
+    plugin_data = tmp_path / "edit-plugin-data"
+    _run(workspace, plugin_data, "start", conversation="edit-conversation")
+    theme_file = _theme_file(plugin_data)
+    _run(
+        workspace,
+        plugin_data,
+        "theme-create",
+        "--name",
+        "Fictional Edit Theme",
+        "--content-file",
+        str(theme_file),
+        conversation="edit-conversation",
+    )
+
+    request_file = plugin_data / "input" / "edit-request.txt"
+    request_file.write_text(
+        "Modify the 1080x2340 fictional orbital homepage, preserve non-target pixels, and export Unity",
+        encoding="utf-8",
+    )
+    blocked = _run(
+        workspace,
+        plugin_data,
+        "submit",
+        "--request-file",
+        str(request_file),
+        conversation="edit-conversation",
+    )
+    assert blocked["stage"] == "source-import-required"
+    action_ids = {item["action"] for item in blocked["actions"]}
+    assert action_ids == {
+        "import-source-and-continue",
+        "import-as-theme-reference",
+        "import-as-master-reference",
+        "continue-outside-guif",
+    }
+    assert blocked["source"]["status"] == "required"
+
+    source = _source_image(plugin_data)
+    imported = _run(
+        workspace,
+        plugin_data,
+        "source-import",
+        "--source-file",
+        str(source),
+        "--source-kind",
+        "conversation-temporary-image",
+        "--source-usage",
+        "editable-source",
+        conversation="edit-conversation",
+    )
+    assert imported["stage"] == "approval-required"
+    assert imported["source"]["status"] == "registered"
+    assert imported["source"]["selected"][0]["privacy"] == "private"
+    serialized = json.dumps(imported, ensure_ascii=False)
+    assert str(source) not in serialized
+    assert "sha256" not in serialized
+
+    approved = _run(
+        workspace,
+        plugin_data,
+        "approve",
+        conversation="edit-conversation",
+    )
+    assert approved["stage"] == "image-production"
+    work = _run(
+        workspace,
+        plugin_data,
+        "host-prepare",
+        conversation="edit-conversation",
+    )
+    assert work["kind"] == "image-editing"
+    assert len(work["attachments"]) == 1
+    assert Path(str(work["attachments"][0]["path"])).is_file()
+    assert work["attachments"][0]["sha256"]
+    _run(
+        workspace,
+        plugin_data,
+        "host-abort",
+        "--session",
+        str(work["host_session"]),
+        conversation="edit-conversation",
+    )
+    assert not any(path.name == source.name for path in workspace.rglob("*"))
+
+
+def test_theme_master_image_is_auto_registered_and_reused_for_edit(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "master-workspace"
+    workspace.mkdir()
+    plugin_data = tmp_path / "master-plugin-data"
+    conversation = "master-conversation"
+    _run(workspace, plugin_data, "start", conversation=conversation)
+    theme_file = _theme_file(plugin_data)
+    master = _source_image(plugin_data, "fictional-master.png")
+    themed = _run(
+        workspace,
+        plugin_data,
+        "theme-create",
+        "--name",
+        "Fictional Master Theme",
+        "--content-file",
+        str(theme_file),
+        "--source-file",
+        str(master),
+        "--source-kind",
+        "user-upload",
+        conversation=conversation,
+    )
+    assert themed["stage"] == "ready-for-request"
+    assert "master-reference" in themed["source"]["selected"][0]["usages"]
+
+    request_file = plugin_data / "input" / "master-edit-request.txt"
+    request_file.write_text(
+        "Adjust the 1080x2340 fictional master homepage while preserving the approved composition and export Unity",
+        encoding="utf-8",
+    )
+    submitted = _run(
+        workspace,
+        plugin_data,
+        "submit",
+        "--request-file",
+        str(request_file),
+        conversation=conversation,
+    )
+    assert submitted["stage"] == "approval-required"
+    assert submitted["stage"] != "source-import-required"
+    approved = _run(workspace, plugin_data, "approve", conversation=conversation)
+    assert approved["stage"] == "image-production"
+    work = _run(workspace, plugin_data, "host-prepare", conversation=conversation)
+    assert work["kind"] == "image-editing"
+    assert len(work["attachments"]) == 1
+    _run(
+        workspace,
+        plugin_data,
+        "host-abort",
+        "--session",
+        str(work["host_session"]),
+        conversation=conversation,
+    )
+
+
+def test_user_can_explicitly_leave_formal_guif_edit_chain(tmp_path: Path) -> None:
+    workspace = tmp_path / "external-workspace"
+    workspace.mkdir()
+    plugin_data = tmp_path / "external-plugin-data"
+    conversation = "external-conversation"
+    _run(workspace, plugin_data, "start", conversation=conversation)
+    theme_file = _theme_file(plugin_data)
+    _run(
+        workspace,
+        plugin_data,
+        "theme-create",
+        "--name",
+        "Fictional External Edit Theme",
+        "--content-file",
+        str(theme_file),
+        conversation=conversation,
+    )
+    request_file = plugin_data / "input" / "external-request.txt"
+    request_file.write_text(
+        "Modify the 1080x2340 fictional homepage and export Unity",
+        encoding="utf-8",
+    )
+    blocked = _run(
+        workspace,
+        plugin_data,
+        "submit",
+        "--request-file",
+        str(request_file),
+        conversation=conversation,
+    )
+    assert blocked["stage"] == "source-import-required"
+    external = _run(
+        workspace,
+        plugin_data,
+        "source-external-edit",
+        conversation=conversation,
+    )
+    assert external["stage"] == "external-edit-selected"
+    assert external["source"]["status"] == "external-edit-selected"
