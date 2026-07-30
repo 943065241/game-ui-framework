@@ -18,11 +18,11 @@ codex plugin marketplace add 943065241/game-ui-framework
 
 Install **game-ui-framework** from the Codex Plugins interface, then start a new Codex session. The Skill can trigger automatically from a matching game UI request, or explicitly with `$game-ui-framework`.
 
-## No server deployment
+## No server deployment or separate GUIF install
 
-This is a local skills-only plugin. It does not require an HTTPS service or custom GPT Action. Codex executes the bundled GUIF bridge inside the checked-out plugin snapshot.
+This is a local skills-only plugin. It does not require an HTTPS service, custom GPT Action, or a separate `pip install`. The Marketplace installs the repository root so the plugin snapshot contains both the Skill bridge and the bundled `guif/` Python runtime.
 
-The framework code still runs locally as part of the plugin. “No deployment” means no separate server; it does not mean the repository code is magically available before the plugin is installed.
+The framework still runs locally as part of the plugin. “No deployment” means no separate server; it does not mean the repository code is available before the plugin is installed.
 
 ## Safety and privacy
 
