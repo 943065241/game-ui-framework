@@ -16,7 +16,10 @@ from uuid import uuid4
 
 def _inject_framework_source() -> None:
     for parent in Path(__file__).resolve().parents:
-        if (parent / "guif" / "__init__.py").is_file() and (parent / "pyproject.toml").is_file():
+        if (
+            (parent / "guif" / "__init__.py").is_file()
+            and (parent / "pyproject.toml").is_file()
+        ):
             sys.path.insert(0, str(parent))
             return
 
@@ -25,8 +28,13 @@ _inject_framework_source()
 
 from guif.beta_readiness import bootstrap_workspace  # noqa: E402
 from guif.conversation_workflow import ConversationWorkflowError  # noqa: E402
+from guif.improvement_cases import (  # noqa: E402
+    CHANGE_TYPES,
+    ImprovementCaseError,
+    TOOL_ADOPTION_SCOPES,
+)
+from guif.improvement_workflow import ConversationWorkflowService  # noqa: E402
 from guif.runtime import Runtime  # noqa: E402
-from guif.source_workflow import ConversationWorkflowService  # noqa: E402
 
 SCHEMA_VERSION = 1
 DEFAULT_CONVERSATION = "codex-main"
@@ -69,7 +77,9 @@ def _secure_json(path: Path, value: dict[str, Any]) -> None:
 
 
 def _read_object(path: Path, label: str) -> dict[str, Any]:
-    value = json.loads(path.expanduser().resolve().read_text(encoding="utf-8"))
+    value = json.loads(
+        path.expanduser().resolve().read_text(encoding="utf-8")
+    )
     if not isinstance(value, dict) or not value:
         raise ValueError(f"{label} must be a non-empty JSON object")
     return value
@@ -82,20 +92,32 @@ def _read_text(path: Path, label: str) -> str:
     return value
 
 
+def _optional_text(path: Path | None, label: str) -> str | None:
+    return _read_text(path, label) if path is not None else None
+
+
 def _plugin_data() -> Path:
-    configured = os.environ.get("GUIF_CODEX_PLUGIN_DATA") or os.environ.get("PLUGIN_DATA")
+    configured = (
+        os.environ.get("GUIF_CODEX_PLUGIN_DATA")
+        or os.environ.get("PLUGIN_DATA")
+    )
     root = (
         Path(configured).expanduser().resolve()
         if configured and configured.strip()
         else (Path.home() / ".guif" / "codex-plugin").resolve()
     )
     _secure_dir(root)
-    os.environ.setdefault("GUIF_DATA_HOME", str(root / "framework-data"))
+    os.environ.setdefault(
+        "GUIF_DATA_HOME",
+        str(root / "framework-data"),
+    )
     return root
 
 
 def _key(workspace: Path) -> str:
-    return hashlib.sha256(str(workspace.resolve()).encode("utf-8")).hexdigest()[:20]
+    return hashlib.sha256(
+        str(workspace.resolve()).encode("utf-8")
+    ).hexdigest()[:20]
 
 
 def _state_root(workspace: Path) -> Path:
@@ -118,7 +140,11 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 
 def _identity(value: str, fallback: str) -> str:
-    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", value.strip()).strip(".-")
+    cleaned = re.sub(
+        r"[^A-Za-z0-9._-]+",
+        "-",
+        value.strip(),
+    ).strip(".-")
     return cleaned or fallback
 
 
@@ -139,7 +165,8 @@ def _ensure_context(
         "GameUIProject",
     )
     resolved_conversation = _identity(
-        conversation or str(existing.get("conversation") or DEFAULT_CONVERSATION),
+        conversation
+        or str(existing.get("conversation") or DEFAULT_CONVERSATION),
         DEFAULT_CONVERSATION,
     )
     token = str(existing.get("bearer_token") or "") or None
@@ -154,7 +181,9 @@ def _ensure_context(
     if isinstance(issued, str) and issued.strip():
         token = issued
     if not isinstance(token, str) or not token.strip():
-        raise RuntimeError("GUIF did not provide a usable private Host credential")
+        raise RuntimeError(
+            "GUIF did not provide a usable private Host credential"
+        )
     context = {
         "schema_version": SCHEMA_VERSION,
         "workspace": str(workspace),
@@ -166,7 +195,10 @@ def _ensure_context(
     return context, bootstrap
 
 
-def _service(workspace: Path, context: dict[str, Any]) -> ConversationWorkflowService:
+def _service(
+    workspace: Path,
+    context: dict[str, Any],
+) -> ConversationWorkflowService:
     return ConversationWorkflowService(
         workspace.resolve(),
         runtime=Runtime(workspace.resolve()),
@@ -174,7 +206,10 @@ def _service(workspace: Path, context: dict[str, Any]) -> ConversationWorkflowSe
     )
 
 
-def _safe_start(result: dict[str, Any], service: ConversationWorkflowService) -> dict[str, Any]:
+def _safe_start(
+    result: dict[str, Any],
+    service: ConversationWorkflowService,
+) -> dict[str, Any]:
     return {
         "schema_version": SCHEMA_VERSION,
         "status": result.get("status"),
@@ -190,7 +225,12 @@ def _safe_start(result: dict[str, Any], service: ConversationWorkflowService) ->
         "privacy": {
             "credential": "stored-in-plugin-private-data",
             "framework_data": "outside-project-git",
-            "source_images": "private-source-library-outside-project-git",
+            "source_images": (
+                "private-source-library-outside-project-git"
+            ),
+            "improvement_cases": (
+                "private-candidate-change-records-outside-project-git"
+            ),
         },
     }
 
@@ -206,17 +246,27 @@ def _context_summary(context: dict[str, Any]) -> dict[str, Any]:
 
 
 def _active_task(
-    context: dict[str, Any], service: ConversationWorkflowService
+    context: dict[str, Any],
+    service: ConversationWorkflowService,
 ) -> tuple[dict[str, Any], Any]:
-    session = service._session(str(context["project"]), str(context["conversation"]))
+    session = service._session(
+        str(context["project"]),
+        str(context["conversation"]),
+    )
     task = service._load_active_task(session)
     if task is None:
-        raise ConversationWorkflowError("Conversation has no active production task")
+        raise ConversationWorkflowError(
+            "Conversation has no active production task"
+        )
     return session, task
 
 
 def _filename(value: str, fallback: str) -> str:
-    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", Path(value).name).strip(".-")
+    cleaned = re.sub(
+        r"[^A-Za-z0-9._-]+",
+        "-",
+        Path(value).name,
+    ).strip(".-")
     return cleaned or fallback
 
 
@@ -230,7 +280,10 @@ def _dimensions(path: Path) -> tuple[int | None, int | None]:
         return None, None
 
 
-def _source_metadata(path: Path, args: argparse.Namespace) -> tuple[str | None, int | None, int | None]:
+def _source_metadata(
+    path: Path,
+    args: argparse.Namespace,
+) -> tuple[str | None, int | None, int | None]:
     resolved = path.expanduser().resolve(strict=True)
     width, height = _dimensions(resolved)
     return (
@@ -238,6 +291,17 @@ def _source_metadata(path: Path, args: argparse.Namespace) -> tuple[str | None, 
         args.width if args.width is not None else width,
         args.height if args.height is not None else height,
     )
+
+
+def _plugin_version() -> str:
+    for parent in Path(__file__).resolve().parents:
+        manifest = parent / ".codex-plugin" / "plugin.json"
+        if not manifest.is_file():
+            continue
+        value = _read_json(manifest).get("version")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    raise RuntimeError("Unable to resolve installed GUIF plugin version")
 
 
 def _prepare_host(
@@ -248,12 +312,17 @@ def _prepare_host(
     _, task = _active_task(context, service)
     runtime = service.runtime
     project = str(context["project"])
-    candidates = runtime.list_host_work(project, statuses=("available",), limit=100)
+    candidates = runtime.list_host_work(
+        project,
+        statuses=("available",),
+        limit=100,
+    )
     work = next(
         (
             item
             for item in candidates
-            if item.get("task_id") == task.task_id and item.get("kind") in HOST_KINDS
+            if item.get("task_id") == task.task_id
+            and item.get("kind") in HOST_KINDS
         ),
         None,
     )
@@ -262,7 +331,10 @@ def _prepare_host(
             "schema_version": SCHEMA_VERSION,
             "status": "blocked",
             "reason": "no-supported-host-work",
-            "conversation": service.status(project, str(context["conversation"])),
+            "conversation": service.status(
+                project,
+                str(context["conversation"]),
+            ),
         }
 
     etag = runtime.get_task_etag(project, task.task_id)
@@ -294,11 +366,19 @@ def _prepare_host(
     claimed_work = claimed["work"]
     claim_token = str(claimed["claim_token"])
     session_id = uuid4().hex
-    claim_root = _secure_dir(_claims_root(workspace) / session_id)
+    claim_root = _secure_dir(
+        _claims_root(workspace) / session_id
+    )
     attachments: list[dict[str, Any]] = []
     try:
-        for index, descriptor in enumerate(claimed_work.get("attachments", []), start=1):
-            if not isinstance(descriptor, dict) or not descriptor.get("attachment_id"):
+        for index, descriptor in enumerate(
+            claimed_work.get("attachments", []),
+            start=1,
+        ):
+            if (
+                not isinstance(descriptor, dict)
+                or not descriptor.get("attachment_id")
+            ):
                 continue
             verified, content = runtime.get_host_work_attachment(
                 project,
@@ -308,7 +388,10 @@ def _prepare_host(
                 claim_token=claim_token,
             )
             name = _filename(
-                str(verified.get("filename") or f"attachment-{index}.bin"),
+                str(
+                    verified.get("filename")
+                    or f"attachment-{index}.bin"
+                ),
                 f"attachment-{index}.bin",
             )
             path = claim_root / name
@@ -319,7 +402,9 @@ def _prepare_host(
                 pass
             attachments.append(
                 {
-                    "attachment_id": verified.get("attachment_id"),
+                    "attachment_id": verified.get(
+                        "attachment_id"
+                    ),
                     "filename": name,
                     "mime_type": verified.get("mime_type"),
                     "sha256": verified.get("sha256"),
@@ -342,14 +427,20 @@ def _prepare_host(
             },
         )
     except Exception:
-        current = runtime.get_task_lease(project, task.task_id)
+        current = runtime.get_task_lease(
+            project,
+            task.task_id,
+        )
         if current.get("status") == "active":
             runtime.release_task_lease(
                 project,
                 task.task_id,
                 bearer_token=str(context["bearer_token"]),
                 lease_token=str(lease["lease_token"]),
-                reason="Codex plugin Host attachment preparation failed",
+                reason=(
+                    "Codex plugin Host attachment "
+                    "preparation failed"
+                ),
             )
         shutil.rmtree(claim_root, ignore_errors=True)
         raise
@@ -357,7 +448,13 @@ def _prepare_host(
     public_work = {
         key: value
         for key, value in claimed_work.items()
-        if key not in {"claim_token", "lease_token", "bearer_token", "attachments"}
+        if key
+        not in {
+            "claim_token",
+            "lease_token",
+            "bearer_token",
+            "attachments",
+        }
     }
     return {
         "schema_version": SCHEMA_VERSION,
@@ -368,20 +465,29 @@ def _prepare_host(
         "attachments": attachments,
         "completion_contract": (
             "Submit a real image file with host-complete-image."
-            if claimed_work.get("kind") in {"image-generation", "image-editing"}
-            else "Submit a real semantic inspection result with host-complete-visual."
+            if claimed_work.get("kind")
+            in {"image-generation", "image-editing"}
+            else (
+                "Submit a real semantic inspection result "
+                "with host-complete-visual."
+            )
         ),
     }
 
 
-def _claim(workspace: Path, session_id: str) -> tuple[Path, dict[str, Any]]:
+def _claim(
+    workspace: Path,
+    session_id: str,
+) -> tuple[Path, dict[str, Any]]:
     normalized = _identity(session_id, "")
     if not normalized or normalized != session_id:
         raise ValueError("Invalid Host session")
     root = _claims_root(workspace) / session_id
     path = root / "claim.json"
     if not path.is_file():
-        raise FileNotFoundError(f"Unknown or expired Host session: {session_id}")
+        raise FileNotFoundError(
+            f"Unknown or expired Host session: {session_id}"
+        )
     return root, _read_json(path)
 
 
@@ -394,8 +500,13 @@ def _complete_image(
     model_id: str,
 ) -> dict[str, Any]:
     root, claim = _claim(workspace, session_id)
-    if claim.get("kind") not in {"image-generation", "image-editing"}:
-        raise ValueError("Host session does not accept an image result")
+    if claim.get("kind") not in {
+        "image-generation",
+        "image-editing",
+    }:
+        raise ValueError(
+            "Host session does not accept an image result"
+        )
     path = image_path.expanduser().resolve()
     content = path.read_bytes()
     if not content:
@@ -409,13 +520,22 @@ def _complete_image(
         lease_token=str(claim["lease_token"]),
         expected_task_etag=str(claim["etag"]),
         content=content,
-        filename=_filename(path.name, "generated-image.png"),
-        mime_type=mimetypes.guess_type(path.name)[0] or "image/png",
+        filename=_filename(
+            path.name,
+            "generated-image.png",
+        ),
+        mime_type=(
+            mimetypes.guess_type(path.name)[0]
+            or "image/png"
+        ),
         content_sha256=hashlib.sha256(content).hexdigest(),
         width=width,
         height=height,
         model_id=model_id,
-        metadata={"host": "codex-plugin", "result_kind": "real-image"},
+        metadata={
+            "host": "codex-plugin",
+            "result_kind": "real-image",
+        },
         request_id=str(claim["work_id"]),
     )
     shutil.rmtree(root, ignore_errors=True)
@@ -425,7 +545,8 @@ def _complete_image(
         "kind": claim["kind"],
         "artifact_created": bool(receipt.get("artifact_id")),
         "conversation": service.status(
-            str(claim["project"]), str(claim["conversation"])
+            str(claim["project"]),
+            str(claim["conversation"]),
         ),
     }
 
@@ -440,14 +561,25 @@ def _complete_visual(
 ) -> dict[str, Any]:
     root, claim = _claim(workspace, session_id)
     if claim.get("kind") != "visual-inspection":
-        raise ValueError("Host session does not accept a visual inspection result")
-    result = _read_object(result_path, "Visual inspection result")
+        raise ValueError(
+            "Host session does not accept a visual inspection result"
+        )
+    result = _read_object(
+        result_path,
+        "Visual inspection result",
+    )
     findings = result.get("findings", [])
-    if not isinstance(findings, list) or any(not isinstance(item, dict) for item in findings):
-        raise ValueError("Visual inspection findings must be an array of objects")
+    if not isinstance(findings, list) or any(
+        not isinstance(item, dict) for item in findings
+    ):
+        raise ValueError(
+            "Visual inspection findings must be an array of objects"
+        )
     status = str(result.get("status") or "").strip()
     if not status:
-        raise ValueError("Visual inspection status is required")
+        raise ValueError(
+            "Visual inspection status is required"
+        )
     receipt = service.runtime.complete_host_visual_work(
         str(claim["project"]),
         str(claim["work_id"]),
@@ -469,9 +601,12 @@ def _complete_visual(
         "schema_version": SCHEMA_VERSION,
         "status": "completed",
         "kind": "visual-inspection",
-        "revision_created": bool(receipt.get("revision_id")),
+        "revision_created": bool(
+            receipt.get("revision_id")
+        ),
         "conversation": service.status(
-            str(claim["project"]), str(claim["conversation"])
+            str(claim["project"]),
+            str(claim["conversation"]),
         ),
     }
 
@@ -483,7 +618,10 @@ def _abort(
     session_id: str,
 ) -> dict[str, Any]:
     root, claim = _claim(workspace, session_id)
-    current = service.runtime.get_task_lease(str(claim["project"]), str(claim["task_id"]))
+    current = service.runtime.get_task_lease(
+        str(claim["project"]),
+        str(claim["task_id"]),
+    )
     if current.get("status") == "active":
         service.runtime.release_task_lease(
             str(claim["project"]),
@@ -493,34 +631,73 @@ def _abort(
             reason="Codex plugin Host session aborted",
         )
     shutil.rmtree(root, ignore_errors=True)
-    return {"schema_version": SCHEMA_VERSION, "status": "aborted"}
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "status": "aborted",
+    }
 
 
-def _add_source_arguments(parser: argparse.ArgumentParser, *, required: bool) -> None:
-    parser.add_argument("--source-file", type=Path, required=required)
-    parser.add_argument("--source-kind", choices=SOURCE_KINDS, default="user-upload")
-    parser.add_argument("--source-usage", choices=SOURCE_USAGES, default="editable-source")
+def _add_source_arguments(
+    parser: argparse.ArgumentParser,
+    *,
+    required: bool,
+) -> None:
+    parser.add_argument(
+        "--source-file",
+        type=Path,
+        required=required,
+    )
+    parser.add_argument(
+        "--source-kind",
+        choices=SOURCE_KINDS,
+        default="user-upload",
+    )
+    parser.add_argument(
+        "--source-usage",
+        choices=SOURCE_USAGES,
+        default="editable-source",
+    )
     parser.add_argument("--mime-type")
     parser.add_argument("--width", type=int)
     parser.add_argument("--height", type=int)
 
 
+def _add_comment_argument(
+    parser: argparse.ArgumentParser,
+) -> None:
+    parser.add_argument("--comment-file", type=Path)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="guif-codex",
-        description="Private natural-language bridge used internally by the GUIF Codex plugin",
+        description=(
+            "Private natural-language bridge used internally "
+            "by the GUIF Codex plugin"
+        ),
     )
-    parser.add_argument("--workspace", type=Path, default=Path.cwd())
+    parser.add_argument(
+        "--workspace",
+        type=Path,
+        default=Path.cwd(),
+    )
     parser.add_argument("--project")
     parser.add_argument("--conversation")
-    sub = parser.add_subparsers(dest="command", required=True)
+    sub = parser.add_subparsers(
+        dest="command",
+        required=True,
+    )
     sub.add_parser("start")
     sub.add_parser("status")
     sub.add_parser("context")
 
     create = sub.add_parser("theme-create")
     create.add_argument("--name", required=True)
-    create.add_argument("--content-file", type=Path, required=True)
+    create.add_argument(
+        "--content-file",
+        type=Path,
+        required=True,
+    )
     _add_source_arguments(create, required=False)
     create.set_defaults(source_usage="master-reference")
 
@@ -530,7 +707,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     derive = sub.add_parser("theme-derive")
     derive.add_argument("--theme-id", required=True)
-    derive.add_argument("--updates-file", type=Path, required=True)
+    derive.add_argument(
+        "--updates-file",
+        type=Path,
+        required=True,
+    )
     derive.add_argument("--from-version", type=int)
     derive.add_argument("--name")
     _add_source_arguments(derive, required=False)
@@ -543,27 +724,159 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("source-external-edit")
 
     submit = sub.add_parser("submit")
-    submit.add_argument("--request-file", type=Path, required=True)
+    submit.add_argument(
+        "--request-file",
+        type=Path,
+        required=True,
+    )
     submit.add_argument("--request-key")
-    submit.add_argument("--pipeline", default="ui-production")
-    for name in ("approve", "request-changes", "reject"):
+    submit.add_argument(
+        "--pipeline",
+        default="ui-production",
+    )
+    for name in (
+        "approve",
+        "request-changes",
+        "reject",
+    ):
         decision = sub.add_parser(name)
-        decision.add_argument("--comment-file", type=Path)
+        _add_comment_argument(decision)
     sub.add_parser("continue")
     sub.add_parser("recover")
     sub.add_parser("retry")
     export = sub.add_parser("export")
     export.add_argument("--target-engine")
 
+    improvement_open = sub.add_parser(
+        "improvement-open"
+    )
+    improvement_open.add_argument(
+        "--change-type",
+        choices=sorted(CHANGE_TYPES),
+        required=True,
+    )
+    improvement_open.add_argument(
+        "--observed-file",
+        type=Path,
+        required=True,
+    )
+    improvement_open.add_argument(
+        "--expected-file",
+        type=Path,
+        required=True,
+    )
+    improvement_open.add_argument(
+        "--diagnosis-file",
+        type=Path,
+    )
+    improvement_open.add_argument(
+        "--proposal-file",
+        type=Path,
+    )
+    improvement_open.add_argument("--tool-id")
+    improvement_open.add_argument("--capability")
+    improvement_open.add_argument(
+        "--adoption-scope",
+        choices=sorted(TOOL_ADOPTION_SCOPES),
+        default="project",
+    )
+    sub.add_parser("improvement-status")
+
+    improvement_propose = sub.add_parser(
+        "improvement-propose"
+    )
+    improvement_propose.add_argument(
+        "--proposal-file",
+        type=Path,
+        required=True,
+    )
+
+    for name in (
+        "improvement-trial-approve",
+        "improvement-trial-request-changes",
+        "improvement-trial-reject",
+        "improvement-adopt",
+        "improvement-adoption-request-changes",
+        "improvement-adoption-reject",
+    ):
+        decision = sub.add_parser(name)
+        _add_comment_argument(decision)
+
+    sub.add_parser("improvement-bundle")
+
+    candidate_link = sub.add_parser(
+        "improvement-candidate-link"
+    )
+    candidate_link.add_argument(
+        "--candidate-file",
+        type=Path,
+        required=True,
+    )
+    sub.add_parser("improvement-candidate-run")
+
+    result = sub.add_parser("improvement-result")
+    result.add_argument(
+        "--group",
+        choices=("stable", "candidate"),
+        required=True,
+    )
+    result.add_argument(
+        "--summary-file",
+        type=Path,
+        required=True,
+    )
+    result.add_argument("--artifact-file", type=Path)
+    result.add_argument("--metadata-file", type=Path)
+
+    published = sub.add_parser(
+        "improvement-published"
+    )
+    published.add_argument(
+        "--delivery-file",
+        type=Path,
+        required=True,
+    )
+
+    refresh = sub.add_parser(
+        "improvement-refresh-confirm"
+    )
+    refresh.add_argument("--current-version")
+
+    for name in (
+        "improvement-regression-pass",
+        "improvement-regression-fail",
+    ):
+        regression = sub.add_parser(name)
+        regression.add_argument(
+            "--summary-file",
+            type=Path,
+            required=True,
+        )
+    sub.add_parser("improvement-resume")
+
     sub.add_parser("host-prepare")
     image = sub.add_parser("host-complete-image")
     image.add_argument("--session", required=True)
-    image.add_argument("--image", type=Path, required=True)
-    image.add_argument("--model-id", default="chatgpt-image")
+    image.add_argument(
+        "--image",
+        type=Path,
+        required=True,
+    )
+    image.add_argument(
+        "--model-id",
+        default="chatgpt-image",
+    )
     visual = sub.add_parser("host-complete-visual")
     visual.add_argument("--session", required=True)
-    visual.add_argument("--result-file", type=Path, required=True)
-    visual.add_argument("--inspector-id", default="chatgpt-vision")
+    visual.add_argument(
+        "--result-file",
+        type=Path,
+        required=True,
+    )
+    visual.add_argument(
+        "--inspector-id",
+        default="chatgpt-vision",
+    )
     abort = sub.add_parser("host-abort")
     abort.add_argument("--session", required=True)
     return parser
@@ -573,20 +886,31 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     workspace = args.workspace.expanduser().resolve()
     try:
-        context, bootstrap = _ensure_context(workspace, args.project, args.conversation)
+        context, bootstrap = _ensure_context(
+            workspace,
+            args.project,
+            args.conversation,
+        )
         service = _service(workspace, context)
         project = str(context["project"])
         conversation = str(context["conversation"])
+
         if args.command == "start":
             result = _safe_start(bootstrap, service)
         elif args.command == "context":
             result = _context_summary(context)
         elif args.command == "status":
-            result = service.status(project, conversation)
+            result = service.status(
+                project,
+                conversation,
+            )
         elif args.command == "theme-create":
             source_options: dict[str, Any] = {}
             if args.source_file is not None:
-                mime_type, width, height = _source_metadata(args.source_file, args)
+                mime_type, width, height = _source_metadata(
+                    args.source_file,
+                    args,
+                )
                 source_options = {
                     "source_path": args.source_file,
                     "source_kind": args.source_kind,
@@ -599,7 +923,10 @@ def main(argv: list[str] | None = None) -> int:
                 project,
                 conversation,
                 args.name,
-                _read_object(args.content_file, "Theme content"),
+                _read_object(
+                    args.content_file,
+                    "Theme content",
+                ),
                 actor="codex-plugin-user",
                 **source_options,
             )
@@ -614,7 +941,10 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "theme-derive":
             source_options = {}
             if args.source_file is not None:
-                mime_type, width, height = _source_metadata(args.source_file, args)
+                mime_type, width, height = _source_metadata(
+                    args.source_file,
+                    args,
+                )
                 source_options = {
                     "source_path": args.source_file,
                     "source_kind": args.source_kind,
@@ -627,16 +957,25 @@ def main(argv: list[str] | None = None) -> int:
                 project,
                 conversation,
                 args.theme_id,
-                _read_object(args.updates_file, "Theme updates"),
+                _read_object(
+                    args.updates_file,
+                    "Theme updates",
+                ),
                 from_version=args.from_version,
                 name=args.name,
                 actor="codex-plugin-user",
                 **source_options,
             )
         elif args.command == "theme-unbound":
-            result = service.continue_unbound(project, conversation)
+            result = service.continue_unbound(
+                project,
+                conversation,
+            )
         elif args.command == "source-import":
-            mime_type, width, height = _source_metadata(args.source_file, args)
+            mime_type, width, height = _source_metadata(
+                args.source_file,
+                args,
+            )
             result = service.import_source(
                 project,
                 conversation,
@@ -650,11 +989,20 @@ def main(argv: list[str] | None = None) -> int:
                 continue_after_import=not args.no_continue,
             )
         elif args.command == "source-external-edit":
-            result = service.select_external_edit(project, conversation)
+            result = service.select_external_edit(
+                project,
+                conversation,
+            )
         elif args.command == "submit":
-            requirement = _read_text(args.request_file, "Design request")
+            requirement = _read_text(
+                args.request_file,
+                "Design request",
+            )
             request_key = args.request_key or (
-                "codex-" + hashlib.sha256(requirement.encode("utf-8")).hexdigest()[:20]
+                "codex-"
+                + hashlib.sha256(
+                    requirement.encode("utf-8")
+                ).hexdigest()[:20]
             )
             result = service.submit(
                 project,
@@ -663,27 +1011,225 @@ def main(argv: list[str] | None = None) -> int:
                 pipeline=args.pipeline,
                 request_key=request_key,
             )
-        elif args.command in {"approve", "request-changes", "reject"}:
-            comment = (
-                _read_text(args.comment_file, "Decision comment")
-                if args.comment_file is not None
-                else None
+        elif args.command in {
+            "approve",
+            "request-changes",
+            "reject",
+        }:
+            comment = _optional_text(
+                args.comment_file,
+                "Decision comment",
             )
-            result = getattr(service, args.command.replace("-", "_"))(
-                project, conversation, comment=comment
+            result = getattr(
+                service,
+                args.command.replace("-", "_"),
+            )(
+                project,
+                conversation,
+                comment=comment,
             )
         elif args.command == "continue":
-            result = service.continue_work(project, conversation)
+            result = service.continue_work(
+                project,
+                conversation,
+            )
         elif args.command == "recover":
-            result = service.recover(project, conversation)
+            result = service.recover(
+                project,
+                conversation,
+            )
         elif args.command == "retry":
-            result = service.retry(project, conversation)
+            result = service.retry(
+                project,
+                conversation,
+            )
         elif args.command == "export":
             result = service.export(
-                project, conversation, target_engine=args.target_engine
+                project,
+                conversation,
+                target_engine=args.target_engine,
+            )
+        elif args.command == "improvement-open":
+            proposal = (
+                _read_object(
+                    args.proposal_file,
+                    "Improvement proposal",
+                )
+                if args.proposal_file is not None
+                else None
+            )
+            result = service.open_improvement(
+                project,
+                conversation,
+                change_type=args.change_type,
+                observed_behavior=_read_text(
+                    args.observed_file,
+                    "Observed behavior",
+                ),
+                expected_behavior=_read_text(
+                    args.expected_file,
+                    "Expected behavior",
+                ),
+                diagnosis=_optional_text(
+                    args.diagnosis_file,
+                    "Improvement diagnosis",
+                ),
+                proposal=proposal,
+                affected_tool_id=args.tool_id,
+                capability=args.capability,
+                adoption_scope=args.adoption_scope,
+                actor="codex-plugin-user",
+            )
+        elif args.command == "improvement-status":
+            result = service.improvement_status(
+                project,
+                conversation,
+            )
+        elif args.command == "improvement-propose":
+            result = service.propose_improvement(
+                project,
+                conversation,
+                _read_object(
+                    args.proposal_file,
+                    "Improvement proposal",
+                ),
+                actor="codex-plugin-user",
+            )
+        elif args.command in {
+            "improvement-trial-approve",
+            "improvement-trial-request-changes",
+            "improvement-trial-reject",
+        }:
+            decisions = {
+                "improvement-trial-approve": "approved",
+                "improvement-trial-request-changes": (
+                    "changes-requested"
+                ),
+                "improvement-trial-reject": "rejected",
+            }
+            result = service.decide_improvement_trial(
+                project,
+                conversation,
+                decisions[args.command],
+                comment=_optional_text(
+                    args.comment_file,
+                    "Trial decision comment",
+                ),
+                actor="codex-plugin-user",
+            )
+        elif args.command == "improvement-bundle":
+            result = service.improvement_development_bundle(
+                project,
+                conversation,
+            )
+        elif args.command == "improvement-candidate-link":
+            result = service.link_improvement_candidate(
+                project,
+                conversation,
+                _read_object(
+                    args.candidate_file,
+                    "Candidate metadata",
+                ),
+                actor="codex-plugin-user",
+            )
+        elif args.command == "improvement-candidate-run":
+            result = service.start_improvement_candidate(
+                project,
+                conversation,
+                actor="codex-plugin-user",
+            )
+        elif args.command == "improvement-result":
+            metadata = (
+                _read_object(
+                    args.metadata_file,
+                    "Improvement result metadata",
+                )
+                if args.metadata_file is not None
+                else None
+            )
+            result = service.record_improvement_result(
+                project,
+                conversation,
+                group=args.group,
+                summary=_read_text(
+                    args.summary_file,
+                    "Improvement result summary",
+                ),
+                file_path=args.artifact_file,
+                metadata=metadata,
+                actor="codex-plugin-user",
+            )
+        elif args.command in {
+            "improvement-adopt",
+            "improvement-adoption-request-changes",
+            "improvement-adoption-reject",
+        }:
+            decisions = {
+                "improvement-adopt": "approved",
+                "improvement-adoption-request-changes": (
+                    "changes-requested"
+                ),
+                "improvement-adoption-reject": "rejected",
+            }
+            result = service.decide_improvement_adoption(
+                project,
+                conversation,
+                decisions[args.command],
+                comment=_optional_text(
+                    args.comment_file,
+                    "Adoption decision comment",
+                ),
+                actor="codex-plugin-user",
+            )
+        elif args.command == "improvement-published":
+            result = service.mark_improvement_published(
+                project,
+                conversation,
+                _read_object(
+                    args.delivery_file,
+                    "Improvement delivery",
+                ),
+                actor="codex-plugin-user",
+            )
+        elif args.command == "improvement-refresh-confirm":
+            result = service.confirm_improvement_refresh(
+                project,
+                conversation,
+                current_plugin_version=(
+                    args.current_version
+                    or _plugin_version()
+                ),
+                actor="codex-plugin-user",
+            )
+        elif args.command in {
+            "improvement-regression-pass",
+            "improvement-regression-fail",
+        }:
+            result = service.record_improvement_regression(
+                project,
+                conversation,
+                passed=(
+                    args.command
+                    == "improvement-regression-pass"
+                ),
+                summary=_read_text(
+                    args.summary_file,
+                    "Regression summary",
+                ),
+                actor="codex-plugin-user",
+            )
+        elif args.command == "improvement-resume":
+            result = service.resume_after_improvement(
+                project,
+                conversation,
+                actor="codex-plugin-user",
             )
         elif args.command == "host-prepare":
-            result = _prepare_host(workspace, context, service)
+            result = _prepare_host(
+                workspace,
+                context,
+                service,
+            )
         elif args.command == "host-complete-image":
             result = _complete_image(
                 workspace,
@@ -703,13 +1249,21 @@ def main(argv: list[str] | None = None) -> int:
                 args.inspector_id,
             )
         elif args.command == "host-abort":
-            result = _abort(workspace, context, service, args.session)
+            result = _abort(
+                workspace,
+                context,
+                service,
+                args.session,
+            )
         else:
-            raise ValueError(f"Unsupported command: {args.command}")
+            raise ValueError(
+                f"Unsupported command: {args.command}"
+            )
         print(_dump(result))
         return 0
     except (
         ConversationWorkflowError,
+        ImprovementCaseError,
         FileNotFoundError,
         RuntimeError,
         ValueError,
