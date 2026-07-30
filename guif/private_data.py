@@ -44,6 +44,10 @@ class PrivateDataLayout:
         return self.root / "source-imports"
 
     @property
+    def improvement_cases(self) -> Path:
+        return self.root / "improvement-cases"
+
+    @property
     def conversations(self) -> Path:
         return self.root / "conversation-theme-bindings"
 
