@@ -1,21 +1,22 @@
 {
   "name": "game-ui-framework",
-  "version": "1.0.0-beta.2",
-  "description": "Natural-language Codex front end for GUIF game UI production workflows.",
+  "version": "1.0.0-beta.3",
+  "description": "Natural-language Codex front end for GUIF production, protected source, Candidate Change, and Tool trial workflows.",
   "repository": "https://github.com/943065241/game-ui-framework",
   "license": "MIT",
-  "keywords": ["game-ui", "image-generation", "visual-review", "workflow"],
+  "keywords": ["game-ui", "image-generation", "visual-review", "candidate-change", "tool-trial", "workflow"],
   "skills": "./plugins/game-ui-framework/skills/",
   "interface": {
     "displayName": "Game UI Framework",
-    "shortDescription": "Create and review game UI through natural language",
-    "longDescription": "Use GUIF from Codex for private Theme management, approval-gated real image work, semantic visual review, controlled revisions, and gated export.",
+    "shortDescription": "Create, review, and safely improve game UI workflows",
+    "longDescription": "Use GUIF from Codex for private Theme management, protected source registration, approval-gated real image work, semantic visual review, isolated Candidate Changes, Tool trials, controlled revisions, and gated export.",
     "developerName": "GUIF Contributors",
     "category": "Productivity",
     "capabilities": ["Read", "Write"],
     "defaultPrompt": [
       "Use GUIF to create a game UI from my natural-language description.",
-      "Use GUIF to review and revise this game UI image."
+      "Use GUIF to review and revise this game UI image.",
+      "Open a GUIF Candidate Change when I identify a Skill, workflow, framework, or Tool problem."
     ]
   }
 }

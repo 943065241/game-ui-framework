@@ -12,6 +12,7 @@ from guif.tools.config import (
     DEFAULT_EXECUTION_CONFIG,
     ExecutionSettings,
     bind_project_tool,
+    bind_workspace_tool,
     load_execution_settings,
     validate_execution_config,
 )
@@ -41,6 +42,7 @@ __all__ = [
     "ToolResolution",
     "ToolResult",
     "bind_project_tool",
+    "bind_workspace_tool",
     "build_default_chatgpt_host",
     "build_default_tool_registry",
     "create_tool_scaffold",

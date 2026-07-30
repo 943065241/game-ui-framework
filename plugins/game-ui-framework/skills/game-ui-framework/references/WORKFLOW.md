@@ -14,7 +14,7 @@ python "$PLUGIN_ROOT/plugins/game-ui-framework/skills/game-ui-framework/scripts/
 
 Optional `--project` and `--conversation` values select a non-default context. The bridge persists that selection privately for the workspace.
 
-## Conversation commands
+## Production commands
 
 | Command | Purpose |
 | --- | --- |
@@ -28,12 +28,155 @@ Optional `--project` and `--conversation` values select a non-default context. T
 | `source-external-edit` | Record the user's explicit choice to leave the formal GUIF editing chain. |
 | `submit --request-file FILE` | Submit the complete natural-language requirement from a private file. |
 | `approve` | Approve the current Initial or Revision gate. |
-| `request-changes --comment-file FILE` | Request changes at the current gate. |
-| `reject` | Reject the current gate. |
-| `continue` | Continue the next approved framework step. |
+| `request-changes --comment-file FILE` | Request changes at the current production gate. |
+| `reject` | Reject the current production gate. |
+| `continue` | Continue the next approved production step. |
 | `recover` | Reconcile private Conversation and Task state. |
 | `retry` | Resume from a persisted recoverable failure. |
 | `export [--target-engine ENGINE]` | Execute the final gated export. |
+
+## Candidate Change commands
+
+| Command | Purpose |
+| --- | --- |
+| `improvement-open --change-type TYPE --observed-file FILE --expected-file FILE [--proposal-file JSON]` | Pause the current production checkpoint and open a private Improvement Case. |
+| `improvement-status` | Return the current Candidate Change state. |
+| `improvement-propose --proposal-file JSON` | Add or replace the candidate proposal before trial approval. |
+| `improvement-trial-approve` | Approve only an isolated trial. This does not authorize adoption, Git merge, publication, or stable configuration changes. |
+| `improvement-trial-request-changes` | Return the case to proposal work. |
+| `improvement-trial-reject` | Close the case and retain the stable version. |
+| `improvement-bundle` | Produce a private, sanitized source-repository development handoff bundle. Never expose its path to the user. |
+| `improvement-candidate-link --candidate-file JSON` | Link a candidate branch, commit, or version after it is built in the GUIF source repository. |
+| `improvement-candidate-run` | Start an isolated executable Tool trial using a Task-only override. |
+| `improvement-result --group stable|candidate --summary-file FILE [--artifact-file FILE]` | Record real comparison evidence. Candidate evidence is required before adoption. |
+| `improvement-adopt` | Approve formal adoption after reviewing real candidate results. |
+| `improvement-adoption-request-changes` | Return to candidate building after result review. |
+| `improvement-adoption-reject` | Reject the candidate and retain the stable version and Tool routing. |
+| `improvement-published --delivery-file JSON` | Record repository, branch, PR, merge commit, and minimum plugin version after an adopted code candidate is merged. |
+| `improvement-refresh-confirm [--current-version VERSION]` | Confirm that the newly loaded plugin meets the required version. |
+| `improvement-regression-pass --summary-file FILE` | Record a real passing replay of the original scenario. |
+| `improvement-regression-fail --summary-file FILE` | Reopen candidate building after a failing formal regression. |
+| `improvement-resume` | Restore the paused production Task after resolution or explicit rejection. |
+
+## Proposal file
+
+A proposal is a JSON object:
+
+```json
+{
+  "summary": "Reduce unintended texture and noise during protected image edits.",
+  "changes": [
+    "Constrain edits to the approved region.",
+    "Add negative constraints for grain, speckle, and unnecessary highlights.",
+    "Add a semantic cleanliness review dimension."
+  ],
+  "affected_layers": [
+    "Skill",
+    "Prompt IR",
+    "Visual Review"
+  ],
+  "validation_plan": [
+    "Run the same fictional source image and edit objective under stable and candidate versions.",
+    "Inspect real candidate pixels and ask the user to confirm the visual result."
+  ],
+  "safety_constraints": [
+    "Do not commit the user's real source image.",
+    "Do not merge before adoption approval.",
+    "Do not replace semantic review with metadata."
+  ],
+  "public_fixture": "Use a fictional orbital market image with flat clean surfaces."
+}
+```
+
+The user must approve the trial after seeing the proposal. Approval of this file does not authorize formal adoption.
+
+## Candidate metadata file
+
+For a code, Skill, workflow, or Tool-integration candidate:
+
+```json
+{
+  "branch": "experiment/reduce-edit-noise",
+  "commit": "candidate-commit-sha",
+  "version": "1.0.0-beta.4-candidate.1",
+  "notes": "Candidate remains isolated from the installed stable plugin."
+}
+```
+
+At least one of `branch`, `commit`, or `version` is required.
+
+## Candidate result evidence
+
+Use a private text file for the summary. An optional real image or other result file is copied into the Improvement Case evidence directory. The public view only reports the evidence group, summary, MIME type, and aggregate Artifact count; it omits the private path and SHA-256.
+
+Recommended visual trial:
+
+```text
+same fictional source
+same edit objective
+same canvas and protected region
+stable result
+candidate result
+real semantic inspection
+user adoption decision
+```
+
+Candidate evidence is mandatory. A stable baseline is recommended but not mandatory when no truthful baseline exists.
+
+## Two independent approvals
+
+```text
+proposal
+  -> trial approval
+  -> isolated candidate
+  -> real result review
+  -> adoption approval
+  -> publication or scoped Tool-route application
+```
+
+Trial approval never implies adoption. Adoption cannot be approved without real candidate evidence.
+
+## Tool trial routing
+
+Open a Tool change with:
+
+```bash
+improvement-open \
+  --change-type tool-change \
+  --observed-file OBSERVED \
+  --expected-file EXPECTED \
+  --proposal-file PROPOSAL \
+  --tool-id figma \
+  --capability structured-ui-layout \
+  --adoption-scope project
+```
+
+GUIF evaluates Tool discovery:
+
+- registered + available + healthy: `tool-trial`; `improvement-candidate-run` creates a new candidate Task with a Task-only Tool override;
+- installable, unregistered, unavailable, unhealthy, or unknown: `tool-integration-change`; build an Adapter candidate instead of pretending the Tool can run.
+
+The stable Project or Workspace routing is not changed by the trial. After the user approves adoption:
+
+- `task`: apply only to the paused source Task;
+- `project`: write the Project execution route;
+- `workspace`: write the Workspace execution route.
+
+A Tool trial should expose permission, data-scope, external-call, billing, credential, Host-support, availability, and health disclosures.
+
+## Publication delivery file
+
+```json
+{
+  "repository": "943065241/game-ui-framework",
+  "branch": "feature/candidate-change",
+  "pull_request": 35,
+  "merge_commit": "merged-commit-sha",
+  "minimum_plugin_version": "1.0.0-beta.3"
+}
+```
+
+Publication is valid only after adoption approval. The current installed session still contains the old Skill and Runtime snapshot, so publication transitions to `plugin-refresh-required`.
 
 ## Source registration decision
 
@@ -114,6 +257,6 @@ When the real Host action cannot be completed after a work item has been claimed
 
 ## Private storage
 
-The bridge stores all credentials, context files, source images, claim tokens, attachments, and private framework records below `PLUGIN_DATA`. `GUIF_CODEX_PLUGIN_DATA` is an explicit test or managed-runtime override. Neither location belongs in Project Git.
+The bridge stores credentials, context files, source images, Improvement Cases, candidate evidence, development bundles, claim tokens, attachments, and private framework records below `PLUGIN_DATA`. `GUIF_CODEX_PLUGIN_DATA` is an explicit test or managed-runtime override. Neither location belongs in Project Git.
 
-Private requirement, Theme, source, and decision files should be placed under `PLUGIN_DATA/input/`. Delete temporary inputs after the corresponding GUIF operation when they are no longer needed; the registered canonical source remains in the private Source Library.
+Private requirement, Theme, source, proposal, candidate, evidence-summary, delivery, regression, and decision files should be placed under `PLUGIN_DATA/input/`. Delete temporary inputs after the corresponding operation when they are no longer needed; canonical private records remain available for recovery.
