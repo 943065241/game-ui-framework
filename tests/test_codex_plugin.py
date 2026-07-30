@@ -126,8 +126,7 @@ def test_codex_bridge_bootstraps_privately_and_reaches_real_host_handoff(
     request_file = plugin_data / "input" / "fictional-request.txt"
     request_file.parent.mkdir(parents=True)
     request_file.write_text(
-        "Create a fictional 1080x1920 observatory inventory screen with brass frames, "
-        "clear hierarchy, and no bottom navigation.",
+        "Create a fictional 1080x2340 observatory shop page and export Unity.",
         encoding="utf-8",
     )
     submitted = _run(
