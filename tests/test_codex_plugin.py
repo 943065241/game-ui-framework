@@ -87,6 +87,7 @@ def test_codex_plugin_manifest_marketplace_and_skill_contract() -> None:
     assert "Do not make the user install GUIF" in skill
     assert "Never fabricate pixels" in skill
     assert "Legacy ProviderAdapter" in skill
+    assert "relative to this SKILL.md" in skill
 
 
 def test_codex_bridge_compiles() -> None:
@@ -120,13 +121,36 @@ def test_codex_bridge_bootstraps_privately_and_reaches_real_host_handoff(
         if path.is_file()
     )
 
-    unbound = _run(workspace, plugin_data, "theme-unbound")
-    assert unbound["stage"] == "ready-for-request"
+    theme_file = plugin_data / "input" / "fictional-theme.json"
+    theme_file.parent.mkdir(parents=True)
+    theme_file.write_text(
+        json.dumps(
+            {
+                "description": "A wholly fictional orbital kiosk interface.",
+                "palette": ["test violet", "test silver"],
+                "materials": ["matte composite"],
+                "lighting": "soft synthetic daylight",
+                "must_include": ["circular menu"],
+                "avoid": ["real brands"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    themed = _run(
+        workspace,
+        plugin_data,
+        "theme-create",
+        "--name",
+        "Fictional Orbital Fixture",
+        "--content-file",
+        str(theme_file),
+    )
+    assert themed["stage"] == "ready-for-request"
+    assert themed["theme"]["privacy"] == "private"
 
     request_file = plugin_data / "input" / "fictional-request.txt"
-    request_file.parent.mkdir(parents=True)
     request_file.write_text(
-        "Create a fictional 1080x2340 observatory shop page and export Unity.",
+        "Create a 1080x2340 fictional orbital shop page and export Unity",
         encoding="utf-8",
     )
     submitted = _run(
@@ -139,7 +163,7 @@ def test_codex_bridge_bootstraps_privately_and_reaches_real_host_handoff(
     assert submitted["stage"] == "approval-required"
 
     approved = _run(workspace, plugin_data, "approve")
-    assert approved["stage"] == "tool-configuration-required"
+    assert approved["stage"] == "image-production"
 
     prepared = _run(workspace, plugin_data, "host-prepare")
     assert prepared["status"] == "prepared"
