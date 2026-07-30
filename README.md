@@ -24,6 +24,8 @@ The Codex plugin version is `1.0.0-beta.3`. The Python package remains `1.0.0b2`
 Important documents:
 
 - [Living product specification](docs/GUIF_PRODUCT_SPEC.md)
+- Beta.3 release notes: [English](docs/RELEASE_NOTES_BETA3.md) | [简体中文](docs/RELEASE_NOTES_BETA3.zh-CN.md)
+- Beta.3 security review: [English](docs/SECURITY_REVIEW_BETA3.md) | [简体中文](docs/SECURITY_REVIEW_BETA3.zh-CN.md)
 - [Support policy](SUPPORT.md)
 - [Privacy migration guidance](docs/PRIVACY_MIGRATION.md)
 
