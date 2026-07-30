@@ -1,13 +1,20 @@
 {
   "name": "game-ui-framework",
-  "owner": {
-    "name": "GUIF Contributors"
+  "interface": {
+    "displayName": "Game UI Framework"
   },
   "plugins": [
     {
       "name": "game-ui-framework",
-      "source": "./plugins/game-ui-framework",
-      "description": "Use GUIF from Codex through natural-language game UI planning, approval, real image work, visual review, revision, and gated export."
+      "source": {
+        "source": "local",
+        "path": "./plugins/game-ui-framework"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
     }
   ]
 }
