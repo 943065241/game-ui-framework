@@ -24,15 +24,20 @@ def _inject_framework_source() -> None:
 _inject_framework_source()
 
 from guif.beta_readiness import bootstrap_workspace  # noqa: E402
-from guif.conversation_workflow import (  # noqa: E402
-    ConversationWorkflowError,
-    ConversationWorkflowService,
-)
+from guif.conversation_workflow import ConversationWorkflowError  # noqa: E402
 from guif.runtime import Runtime  # noqa: E402
+from guif.source_workflow import ConversationWorkflowService  # noqa: E402
 
 SCHEMA_VERSION = 1
 DEFAULT_CONVERSATION = "codex-main"
 HOST_KINDS = {"image-generation", "image-editing", "visual-inspection"}
+SOURCE_KINDS = (
+    "conversation-temporary-image",
+    "user-upload",
+    "external-file",
+    "guif-artifact",
+)
+SOURCE_USAGES = ("editable-source", "theme-reference", "master-reference")
 
 
 def _dump(value: Any) -> str:
@@ -169,19 +174,23 @@ def _service(workspace: Path, context: dict[str, Any]) -> ConversationWorkflowSe
     )
 
 
-def _safe_start(result: dict[str, Any]) -> dict[str, Any]:
+def _safe_start(result: dict[str, Any], service: ConversationWorkflowService) -> dict[str, Any]:
     return {
         "schema_version": SCHEMA_VERSION,
         "status": result.get("status"),
         "project_created": bool(result.get("project_created")),
         "project": result.get("project"),
         "conversation_id": result.get("conversation_id"),
-        "conversation": result.get("conversation"),
+        "conversation": service.status(
+            str(result.get("project")),
+            str(result.get("conversation_id")),
+        ),
         "next_action": result.get("next_action"),
         "compatibility": result.get("compatibility"),
         "privacy": {
             "credential": "stored-in-plugin-private-data",
             "framework_data": "outside-project-git",
+            "source_images": "private-source-library-outside-project-git",
         },
     }
 
@@ -209,6 +218,26 @@ def _active_task(
 def _filename(value: str, fallback: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", Path(value).name).strip(".-")
     return cleaned or fallback
+
+
+def _dimensions(path: Path) -> tuple[int | None, int | None]:
+    try:
+        from PIL import Image
+
+        with Image.open(path) as image:
+            return int(image.width), int(image.height)
+    except (ImportError, OSError, ValueError):
+        return None, None
+
+
+def _source_metadata(path: Path, args: argparse.Namespace) -> tuple[str | None, int | None, int | None]:
+    resolved = path.expanduser().resolve(strict=True)
+    width, height = _dimensions(resolved)
+    return (
+        args.mime_type or mimetypes.guess_type(resolved.name)[0],
+        args.width if args.width is not None else width,
+        args.height if args.height is not None else height,
+    )
 
 
 def _prepare_host(
@@ -356,16 +385,6 @@ def _claim(workspace: Path, session_id: str) -> tuple[Path, dict[str, Any]]:
     return root, _read_json(path)
 
 
-def _dimensions(path: Path) -> tuple[int | None, int | None]:
-    try:
-        from PIL import Image
-
-        with Image.open(path) as image:
-            return int(image.width), int(image.height)
-    except (ImportError, OSError, ValueError):
-        return None, None
-
-
 def _complete_image(
     workspace: Path,
     context: dict[str, Any],
@@ -477,6 +496,15 @@ def _abort(
     return {"schema_version": SCHEMA_VERSION, "status": "aborted"}
 
 
+def _add_source_arguments(parser: argparse.ArgumentParser, *, required: bool) -> None:
+    parser.add_argument("--source-file", type=Path, required=required)
+    parser.add_argument("--source-kind", choices=SOURCE_KINDS, default="user-upload")
+    parser.add_argument("--source-usage", choices=SOURCE_USAGES, default="editable-source")
+    parser.add_argument("--mime-type")
+    parser.add_argument("--width", type=int)
+    parser.add_argument("--height", type=int)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="guif-codex",
@@ -493,15 +521,26 @@ def build_parser() -> argparse.ArgumentParser:
     create = sub.add_parser("theme-create")
     create.add_argument("--name", required=True)
     create.add_argument("--content-file", type=Path, required=True)
+    _add_source_arguments(create, required=False)
+    create.set_defaults(source_usage="master-reference")
+
     select = sub.add_parser("theme-select")
     select.add_argument("--theme-id", required=True)
     select.add_argument("--version", type=int)
+
     derive = sub.add_parser("theme-derive")
     derive.add_argument("--theme-id", required=True)
     derive.add_argument("--updates-file", type=Path, required=True)
     derive.add_argument("--from-version", type=int)
     derive.add_argument("--name")
+    _add_source_arguments(derive, required=False)
+    derive.set_defaults(source_usage="theme-reference")
     sub.add_parser("theme-unbound")
+
+    source = sub.add_parser("source-import")
+    _add_source_arguments(source, required=True)
+    source.add_argument("--no-continue", action="store_true")
+    sub.add_parser("source-external-edit")
 
     submit = sub.add_parser("submit")
     submit.add_argument("--request-file", type=Path, required=True)
@@ -535,100 +574,138 @@ def main(argv: list[str] | None = None) -> int:
     workspace = args.workspace.expanduser().resolve()
     try:
         context, bootstrap = _ensure_context(workspace, args.project, args.conversation)
+        service = _service(workspace, context)
+        project = str(context["project"])
+        conversation = str(context["conversation"])
         if args.command == "start":
-            result = _safe_start(bootstrap)
+            result = _safe_start(bootstrap, service)
         elif args.command == "context":
             result = _context_summary(context)
+        elif args.command == "status":
+            result = service.status(project, conversation)
+        elif args.command == "theme-create":
+            source_options: dict[str, Any] = {}
+            if args.source_file is not None:
+                mime_type, width, height = _source_metadata(args.source_file, args)
+                source_options = {
+                    "source_path": args.source_file,
+                    "source_kind": args.source_kind,
+                    "source_usage": args.source_usage,
+                    "source_mime_type": mime_type,
+                    "source_width": width,
+                    "source_height": height,
+                }
+            result = service.create_theme(
+                project,
+                conversation,
+                args.name,
+                _read_object(args.content_file, "Theme content"),
+                actor="codex-plugin-user",
+                **source_options,
+            )
+        elif args.command == "theme-select":
+            result = service.select_theme(
+                project,
+                conversation,
+                args.theme_id,
+                version=args.version,
+                actor="codex-plugin-user",
+            )
+        elif args.command == "theme-derive":
+            source_options = {}
+            if args.source_file is not None:
+                mime_type, width, height = _source_metadata(args.source_file, args)
+                source_options = {
+                    "source_path": args.source_file,
+                    "source_kind": args.source_kind,
+                    "source_usage": args.source_usage,
+                    "source_mime_type": mime_type,
+                    "source_width": width,
+                    "source_height": height,
+                }
+            result = service.derive_theme(
+                project,
+                conversation,
+                args.theme_id,
+                _read_object(args.updates_file, "Theme updates"),
+                from_version=args.from_version,
+                name=args.name,
+                actor="codex-plugin-user",
+                **source_options,
+            )
+        elif args.command == "theme-unbound":
+            result = service.continue_unbound(project, conversation)
+        elif args.command == "source-import":
+            mime_type, width, height = _source_metadata(args.source_file, args)
+            result = service.import_source(
+                project,
+                conversation,
+                args.source_file,
+                source_kind=args.source_kind,
+                usage=args.source_usage,
+                mime_type=mime_type,
+                width=width,
+                height=height,
+                actor="codex-plugin-user",
+                continue_after_import=not args.no_continue,
+            )
+        elif args.command == "source-external-edit":
+            result = service.select_external_edit(project, conversation)
+        elif args.command == "submit":
+            requirement = _read_text(args.request_file, "Design request")
+            request_key = args.request_key or (
+                "codex-" + hashlib.sha256(requirement.encode("utf-8")).hexdigest()[:20]
+            )
+            result = service.submit(
+                project,
+                conversation,
+                requirement,
+                pipeline=args.pipeline,
+                request_key=request_key,
+            )
+        elif args.command in {"approve", "request-changes", "reject"}:
+            comment = (
+                _read_text(args.comment_file, "Decision comment")
+                if args.comment_file is not None
+                else None
+            )
+            result = getattr(service, args.command.replace("-", "_"))(
+                project, conversation, comment=comment
+            )
+        elif args.command == "continue":
+            result = service.continue_work(project, conversation)
+        elif args.command == "recover":
+            result = service.recover(project, conversation)
+        elif args.command == "retry":
+            result = service.retry(project, conversation)
+        elif args.command == "export":
+            result = service.export(
+                project, conversation, target_engine=args.target_engine
+            )
+        elif args.command == "host-prepare":
+            result = _prepare_host(workspace, context, service)
+        elif args.command == "host-complete-image":
+            result = _complete_image(
+                workspace,
+                context,
+                service,
+                args.session,
+                args.image,
+                args.model_id,
+            )
+        elif args.command == "host-complete-visual":
+            result = _complete_visual(
+                workspace,
+                context,
+                service,
+                args.session,
+                args.result_file,
+                args.inspector_id,
+            )
+        elif args.command == "host-abort":
+            result = _abort(workspace, context, service, args.session)
         else:
-            service = _service(workspace, context)
-            project = str(context["project"])
-            conversation = str(context["conversation"])
-            if args.command == "status":
-                result = service.status(project, conversation)
-            elif args.command == "theme-create":
-                result = service.create_theme(
-                    project,
-                    conversation,
-                    args.name,
-                    _read_object(args.content_file, "Theme content"),
-                    actor="codex-plugin-user",
-                )
-            elif args.command == "theme-select":
-                result = service.select_theme(
-                    project,
-                    conversation,
-                    args.theme_id,
-                    version=args.version,
-                    actor="codex-plugin-user",
-                )
-            elif args.command == "theme-derive":
-                result = service.derive_theme(
-                    project,
-                    conversation,
-                    args.theme_id,
-                    _read_object(args.updates_file, "Theme updates"),
-                    from_version=args.from_version,
-                    name=args.name,
-                    actor="codex-plugin-user",
-                )
-            elif args.command == "theme-unbound":
-                result = service.continue_unbound(project, conversation)
-            elif args.command == "submit":
-                requirement = _read_text(args.request_file, "Design request")
-                request_key = args.request_key or (
-                    "codex-"
-                    + hashlib.sha256(requirement.encode("utf-8")).hexdigest()[:20]
-                )
-                result = service.submit(
-                    project,
-                    conversation,
-                    requirement,
-                    pipeline=args.pipeline,
-                    request_key=request_key,
-                )
-            elif args.command in {"approve", "request-changes", "reject"}:
-                comment = (
-                    _read_text(args.comment_file, "Decision comment")
-                    if args.comment_file is not None
-                    else None
-                )
-                result = getattr(service, args.command.replace("-", "_"))(
-                    project, conversation, comment=comment
-                )
-            elif args.command == "continue":
-                result = service.continue_work(project, conversation)
-            elif args.command == "recover":
-                result = service.recover(project, conversation)
-            elif args.command == "retry":
-                result = service.retry(project, conversation)
-            elif args.command == "export":
-                result = service.export(
-                    project, conversation, target_engine=args.target_engine
-                )
-            elif args.command == "host-prepare":
-                result = _prepare_host(workspace, context, service)
-            elif args.command == "host-complete-image":
-                result = _complete_image(
-                    workspace,
-                    context,
-                    service,
-                    args.session,
-                    args.image,
-                    args.model_id,
-                )
-            elif args.command == "host-complete-visual":
-                result = _complete_visual(
-                    workspace,
-                    context,
-                    service,
-                    args.session,
-                    args.result_file,
-                    args.inspector_id,
-                )
-            elif args.command == "host-abort":
-                result = _abort(workspace, context, service, args.session)
-            else:
-                raise ValueError(f"Unsupported command: {args.command}")
+            raise ValueError(f"Unsupported command: {args.command}")
         print(_dump(result))
         return 0
     except (
