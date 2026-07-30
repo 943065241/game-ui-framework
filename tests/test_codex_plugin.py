@@ -56,19 +56,29 @@ def test_codex_plugin_manifest_marketplace_and_skill_contract() -> None:
             encoding="utf-8"
         )
     )
+    assert marketplace["interface"]["displayName"] == "Game UI Framework"
     plugin = marketplace["plugins"][0]
     assert plugin["name"] == "game-ui-framework"
-    assert plugin["source"] == "./plugins/game-ui-framework"
+    assert plugin["source"] == {
+        "source": "local",
+        "path": "./plugins/game-ui-framework",
+    }
+    assert plugin["policy"] == {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL",
+    }
+    assert plugin["category"] == "Productivity"
 
     manifest = json.loads(
         (PLUGIN_ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8")
     )
-    assert manifest == {
-        "name": "game-ui-framework",
-        "version": "1.0.0-beta.2",
-        "description": "Natural-language Codex front end for GUIF game UI production workflows.",
-        "skills": "./skills/",
-    }
+    assert manifest["name"] == "game-ui-framework"
+    assert manifest["version"] == "1.0.0-beta.2"
+    assert manifest["skills"] == "./skills/"
+    assert manifest["repository"] == "https://github.com/943065241/game-ui-framework"
+    assert manifest["interface"]["displayName"] == "Game UI Framework"
+    assert "Read" in manifest["interface"]["capabilities"]
+    assert "Write" in manifest["interface"]["capabilities"]
 
     skill = (
         PLUGIN_ROOT / "skills" / "game-ui-framework" / "SKILL.md"
