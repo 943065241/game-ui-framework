@@ -20,7 +20,7 @@ class Runtime(HostLoopRuntime):
         bearer_token: str | None = None,
         data_root: Path | None = None,
     ) -> Any:
-        from guif.conversation_workflow import ConversationWorkflowService
+        from guif.source_workflow import ConversationWorkflowService
 
         return ConversationWorkflowService(
             self.workspace,
