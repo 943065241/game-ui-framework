@@ -81,12 +81,7 @@ class WorkflowRun:
 
 
 class WorkflowEngine:
-    """Domain-neutral workflow graph and lifecycle engine.
-
-    Domain packs register actions and conditions. The engine owns graph traversal,
-    nested workflow stack handling, lifecycle transitions, events and checkpoints.
-    Provider and domain-specific behavior remains outside the runtime.
-    """
+    """Domain-neutral workflow graph and lifecycle engine."""
 
     def __init__(
         self,
@@ -143,8 +138,6 @@ class WorkflowEngine:
         return run
 
     def execute(self, run_id: str) -> WorkflowRun:
-        """Execute the registered graph until completion or a wait/failure state."""
-
         run = self.get_run(run_id)
         if run.status is WorkflowStatus.PENDING:
             self.start(run_id)
@@ -306,13 +299,14 @@ class WorkflowEngine:
         elif node.kind is NodeKind.SUBWORKFLOW:
             self._execute_subworkflow(run, node.workflow_id or "")
         elif node.kind is NodeKind.APPROVAL:
-            self.pause(run.run_id, node.policy.get("reason", node.node_id))
+            self.pause(run.run_id, str(node.policy.get("reason", node.node_id)))
         elif node.kind is NodeKind.REVIEW:
             self._transition(run, WorkflowStatus.REVIEWING)
+            self._emit(run, "review.started", {"node_id": node.node_id})
+            self._transition(run, WorkflowStatus.RUNNING)
             for child in node.children:
                 self._execute_node(run, definition, child)
-            if run.status is WorkflowStatus.REVIEWING:
-                self._transition(run, WorkflowStatus.RUNNING)
+            self._emit(run, "review.completed", {"node_id": node.node_id})
         else:
             raise ValueError(f"Unsupported workflow node kind: {node.kind}")
 
