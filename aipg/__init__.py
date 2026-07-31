@@ -18,6 +18,7 @@ from guif.layered_workflow import (
 
 from .artifacts import ArtifactRecord, ArtifactRegistry, ArtifactStatus
 from .capabilities import CapabilityRequirement, ToolAdapter, ToolRegistry
+from .checkpoints import CheckpointStore, InMemoryCheckpointStore
 from .context import ContextMode, ProductionRequest
 from .domains import (
     BUILTIN_DOMAIN_REGISTRY,
@@ -29,7 +30,7 @@ from .domains import (
     get_domain_pack,
     list_domain_packs,
 )
-from .engine import ActionHandler, WorkflowEngine, WorkflowRun
+from .engine import ActionHandler, ConditionHandler, WorkflowEngine, WorkflowRun
 from .events import EventBus, EventHandler, RuntimeEvent
 from .runtime import (
     NodeKind,
@@ -50,6 +51,8 @@ __all__ = [
     "ArtifactStatus",
     "BUILTIN_DOMAIN_REGISTRY",
     "CapabilityRequirement",
+    "CheckpointStore",
+    "ConditionHandler",
     "ContextMode",
     "DomainPack",
     "DomainPackDefinition",
@@ -58,6 +61,7 @@ __all__ = [
     "EventHandler",
     "FRAMEWORK_GOVERNANCE_DOMAIN",
     "GUIF_VISUAL_DOMAIN",
+    "InMemoryCheckpointStore",
     "NodeKind",
     "ProductionRequest",
     "RuntimeEvent",
