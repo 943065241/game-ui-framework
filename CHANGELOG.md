@@ -3,6 +3,18 @@
 All notable framework changes are recorded here. Candidate entries describe
 unreleased work and do not imply adoption or publication.
 
+## Unreleased — 1.1.0-dev.11
+
+### Planned
+
+- Implement the first real Provider Adapter behind the existing Tool contracts.
+- Connect provider execution to `ToolRegistry` without exposing provider identity
+  to Workflow definitions.
+- Add configuration, health, standard error, retry and fallback integration
+  coverage for the Adapter.
+- Document deployment requirements without claiming availability before runtime
+  configuration is complete.
+
 ## Unreleased — AIPG runtime refactor
 
 ### Added
@@ -44,8 +56,8 @@ unreleased work and do not imply adoption or publication.
   into AIPG while keeping visual behavior outside the Runtime.
 - Clarified that GUIF remains the compatible visual implementation while generic
   responsibilities migrate upward into AIPG incrementally.
-- Updated README, architecture, iteration, migration and Workflow Runtime
-  documentation to describe the compatibility-preserving strangler refactor.
+- Updated README, architecture, migration and Workflow Runtime documentation to
+  describe the compatibility-preserving strangler refactor.
 
 ### Compatibility
 
