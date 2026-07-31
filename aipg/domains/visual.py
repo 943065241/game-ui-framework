@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from aipg.core import DomainPackDefinition
+from .model import DomainPackDefinition
 
 
 GUIF_VISUAL_DOMAIN = DomainPackDefinition(
