@@ -1,8 +1,7 @@
 """AIPG: AI Production & Governance Framework.
 
-The existing ``guif`` package remains the compatibility API for the GUIF
-visual-production domain. New domain-neutral integrations should prefer the
-contracts exported from :mod:`aipg.core`.
+AIPG owns the domain-neutral production contracts. The existing ``guif``
+package remains the compatibility API and visual-production implementation.
 """
 
 from guif import __version__
@@ -18,17 +17,13 @@ from guif.layered_workflow import (
     validate_layered_composition,
 )
 
-from aipg.core import (
-    ArtifactRecord,
-    ArtifactRegistry,
-    ArtifactStatus,
-    CapabilityRequirement,
-    ContextMode,
-    DomainPackDefinition,
+from .artifacts import ArtifactRecord, ArtifactRegistry, ArtifactStatus
+from .capabilities import CapabilityRequirement, ToolAdapter, ToolRegistry
+from .context import ContextMode, ProductionRequest
+from .domains import GUIF_VISUAL_DOMAIN
+from .domains.model import DomainPackDefinition
+from .runtime import (
     NodeKind,
-    ProductionRequest,
-    ToolAdapter,
-    ToolRegistry,
     WorkflowDefinition,
     WorkflowFrame,
     WorkflowNode,
@@ -36,7 +31,6 @@ from aipg.core import (
     WorkflowStatus,
     validate_workflow_references,
 )
-from aipg.domains import GUIF_VISUAL_DOMAIN
 
 __all__ = [
     "ArtifactRecord",
