@@ -8,10 +8,10 @@ AIPG 是一个本地优先的 AI 生产工作流与治理框架。GUIF 继续作
 
 ## 当前迭代
 
-- 开发版本：`1.1.0-dev.7`
+- 开发版本：`1.1.0-dev.8`
 - 最后更新：`2026-07-31`
 - 分支策略：直接提交到 `main`
-- 最新里程碑：Tool Runtime v2 治理能力
+- 最新里程碑：Tool Runtime v2.1 兼容性修复
 
 当前开发线已完成：
 
@@ -25,6 +25,7 @@ AIPG 是一个本地优先的 AI 生产工作流与治理框架。GUIF 继续作
 - Tool 健康状态与配置校验
 - 标准 Tool 错误与执行结果
 - 超时、重试与 Provider fallback 策略
+- 保持向后兼容的纯 Capability 工具发现
 
 下一阶段计划：
 
@@ -86,7 +87,7 @@ Workflow
 
 ## Tool Runtime 治理
 
-Tool Adapter 提供与 Provider 无关的 Capability、配置要求、健康检查与执行函数。ToolRegistry 只选择可用 Adapter，并按优先级进行确定性路由。
+`resolve()` 保持为兼容旧代码的 Capability 与 Feature 发现接口。健康状态、配置、重试、超时和 fallback 治理在真正执行 Tool 时应用。明确只需要可执行 Adapter 的调用方可使用 `available_only=True`。
 
 执行策略支持：
 
