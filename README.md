@@ -5,158 +5,105 @@
 > Build governed AI production systems, not just prompts.
 
 AIPG is a local-first framework for routing, executing, reviewing, revising,
-and exporting AI production through explicit governance. GUIF is retained as
-the game UI and visual-production domain.
+and exporting AI production through explicit governance. GUIF remains the game
+UI and visual-production Domain Pack.
 
 ChatGPT / Codex is the default Host. Image generation, semantic vision, layout
 tools, engines, and future production capabilities are replaceable Tool
-contracts rather than hard-coded Core dependencies.
+contracts rather than hard-coded dependencies.
 
 ## Release status
 
-Version `1.1.0-beta.1` is formally adopted and published. It establishes AIPG
-as the top-level framework while retaining GUIF as the compatible visual domain.
+Version `1.1.0-beta.1` is published. The current unreleased iteration directly
+refactors the existing AIPG implementation; it does not create a second Core or
+replace GUIF wholesale.
 
 - Python package: `aipg-framework==1.1.0b1`
-- New import and CLI: `aipg`
+- Framework import and CLI: `aipg`
 - Compatibility import and CLI: `guif`
 - Visual domain Skill: `$game-ui-framework`
 - Framework Skill: `$aipg-framework`
-- Workflow schemas v1 and v2 remain supported
+- Workflow schemas v1, v2, and v3 remain readable
 
 Important documents:
 
 - [Changelog](CHANGELOG.md)
 - [AIPG architecture](docs/AIPG_ARCHITECTURE.md)
-- [Detailed user blueprint and usage map](docs/AIPG_USER_BLUEPRINT.md)
+- [Current AIPG/GUIF refactor](docs/AIPG_CORE_GUIF_ITERATION.md)
+- [Detailed user blueprint](docs/AIPG_USER_BLUEPRINT.md)
 - [GUIF-to-AIPG migration](docs/MIGRATING_GUIF_TO_AIPG.md)
 - [Master-guided layer workflow](docs/MASTER_GUIDED_LAYER_WORKFLOW.md)
 - [Release notes](docs/RELEASE_NOTES_AIPG_1_1_BETA1.md)
-- [Existing GUIF product specification](docs/GUIF_PRODUCT_SPEC.md)
-- [Candidate Change workflow](docs/IMPROVEMENT_WORKFLOW.md)
-- [Support policy](SUPPORT.md)
+- [GUIF product specification](docs/GUIF_PRODUCT_SPEC.md)
 
 ## Architecture
 
 ```text
-AIPG Core
-├─ intent and domain routing
-├─ workflow runtime and recovery
-├─ approvals and revision scopes
-├─ Artifact lineage and protected sources
-├─ Host and Tool routing
-├─ evidence and review
-├─ Candidate Change and adoption
-└─ gated export
+AIPG
+├─ runtime.py          workflow graph, state, stack, validation
+├─ context.py          project and standalone lifecycle
+├─ artifacts.py        Artifact identity, status, ancestry, lineage
+├─ capabilities.py     capability requirements and Tool adapters
+└─ domains/
+   └─ visual.py        GUIF Visual Production registration
 
-Domain Packs
-├─ Framework Governance
-└─ GUIF Visual Production
+GUIF compatibility implementation
+├─ existing workflows and CLIs
+├─ Theme and visual context
+├─ visual Artifact semantics
+├─ visual review and exporters
+└─ adapters for external visual Tools
 ```
 
-AIPG Core does not need to understand buttons, image alpha, Theme, or visual
-layers. These belong to GUIF. Future audio, text, code, video, and game-content
-domains can register their own workflows, context, Artifacts, Tools, review
-criteria, and exporters.
+The current refactor promotes generic responsibilities from the working GUIF
+implementation into focused AIPG modules. Existing `guif` APIs remain available
+while orchestration, Artifact, context, and capability contracts move upward
+incrementally.
 
-Theme is not a top-level AIPG prerequisite. AIPG first selects a domain and
-workflow; that workflow declares the context it requires.
+AIPG does not need to understand buttons, image alpha, Theme, masks, or visual
+layers. Those concepts belong to GUIF. Future code, document, video, audio, and
+game-content domains can reuse the same runtime contracts.
 
-## Production and improvement loops
+## Runtime model
 
-Production:
+Workflow definitions use a behavior-tree-like graph. Runtime execution uses a
+hierarchical state machine with a finite call stack.
 
 ```text
-request
--> domain and workflow
--> required context
--> production contract
--> approval
--> real Host/Tool execution
--> Artifact and lineage
--> deterministic and semantic review
--> revision when needed
--> gated export
+Workflow
+→ Subworkflow
+→ Stage or control node
+→ Action
+→ Tool invocation
 ```
 
-Framework improvement:
+Parents wait while child workflows execute, then resume with declared child
+results. Workflow status and Artifact status are independent.
+
+## Context modes
+
+- `project`: long-lived production context. GUIF commonly binds this to Theme,
+  master references, approved assets, and export targets.
+- `standalone`: finite one-off work such as localized repaint, image editing,
+  image layering, or effect-image generation.
+
+Figma is a Tool and structured design environment, not another lifecycle mode.
+
+## Capability routing
+
+Workflows request stable capabilities instead of providers.
 
 ```text
-observed problem
--> diagnosis
--> candidate proposal
--> isolated candidate
--> real evidence
--> adoption decision
--> publication and refresh
--> regression
--> resume production
+CapabilityRequirement
+→ ToolRegistry
+→ compatible ToolAdapter
+→ provider execution
 ```
 
-Candidate authorization does not authorize adoption, merge, publication, or
-stable Tool-route changes. Metadata checks do not prove visual quality or
-semantic correctness.
-
-## GUIF Visual Production
-
-GUIF remains the compatible visual domain and supports:
-
-- effect-image generation and editing;
-- private Theme and source registration;
-- protected source lineage;
-- semantic visual review;
-- resource production and engine export;
-- master-guided layer creation.
-
-### Master-guided layer creation
-
-The master effect image provides style, layout, hierarchy, and intent. It is
-not a pixel-matching target.
-
-```text
-Theme and master
--> coarse semantic layer analysis
--> layer-plan approval
--> bottom-to-top creation
--> recomposition after every layer
--> semantic visual review
--> scoped layer revision
--> final approval
--> independent assets and manifest export
-```
-
-Hard constraints protect functional roles, layout anchors, asset boundaries,
-required content, transparency, and output contracts. Shape details, materials,
-texture, lighting, and decoration remain soft guidance. Every layer receives
-low, medium, or high creative freedom.
-
-## Workflow manifest v3
-
-New domain workflows can declare:
-
-```json
-{
-  "schema_version": 3,
-  "id": "master-guided-layer-creation",
-  "domain": "visual-production",
-  "requires": ["theme", "master-reference"],
-  "creation_direction": "bottom-to-top",
-  "stages": [
-    "master-approval",
-    "layer-analysis",
-    "layer-plan-approval",
-    "progressive-layer-creation",
-    "recomposition-review",
-    "final-approval",
-    "engine-export"
-  ],
-  "constraint_policy": {
-    "master_role": "style-and-layout-guidance",
-    "pixel_matching": false,
-    "creative_freedom": "adaptive"
-  }
-}
-```
+GUIF can register adapters for image generation, editing, segmentation, OCR,
+vision, Figma, composition, visual diff, and engine export. AIPG does not claim
+Tool availability until credentials, permissions, billing, and data flow are
+configured.
 
 ## Development
 
@@ -168,21 +115,14 @@ python -m venv .venv
 
 On macOS or Linux, use `.venv/bin/python`.
 
-The repository includes pre-existing Windows-specific tests involving symlink
-behavior and private temporary directories. Candidate validation should record
-the stable baseline and compare candidate results rather than misattribute
-environment failures.
-
 ## Privacy and assurance
 
 Real Themes, prompts, source images, conversation records, credentials, private
-paths, candidate evidence, and generated artifacts remain outside Framework
-Git and Project Git by default. Public tests and examples use wholly fictional
-fixtures.
+paths, candidate evidence, and generated artifacts remain outside Framework Git
+and Project Git by default. Public tests and examples use fictional fixtures.
 
 AIPG does not fabricate pixels, Tool availability, semantic findings, candidate
-results, or successful export. External Tool permissions, billing, credentials,
-and data flow remain explicit.
+results, or successful export.
 
 ## Compatibility
 
