@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from .capabilities import CapabilityRequirement, ToolRegistry
+from .capabilities import (
+    CapabilityRequirement,
+    ToolExecutionPolicy,
+    ToolRegistry,
+)
 from .engine import WorkflowEngine, WorkflowRun
 from .runtime import WorkflowFrame, WorkflowNode, WorkflowStack, WorkflowStatus
 
@@ -19,26 +23,23 @@ class RecoverableWorkflowEngine(WorkflowEngine):
         run_id: str,
         requirement: CapabilityRequirement,
         arguments: Mapping[str, Any] | None = None,
+        policy: ToolExecutionPolicy | None = None,
     ) -> Mapping[str, Any]:
         run = self.get_run(run_id)
         if run.status is not WorkflowStatus.RUNNING:
             raise RuntimeError("Workflow must be running before executing capabilities")
         self._transition(run, WorkflowStatus.WAITING_FOR_TOOL)
-        adapter = self.tool_registry.select(requirement)
         self._emit(
             run,
             "capability.started",
-            {
-                "capability_id": requirement.capability_id,
-                "adapter_id": adapter.adapter_id,
-                "provider": adapter.provider,
-            },
+            {"capability_id": requirement.capability_id},
         )
         try:
-            result = adapter.execute(dict(arguments or {}))
+            execution = self.tool_registry.execute(requirement, arguments, policy)
         except Exception as exc:
             self.fail(run_id, exc)
             raise
+        result = dict(execution.output)
         self._transition(run, WorkflowStatus.RUNNING)
         run.frame.local_context.update(result)
         self._checkpoint(run, f"capability:{requirement.capability_id}")
@@ -47,8 +48,10 @@ class RecoverableWorkflowEngine(WorkflowEngine):
             "capability.completed",
             {
                 "capability_id": requirement.capability_id,
-                "adapter_id": adapter.adapter_id,
-                "provider": adapter.provider,
+                "adapter_id": execution.adapter_id,
+                "provider": execution.provider,
+                "attempts": execution.attempts,
+                "duration_seconds": execution.duration_seconds,
                 "result": result,
             },
         )
@@ -86,12 +89,7 @@ class RecoverableWorkflowEngine(WorkflowEngine):
         self._emit(run, "workflow.restored", {"reason": checkpoint.get("reason")})
         return run
 
-    def _execute_node(
-        self,
-        run: WorkflowRun,
-        definition: Any,
-        node: WorkflowNode,
-    ) -> None:
+    def _execute_node(self, run: WorkflowRun, definition: Any, node: WorkflowNode) -> None:
         completed = set(run.frame.local_context.get("_completed_node_ids", ()))
         cursor_key = f"{run.frame.workflow_id}:{node.node_id}"
         if cursor_key in completed:
