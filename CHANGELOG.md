@@ -14,8 +14,14 @@ unreleased work and do not imply adoption or publication.
 - Generic Artifact lineage and GUIF Visual Production Domain Pack declaration.
 - Authoritative `aipg.domains.DomainRegistry` with built-in visual-production
   and framework-governance registrations.
+- Executable `WorkflowEngine` with run creation, lifecycle transitions,
+  action binding, pause/resume, bounded retry, cancellation, checkpoints, and
+  output contract validation.
+- Domain-neutral synchronous `EventBus` and `RuntimeEvent` contracts for
+  Workflow and action lifecycle events.
 - Contract tests for nested workflows, lifecycle modes, capability matching,
-  Artifact ancestry, domain ownership, serialization, and compatibility aliases.
+  Artifact ancestry, domain ownership, serialization, compatibility aliases,
+  runtime state transitions, event delivery, and retry limits.
 
 ### Changed
 
@@ -25,6 +31,8 @@ unreleased work and do not imply adoption or publication.
   from focused AIPG modules and re-exported by `aipg`.
 - Promoted Domain Pack ownership from `guif.domains` to `aipg.domains`;
   `guif.domains` now delegates to the AIPG registry as a compatibility surface.
+- Promoted Workflow lifecycle execution into AIPG while keeping visual actions
+  and provider-specific behavior outside the Runtime.
 - Clarified that GUIF remains the compatible visual implementation while generic
   responsibilities migrate upward into AIPG incrementally.
 - Updated README, architecture, iteration, and migration-facing documentation to
@@ -34,8 +42,9 @@ unreleased work and do not imply adoption or publication.
 
 - Existing `guif` imports, commands, workflows, schemas, Theme records, Artifact
   records, Domain Pack helpers, and storage conventions remain supported.
-- This candidate does not claim complete scheduler, persistence, provider
-  execution, or semantic review migration.
+- The first executable Runtime is in-memory and synchronous; it does not yet
+  claim durable scheduling, persistent checkpoints, distributed execution,
+  provider execution, or semantic visual review migration.
 
 ## 1.1.0-beta.1 — 2026-07-31
 
