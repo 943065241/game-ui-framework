@@ -100,7 +100,7 @@ def test_codex_plugin_manifest_marketplace_and_bundled_runtime_contract() -> Non
         (ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8")
     )
     assert manifest["name"] == "aipg-framework"
-    assert manifest["version"] == "1.1.0-beta.1-candidate.2"
+    assert manifest["version"] == "1.1.0-beta.1"
     assert manifest["skills"] == "./plugins/game-ui-framework/skills/"
     assert manifest["repository"] == "https://github.com/943065241/game-ui-framework"
     assert manifest["interface"]["displayName"] == "AIPG Framework"

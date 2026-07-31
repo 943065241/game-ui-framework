@@ -1,9 +1,7 @@
-# AIPG 1.1.0-beta.1 Candidate Release Notes
+# AIPG 1.1.0-beta.1 Release Notes
 
-Current candidate iteration: `1.1.0-beta.1-candidate.2`.
-
-This is an isolated Candidate Change. It is not an adopted or published stable
-release.
+Released on 2026-07-31 after formal adoption, repository publication, and
+successful CI.
 
 ## Framework identity
 
@@ -20,7 +18,7 @@ exports a manifest.
 ## Compatibility
 
 The `guif` import, command, Skill, prior workflow schemas, private storage
-variables, and existing records remain supported in the candidate.
+variables, and existing records remain supported.
 
 ## Evidence boundary
 

@@ -3,7 +3,7 @@
 All notable framework changes are recorded here. Candidate entries describe
 unreleased work and do not imply adoption or publication.
 
-## 1.1.0-beta.1-candidate.2 — Unreleased
+## 1.1.0-beta.1 — 2026-07-31
 
 ### Added
 

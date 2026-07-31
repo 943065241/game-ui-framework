@@ -1,6 +1,6 @@
 {
   "name": "aipg-framework",
-  "version": "1.1.0-beta.1-candidate.2",
+  "version": "1.1.0-beta.1",
   "description": "Natural-language Codex front end for governed AI production, with GUIF as the visual-production domain.",
   "repository": "https://github.com/943065241/game-ui-framework",
   "license": "MIT",

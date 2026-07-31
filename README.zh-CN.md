@@ -8,9 +8,9 @@ AIPG 是一个本地优先的 AI 生产工作流与治理框架，负责路由�
 
 ChatGPT / Codex 是默认 Host。图片生成、语义视觉、结构化布局、游戏引擎以及未来的生产能力都是可替换的 Tool 契约，而不是 AIPG Core 的硬编码依赖。
 
-## 候选状态
+## 发布状态
 
-当前分支为 `1.1.0-beta.1-candidate.2`。它是隔离的 Candidate Change，尚未被正式采用或发布。
+`1.1.0-beta.1` 已正式采用并发布。AIPG 成为顶层框架，GUIF 继续作为兼容的视觉生产领域。
 
 - Python 包：`aipg-framework==1.1.0b1`
 - 新导入与命令：`aipg`
@@ -26,7 +26,7 @@ ChatGPT / Codex 是默认 Host。图片生成、语义视觉、结构化布局�
 - [详细用户蓝图与使用地图](docs/AIPG_USER_BLUEPRINT.md)
 - [GUIF 到 AIPG 迁移指南](docs/MIGRATING_GUIF_TO_AIPG.md)
 - [母版引导式分层创作](docs/MASTER_GUIDED_LAYER_WORKFLOW.md)
-- [候选发布说明](docs/RELEASE_NOTES_AIPG_1_1_BETA1_CANDIDATE.md)
+- [发布说明](docs/RELEASE_NOTES_AIPG_1_1_BETA1.md)
 - [既有 GUIF 产品规格](docs/GUIF_PRODUCT_SPEC.md)
 - [Candidate Change 工作流](docs/IMPROVEMENT_WORKFLOW.md)
 - [支持策略](SUPPORT.md)

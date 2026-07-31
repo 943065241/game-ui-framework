@@ -12,10 +12,10 @@ ChatGPT / Codex is the default Host. Image generation, semantic vision, layout
 tools, engines, and future production capabilities are replaceable Tool
 contracts rather than hard-coded Core dependencies.
 
-## Candidate status
+## Release status
 
-This branch is `1.1.0-beta.1-candidate.2`. It is an isolated Candidate Change,
-not an adopted or published stable release.
+Version `1.1.0-beta.1` is formally adopted and published. It establishes AIPG
+as the top-level framework while retaining GUIF as the compatible visual domain.
 
 - Python package: `aipg-framework==1.1.0b1`
 - New import and CLI: `aipg`
@@ -31,7 +31,7 @@ Important documents:
 - [Detailed user blueprint and usage map](docs/AIPG_USER_BLUEPRINT.md)
 - [GUIF-to-AIPG migration](docs/MIGRATING_GUIF_TO_AIPG.md)
 - [Master-guided layer workflow](docs/MASTER_GUIDED_LAYER_WORKFLOW.md)
-- [Candidate release notes](docs/RELEASE_NOTES_AIPG_1_1_BETA1_CANDIDATE.md)
+- [Release notes](docs/RELEASE_NOTES_AIPG_1_1_BETA1.md)
 - [Existing GUIF product specification](docs/GUIF_PRODUCT_SPEC.md)
 - [Candidate Change workflow](docs/IMPROVEMENT_WORKFLOW.md)
 - [Support policy](SUPPORT.md)

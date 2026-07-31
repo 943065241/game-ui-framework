@@ -1,7 +1,7 @@
 # AIPG User Blueprint
 
 > A detailed usage map for AIPG — AI Production & Governance Framework  
-> Document version: `1.1.0-beta.1-candidate.2`  
+> Document version: `1.1.0-beta.1`
 > Applies to: AIPG Core, GUIF Visual Production, Codex Skills, Host/Tool
 > routing, Artifact governance, versioning, publication, recovery, and export
 
@@ -708,7 +708,7 @@ AIPG has several version axes. They must not be collapsed into one number.
 | Version | Example | Governs |
 | --- | --- | --- |
 | Plugin version | `1.1.0-beta.1` | Installed Codex plugin snapshot |
-| Candidate plugin version | `1.1.0-beta.1-candidate.2` | Isolated pre-adoption build |
+| Candidate plugin version | `1.2.0-candidate.1` | Example isolated pre-adoption build |
 | Python package version | `1.1.0b1` | `aipg-framework` distribution |
 | Public API version | `1` | Compatibility surface |
 | Workflow schema | `3` | Workflow manifest structure |
