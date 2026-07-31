@@ -139,7 +139,7 @@ def generate_hash_provenance(
     *,
     git_commit: str,
     output_path: Path | None = None,
-    expected_name: str = "game-ui-framework",
+    expected_name: str = "aipg-framework",
     expected_version: str = __version__,
 ) -> dict[str, Any]:
     root = dist_dir.resolve()

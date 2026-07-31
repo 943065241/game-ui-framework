@@ -1,6 +1,12 @@
-# Codex plugin integration
+# AIPG Codex plugin integration
 
-GUIF includes a skills-only Codex plugin, a root plugin manifest, and a repository marketplace.
+> AIPG is the top-level production and governance framework. GUIF remains its
+> compatible game UI and visual-production Skill. See
+> [MIGRATING_GUIF_TO_AIPG.md](MIGRATING_GUIF_TO_AIPG.md).
+
+AIPG includes a skills-only Codex plugin, a root plugin manifest, and a
+repository marketplace. It exposes both the domain-neutral `$aipg-framework`
+Skill and the compatible `$game-ui-framework` visual Skill.
 
 ## Intended user experience
 

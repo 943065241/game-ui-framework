@@ -20,6 +20,9 @@ class Pipeline:
     source: str = "runtime"
     manager: str | None = None
     steps: tuple[str, ...] = ()
+    domain: str = "visual-production"
+    requires: tuple[str, ...] = ()
+    stages: tuple[str, ...] = ()
 
     @classmethod
     def from_workflow(cls, workflow: WorkflowManifest) -> "Pipeline":
@@ -29,6 +32,9 @@ class Pipeline:
             source=workflow.source,
             manager=workflow.manager,
             steps=workflow.steps,
+            domain=workflow.domain,
+            requires=workflow.requires,
+            stages=workflow.stages,
         )
 
     def to_dict(self) -> dict[str, object]:
@@ -38,6 +44,9 @@ class Pipeline:
             "source": self.source,
             "manager": self.manager,
             "steps": list(self.steps),
+            "domain": self.domain,
+            "requires": list(self.requires),
+            "stages": list(self.stages),
         }
 
     def execute(

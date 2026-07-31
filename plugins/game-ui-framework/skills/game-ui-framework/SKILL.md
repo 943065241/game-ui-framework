@@ -1,9 +1,33 @@
 ---
 name: game-ui-framework
-description: Use GUIF from Codex to create, edit, review, revise, export, and safely improve game UI workflows through natural-language conversation. Trigger for game interface design, UI image generation or editing, private Theme management, source registration, approvals, visual QA, controlled revisions, Candidate Changes, Tool trials, and engine export. Do not trigger for unrelated general coding work.
+description: Use the GUIF visual-production domain of AIPG from Codex to create, edit, review, revise, layer, and export game UI. Trigger for game interface design, master-guided layer creation, UI image generation or editing, private Theme management, source registration, approvals, visual QA, controlled revisions, and engine export. Do not trigger for non-visual production domains.
 ---
 
-# GUIF for Codex
+# GUIF Visual Production for AIPG
+
+GUIF is the visual-production domain of AIPG (AI Production & Governance
+Framework). Preserve the `$game-ui-framework` Skill name as a compatibility
+entry point. Route framework-wide governance and non-visual production through
+the sibling AIPG Skill.
+
+## Master-guided layer creation
+
+When the user wants a master effect image to guide style and layout while AI
+creates reusable layers from bottom to top, select
+`master-guided-layer-creation`.
+
+- Treat the master as style and layout guidance, not a pixel-matching target.
+- Require only functional roles, layout anchors, asset boundaries, protected
+  content, and output contracts as hard constraints.
+- Keep shape details, materials, texture, lighting, and decoration as soft
+  guidance with low, medium, or high creative freedom per layer.
+- Approve the coarse layer plan before production.
+- Give each layer Host work the master, Theme, current composite, completed
+  layers, and future layer roles.
+- Recompose after every layer and perform real semantic visual inspection.
+- A revision to one layer invalidates that layer and downstream composites, not
+  protected earlier layers.
+- Export independent assets, the final composite, and a composition manifest.
 
 Act as the natural-language front end for GUIF. The user talks about the desired game UI or a GUIF workflow problem; you operate the framework internally. Do not make the user install GUIF, copy tokens, type GUIF CLI commands, or reason about private Runtime IDs.
 
@@ -89,7 +113,7 @@ Enter this workflow when the user explicitly says GUIF, the Skill, a workflow, o
    - A supported Tool change applies only to the user-confirmed `task`, `project`, or `workspace` scope and can resolve without a Git release.
    - A Skill, framework, workflow, Theme-policy, provider-routing, or Tool-integration change enters `improvement-publishing-required`. Only now may the source-repository session commit, run CI, open a PR, and merge after checks pass.
 10. After publication, record the repository, branch, PR, merge commit, and minimum plugin version with `improvement-published`.
-11. At `plugin-refresh-required`, tell the user to refresh **Game UI Framework** and start a new Codex session. The current session cannot claim a hot reload. In the new session, confirm the installed version with `improvement-refresh-confirm`.
+11. At `plugin-refresh-required`, tell the user to refresh **AIPG Framework** and start a new Codex session. The current session cannot claim a hot reload. In the new session, confirm the installed version with `improvement-refresh-confirm`.
 12. Reproduce the original scenario. Record `improvement-regression-pass` only after real validation. A failed regression reopens candidate building. Resume the paused production Task only after resolution or explicit candidate rejection.
 
 ## Tool change rules

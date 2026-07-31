@@ -29,6 +29,6 @@ jobs:
       - name: Install built wheel
         run: |
           python -m pip install --force-reinstall dist/*.whl
-          python -c "import guif; assert guif.__version__ == '1.0.0b2'"
+          python -c "import aipg, guif; assert aipg.__version__ == guif.__version__ == '1.1.0b1'"
       - name: CLI contract smoke test
         run: guif-ready contract > /dev/null

@@ -1,6 +1,9 @@
-# GUIF for Codex
+# AIPG for Codex, with GUIF Visual Production
 
-This skills-only Codex plugin turns GUIF into a natural-language game UI production and improvement workflow.
+This skills-only Codex plugin exposes AIPG production governance and the GUIF
+game UI / visual-production domain. `$aipg-framework` handles domain-neutral
+routing and governance; `$game-ui-framework` remains the compatible visual
+entry point.
 
 After one-time installation, a user can say:
 

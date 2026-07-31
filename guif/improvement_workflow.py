@@ -199,7 +199,7 @@ class ConversationWorkflowService(SourceConversationWorkflowService):
                 "检查通过后合并。"
             ),
             "plugin-refresh-required": (
-                "改进已经发布到 GUIF 源仓库。请刷新 Game UI Framework 插件并新建"
+                "改进已经发布到 AIPG 源仓库。请刷新 AIPG Framework 插件并新建"
                 " Codex 会话；旧会话不能假装热更新。"
             ),
             "regression-validation-required": (

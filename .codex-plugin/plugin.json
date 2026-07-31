@@ -1,22 +1,23 @@
 {
-  "name": "game-ui-framework",
-  "version": "1.0.0-beta.3",
-  "description": "Natural-language Codex front end for GUIF production, protected source, Candidate Change, and Tool trial workflows.",
+  "name": "aipg-framework",
+  "version": "1.1.0-beta.1-candidate.2",
+  "description": "Natural-language Codex front end for governed AI production, with GUIF as the visual-production domain.",
   "repository": "https://github.com/943065241/game-ui-framework",
   "license": "MIT",
-  "keywords": ["game-ui", "image-generation", "visual-review", "candidate-change", "tool-trial", "workflow"],
+  "keywords": ["ai-production", "governance", "game-ui", "image-generation", "visual-review", "candidate-change", "workflow"],
   "skills": "./plugins/game-ui-framework/skills/",
   "interface": {
-    "displayName": "Game UI Framework",
-    "shortDescription": "Create, review, and safely improve game UI workflows",
-    "longDescription": "Use GUIF from Codex for private Theme management, protected source registration, approval-gated real image work, semantic visual review, isolated Candidate Changes, Tool trials, controlled revisions, and gated export.",
-    "developerName": "GUIF Contributors",
+    "displayName": "AIPG Framework",
+    "shortDescription": "Govern AI production workflows across pluggable domains",
+    "longDescription": "Use AIPG from Codex for domain-routed production, approvals, protected sources, evidence, Candidate Changes, controlled revisions, and gated export. GUIF remains the visual-production domain.",
+    "developerName": "AIPG Contributors",
     "category": "Productivity",
     "capabilities": ["Read", "Write"],
     "defaultPrompt": [
-      "Use GUIF to create a game UI from my natural-language description.",
-      "Use GUIF to review and revise this game UI image.",
-      "Open a GUIF Candidate Change when I identify a Skill, workflow, framework, or Tool problem."
+      "Use AIPG to route and govern this AI production request.",
+      "Use GUIF to create or revise this game UI.",
+      "Use GUIF Master-Guided Layer Creation to build this interface from bottom to top.",
+      "Open an AIPG Candidate Change when I identify a Skill, workflow, framework, or Tool problem."
     ]
   }
 }

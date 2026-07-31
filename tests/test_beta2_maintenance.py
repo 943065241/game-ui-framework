@@ -46,18 +46,18 @@ class _LegacyImage:
 
 
 def _write_wheel(path: Path, *, version: str = __version__) -> None:
-    metadata = f"Metadata-Version: 2.1\nName: game-ui-framework\nVersion: {version}\n\n"
+    metadata = f"Metadata-Version: 2.1\nName: aipg-framework\nVersion: {version}\n\n"
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr(
-            f"game_ui_framework-{version}.dist-info/METADATA",
+            f"aipg_framework-{version}.dist-info/METADATA",
             metadata,
         )
         archive.writestr("guif/__init__.py", f'__version__ = "{version}"\n')
 
 
 def _write_sdist(path: Path, *, version: str = __version__) -> None:
-    metadata = f"Metadata-Version: 2.1\nName: game-ui-framework\nVersion: {version}\n\n".encode()
-    root = f"game_ui_framework-{version}"
+    metadata = f"Metadata-Version: 2.1\nName: aipg-framework\nVersion: {version}\n\n".encode()
+    root = f"aipg_framework-{version}"
     with tarfile.open(path, "w:gz") as archive:
         canonical = tarfile.TarInfo(f"{root}/PKG-INFO")
         canonical.size = len(metadata)
@@ -65,7 +65,7 @@ def _write_sdist(path: Path, *, version: str = __version__) -> None:
 
         # Setuptools can include this additional copy. Provenance must select
         # only the canonical top-level PKG-INFO member.
-        nested = tarfile.TarInfo(f"{root}/game_ui_framework.egg-info/PKG-INFO")
+        nested = tarfile.TarInfo(f"{root}/aipg_framework.egg-info/PKG-INFO")
         nested.size = len(metadata)
         archive.addfile(nested, io.BytesIO(metadata))
 
@@ -73,8 +73,8 @@ def _write_sdist(path: Path, *, version: str = __version__) -> None:
 def _dist_fixture(tmp_path: Path, *, wheel_version: str = __version__) -> Path:
     dist = tmp_path / "dist"
     dist.mkdir()
-    _write_wheel(dist / f"game_ui_framework-{wheel_version}-py3-none-any.whl", version=wheel_version)
-    _write_sdist(dist / f"game_ui_framework-{__version__}.tar.gz")
+    _write_wheel(dist / f"aipg_framework-{wheel_version}-py3-none-any.whl", version=wheel_version)
+    _write_sdist(dist / f"aipg_framework-{__version__}.tar.gz")
     return dist
 
 
@@ -101,8 +101,8 @@ def test_release_hash_provenance_round_trip(tmp_path: Path) -> None:
     assert generated["attestation_present"] is False
     payload = json.loads(manifest.read_text(encoding="utf-8"))
     assert payload["package"] == {
-        "name": "game-ui-framework",
-        "version": "1.0.0b2",
+        "name": "aipg-framework",
+        "version": "1.1.0b1",
     }
     assert {item["artifact_type"] for item in payload["artifacts"]} == {"wheel", "sdist"}
 

@@ -12,6 +12,7 @@ def test_builtin_workflows_are_valid_and_executable(tmp_path):
     assert {item["id"] for item in items} == {
         "effect-image",
         "framework-evolution",
+        "master-guided-layer-creation",
         "planning",
         "quality-assurance",
         "resource-production",
@@ -24,6 +25,16 @@ def test_builtin_workflows_are_valid_and_executable(tmp_path):
     assert manifest.steps
     assert manifest.agents == ("planner", "director", "theme", "prompt", "qa")
     assert manifest.source == "builtin"
+
+    layered = load_workflow(
+        tmp_path, "unused", "master-guided-layer-creation"
+    )
+    assert layered.schema_version == 3
+    assert layered.domain == "visual-production"
+    assert layered.requires == ("theme", "master-reference")
+    assert layered.creation_direction == "bottom-to-top"
+    assert layered.constraint_policy["pixel_matching"] is False
+    assert "progressive-layer-creation" in layered.stages
 
 
 def test_project_workflow_overrides_builtin_and_drives_plan(tmp_path):

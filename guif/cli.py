@@ -11,11 +11,12 @@ from guif import __version__
 from guif.asset_qa import validate_asset_against_manifest
 from guif.compositor import compose_masked_edit
 from guif.core import create_plan, init_project, project_root, record_memory, validate_project
+from guif.domains import get_domain_pack, list_domain_packs
 from guif.exporter import export_project_assets
 from guif.image_qa import compare_protected_pixels
 from guif.resource import create_resource_manifest, load_resource_manifest, validate_resource_file
-from guif.revision_review import RevisionReviewService
 from guif.runtime import Runtime, ThemeResolutionRequired
+from guif.revision_review import RevisionReviewService
 from guif.theme import validate_theme_file
 from guif.workflow import list_workflows, load_workflow, validate_workflow_file
 
@@ -50,15 +51,18 @@ def _revision_decision_command(sub: argparse._SubParsersAction, name: str, help_
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="guif", description="Game UI Framework CLI")
-    parser.add_argument("--version", action="version", version=f"GUIF {__version__}")
+    parser = argparse.ArgumentParser(
+        prog="aipg",
+        description="AIPG Framework CLI (the guif command remains a compatibility alias)",
+    )
+    parser.add_argument("--version", action="version", version=f"AIPG {__version__}")
     parser.add_argument("--workspace", type=Path, default=Path.cwd(), help="Framework workspace root")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    init_cmd = sub.add_parser("init", help="Create a GUIF project"); init_cmd.add_argument("project")
+    init_cmd = sub.add_parser("init", help="Create an AIPG project"); init_cmd.add_argument("project")
     inspect_cmd = sub.add_parser("inspect", help="Inspect framework or project state without revealing private Theme content"); inspect_cmd.add_argument("project", nargs="?")
     plan_cmd = sub.add_parser("plan", help="Create a private routed plan from a requirement"); plan_cmd.add_argument("requirement"); plan_cmd.add_argument("--project", required=True)
-    run_cmd = sub.add_parser("run", help="Execute and privately persist a requirement through the GUIF runtime"); run_cmd.add_argument("requirement"); run_cmd.add_argument("--project", required=True); run_cmd.add_argument("--pipeline", default="ui-production"); run_cmd.add_argument("--conversation-id"); run_cmd.add_argument("--continue-unbound", action="store_true")
+    run_cmd = sub.add_parser("run", help="Execute and privately persist a requirement through the AIPG runtime"); run_cmd.add_argument("requirement"); run_cmd.add_argument("--project", required=True); run_cmd.add_argument("--pipeline", default="ui-production"); run_cmd.add_argument("--conversation-id"); run_cmd.add_argument("--continue-unbound", action="store_true")
     run_list_cmd = sub.add_parser("run-list", help="List persisted private runtime task runs"); run_list_cmd.add_argument("--project", required=True)
     run_show_cmd = sub.add_parser("run-show", help="Show a persisted runtime task"); run_show_cmd.add_argument("task_id"); run_show_cmd.add_argument("--project", required=True)
     run_resume_cmd = sub.add_parser("run-resume", help="Resume a failed or interrupted runtime task"); run_resume_cmd.add_argument("task_id"); run_resume_cmd.add_argument("--project", required=True)
@@ -124,6 +128,8 @@ def build_parser() -> argparse.ArgumentParser:
     workflow_list = sub.add_parser("workflow-list", help="List built-in and project workflows"); workflow_list.add_argument("--project")
     workflow_show = sub.add_parser("workflow-show", help="Show a workflow manifest"); workflow_show.add_argument("workflow_id"); workflow_show.add_argument("--project", required=True)
     workflow_validate = sub.add_parser("workflow-validate", help="Validate a workflow JSON file"); workflow_validate.add_argument("path", type=Path)
+    sub.add_parser("domain-list", help="List registered AIPG production domains")
+    domain_show = sub.add_parser("domain-show", help="Show one AIPG production domain"); domain_show.add_argument("domain_id")
     resource_create = sub.add_parser("resource-create", help="Create a production resource manifest"); resource_create.add_argument("resource_id"); resource_create.add_argument("resource_type"); resource_create.add_argument("width", type=int); resource_create.add_argument("height", type=int); resource_create.add_argument("file_format"); resource_create.add_argument("--project", required=True); resource_create.add_argument("--target-engine", default="generic"); resource_create.add_argument("--output-name"); resource_create.add_argument("--source"); resource_create.add_argument("--alpha", action=argparse.BooleanOptionalAction, default=True); resource_create.add_argument("--import-settings", default="{}")
     resource_validate = sub.add_parser("resource-validate", help="Validate a production resource manifest"); resource_validate.add_argument("path", type=Path)
     resource_show = sub.add_parser("resource-show", help="Show a normalized resource manifest"); resource_show.add_argument("path", type=Path)
@@ -144,9 +150,9 @@ def main(argv: list[str] | None = None) -> int:
             if args.project:
                 root = project_root(workspace, args.project); config_path = root / "project.json"
                 if not config_path.exists(): raise FileNotFoundError(f"Unknown project: {args.project}")
-                payload = {"root": str(root), "private_data_root": str(runtime.store.private_root()), "config": json.loads(config_path.read_text(encoding="utf-8")), "run_count": len(runtime.list_runs(args.project)), "private_theme_binding": runtime.theme_store.get_binding("project", args.project), "resources": sorted(path.name for path in (root / "production-assets").glob("*.resource.json")), "workflows": list_workflows(workspace, args.project)}
+                payload = {"root": str(root), "private_data_root": str(runtime.store.private_root()), "config": json.loads(config_path.read_text(encoding="utf-8")), "run_count": len(runtime.list_runs(args.project)), "private_theme_binding": runtime.theme_store.get_binding("project", args.project), "resources": sorted(path.name for path in (root / "production-assets").glob("*.resource.json")), "domains": list_domain_packs(), "workflows": list_workflows(workspace, args.project)}
             else:
-                projects_dir = workspace / "projects"; payload = {"version": __version__, "workspace": str(workspace), "private_data_root": str(runtime.store.private_root()), "projects": sorted(path.name for path in projects_dir.iterdir() if path.is_dir()) if projects_dir.exists() else [], "workflows": list_workflows(workspace)}
+                projects_dir = workspace / "projects"; payload = {"version": __version__, "workspace": str(workspace), "private_data_root": str(runtime.store.private_root()), "projects": sorted(path.name for path in projects_dir.iterdir() if path.is_dir()) if projects_dir.exists() else [], "domains": list_domain_packs(), "workflows": list_workflows(workspace)}
             _json(payload); return 0
         if args.command == "plan": print(create_plan(workspace, args.project, args.requirement)); return 0
         if args.command == "run": _json(runtime.run(args.project, args.requirement, pipeline=args.pipeline, conversation_id=args.conversation_id, continue_unbound=args.continue_unbound).to_dict()); return 0
@@ -229,6 +235,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "record": print(record_memory(workspace, args.project, args.memory_type, args.message)); return 0
         if args.command == "workflow-list": _json(list_workflows(workspace, args.project)); return 0
         if args.command == "workflow-show": _json(load_workflow(workspace, args.project, args.workflow_id).to_dict()); return 0
+        if args.command == "domain-list": _json(list_domain_packs()); return 0
+        if args.command == "domain-show": _json(get_domain_pack(args.domain_id).to_dict()); return 0
         if args.command == "workflow-validate":
             errors = validate_workflow_file(args.path)
             if errors:

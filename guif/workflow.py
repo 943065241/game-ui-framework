@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 REQUIRED_FIELDS = ("schema_version", "id", "name", "manager", "steps")
-SUPPORTED_SCHEMA_VERSIONS = {1, 2}
+SUPPORTED_SCHEMA_VERSIONS = {1, 2, 3}
 
 LEGACY_MANAGER_AGENTS: dict[str, tuple[str, ...]] = {
     "UI Director": ("planner", "director", "theme", "prompt", "qa"),
@@ -17,6 +17,52 @@ LEGACY_MANAGER_AGENTS: dict[str, tuple[str, ...]] = {
 }
 
 BUILTIN_WORKFLOWS: dict[str, dict[str, object]] = {
+    "master-guided-layer-creation": {
+        "schema_version": 3,
+        "id": "master-guided-layer-creation",
+        "name": "Master-Guided Layer Creation",
+        "domain": "visual-production",
+        "manager": "UI Director",
+        "agents": ["planner", "director", "theme", "resource", "prompt", "qa", "export"],
+        "requires": ["theme", "master-reference"],
+        "creation_direction": "bottom-to-top",
+        "stages": [
+            "master-approval",
+            "layer-analysis",
+            "layer-plan-approval",
+            "progressive-layer-creation",
+            "recomposition-review",
+            "final-approval",
+            "engine-export",
+        ],
+        "constraint_policy": {
+            "master_role": "style-and-layout-guidance",
+            "pixel_matching": False,
+            "creative_freedom": "adaptive",
+            "hard_constraints": [
+                "functional role",
+                "layout anchors",
+                "asset boundary",
+                "output contract",
+            ],
+            "soft_guidance": [
+                "shape details",
+                "materials",
+                "texture",
+                "lighting",
+                "decorative interpretation",
+            ],
+        },
+        "steps": [
+            "Confirm the Theme and master effect image as style and layout guidance",
+            "Analyze a coarse semantic layer plan and assign adaptive creative freedom",
+            "Approve the layer plan without requiring pixel matching",
+            "Create layers from bottom to top using the master and current composite",
+            "Recompose and perform semantic visual review after each layer",
+            "Revise only the affected layer and its downstream composites",
+            "Approve and export independent assets plus the composition manifest",
+        ],
+    },
     "ui-production": {
         "schema_version": 2,
         "id": "ui-production",
@@ -123,6 +169,11 @@ class WorkflowManifest:
     steps: tuple[str, ...]
     agents: tuple[str, ...]
     source: str
+    domain: str = "visual-production"
+    requires: tuple[str, ...] = ()
+    stages: tuple[str, ...] = ()
+    creation_direction: str | None = None
+    constraint_policy: dict[str, object] | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -133,6 +184,11 @@ class WorkflowManifest:
             "steps": list(self.steps),
             "agents": list(self.agents),
             "source": self.source,
+            "domain": self.domain,
+            "requires": list(self.requires),
+            "stages": list(self.stages),
+            "creation_direction": self.creation_direction,
+            "constraint_policy": dict(self.constraint_policy or {}),
         }
 
 
@@ -164,13 +220,25 @@ def validate_workflow_data(data: object) -> list[str]:
             errors.append(f"Missing field: {field}")
     schema_version = data.get("schema_version")
     if schema_version not in SUPPORTED_SCHEMA_VERSIONS:
-        errors.append("schema_version must be 1 or 2")
+        errors.append("schema_version must be 1, 2, or 3")
     for field in ("id", "name", "manager"):
         value = data.get(field)
         if not isinstance(value, str) or not value.strip():
             errors.append(f"{field} must be a non-empty string")
     errors.extend(_validate_string_list(data, "steps", required=True))
     errors.extend(_validate_string_list(data, "agents", required=schema_version == 2, unique=True))
+    if schema_version == 3:
+        errors.extend(_validate_string_list(data, "agents", required=True, unique=True))
+        errors.extend(_validate_string_list(data, "requires", required=True, unique=True))
+        errors.extend(_validate_string_list(data, "stages", required=True, unique=True))
+        if not isinstance(data.get("domain"), str) or not str(data.get("domain")).strip():
+            errors.append("domain must be a non-empty string")
+        if data.get("creation_direction") not in {"bottom-to-top", "top-to-bottom", "unordered"}:
+            errors.append(
+                "creation_direction must be bottom-to-top, top-to-bottom, or unordered"
+            )
+        if not isinstance(data.get("constraint_policy"), dict):
+            errors.append("constraint_policy must be an object")
     return errors
 
 
@@ -196,14 +264,33 @@ def _to_manifest(data: dict[str, object], source: str) -> WorkflowManifest:
     errors = validate_workflow_data(data)
     if errors:
         raise ValueError("Invalid workflow manifest: " + "; ".join(errors))
+    workflow_id = str(data["id"])
+    domain = data.get("domain")
+    if not isinstance(domain, str) or not domain:
+        from guif.domains import domain_for_workflow
+
+        domain = domain_for_workflow(workflow_id)
     return WorkflowManifest(
         schema_version=int(data["schema_version"]),
-        workflow_id=str(data["id"]),
+        workflow_id=workflow_id,
         name=str(data["name"]),
         manager=str(data["manager"]),
         steps=tuple(str(step) for step in data["steps"]),
         agents=_resolve_agents(data),
         source=source,
+        domain=domain,
+        requires=tuple(str(item) for item in data.get("requires", [])),
+        stages=tuple(str(item) for item in data.get("stages", [])),
+        creation_direction=(
+            str(data["creation_direction"])
+            if data.get("creation_direction") is not None
+            else None
+        ),
+        constraint_policy=(
+            dict(data["constraint_policy"])
+            if isinstance(data.get("constraint_policy"), dict)
+            else None
+        ),
     )
 
 
@@ -228,6 +315,7 @@ def list_workflows(workspace: Path, project: str | None = None) -> list[dict[str
             "schema_version": int(data["schema_version"]),
             "agents": list(_resolve_agents(data)),
             "source": "builtin",
+            "domain": _to_manifest(data, "builtin").domain,
         }
         for workflow_id, data in sorted(BUILTIN_WORKFLOWS.items())
     ]
@@ -247,6 +335,7 @@ def list_workflows(workspace: Path, project: str | None = None) -> list[dict[str
                         "schema_version": manifest.schema_version,
                         "agents": list(manifest.agents),
                         "source": manifest.source,
+                        "domain": manifest.domain,
                     }
             items = sorted(by_id.values(), key=lambda item: str(item["id"]))
     return items
