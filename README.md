@@ -21,6 +21,7 @@ Canonical project documents:
 - [Architecture](docs/AIPG_ARCHITECTURE.md)
 - [Workflow Runtime](docs/AIPG_WORKFLOW_RUNTIME.md)
 - [Changelog](CHANGELOG.md)
+- [Contribution policy](CONTRIBUTING.md)
 - [GUIF migration](docs/MIGRATING_GUIF_TO_AIPG.md)
 
 ## Architecture
