@@ -8,16 +8,12 @@ AIPG is a local-first framework for routing, executing, reviewing, revising,
 and exporting AI production through explicit governance. GUIF remains the game
 UI and visual-production Domain Pack.
 
-ChatGPT / Codex is the default Host. Image generation, semantic vision, layout
-tools, engines, and future production capabilities are replaceable Tool
-contracts rather than hard-coded dependencies.
-
 ## Current iteration
 
-- Development version: `1.1.0-dev.6`
+- Development version: `1.1.0-dev.7`
 - Last updated: `2026-07-31`
 - Branch policy: direct commits to `main`
-- Latest milestone: recoverable Workflow Runtime and Capability execution
+- Latest milestone: Tool Runtime v2 governance
 
 Completed in the current development line:
 
@@ -28,9 +24,13 @@ Completed in the current development line:
 - CheckpointStore persistence boundary
 - deterministic checkpoint restore and resume
 - Capability → ToolAdapter → Provider execution
+- Tool health and configuration validation
+- standard Tool errors and execution results
+- timeout, retry and provider fallback policies
 
 Next planned milestones:
 
+- first real Provider Adapter
 - scheduler and durable execution queue
 - Artifact lifecycle runtime and dependency graph
 - GUIF Workflow migration onto the AIPG Runtime
@@ -73,22 +73,10 @@ AIPG
 ├─ events.py           runtime event delivery
 ├─ context.py          project and standalone lifecycle
 ├─ artifacts.py        Artifact identity, status, ancestry, lineage
-├─ capabilities.py     capability routing and Tool adapter execution
+├─ capabilities.py     governed capability routing and Tool execution
 └─ domains/
    └─ visual.py        GUIF Visual Production registration
-
-GUIF compatibility implementation
-├─ existing workflows and CLIs
-├─ Theme and visual context
-├─ visual Artifact semantics
-├─ visual review and exporters
-└─ adapters for external visual Tools
 ```
-
-The current refactor promotes generic responsibilities from the working GUIF
-implementation into focused AIPG modules. Existing `guif` APIs remain available
-while orchestration, Artifact, context, and capability contracts move upward
-incrementally.
 
 AIPG does not need to understand buttons, image alpha, Theme, masks, or visual
 layers. Those concepts belong to GUIF. Future code, document, video, audio, and
@@ -104,11 +92,29 @@ Workflow
 → Subworkflow
 → Stage or control node
 → Action
-→ Tool invocation
+→ CapabilityRequirement
+→ ToolRegistry
+→ ToolAdapter
+→ Provider
 ```
 
-Parents wait while child workflows execute, then resume with declared child
-results. Workflow status and Artifact status are independent.
+## Tool Runtime governance
+
+Tool adapters expose provider-neutral capabilities, configuration requirements,
+health checks and execution handlers. The registry selects only available
+adapters and applies deterministic priority routing.
+
+Execution policies support:
+
+- timeout boundaries
+- bounded retries for retryable errors
+- deterministic provider fallback
+- fallback opt-out
+- standard execution result metadata
+- explicit unavailable, configuration, authentication and timeout errors
+
+AIPG does not claim Tool availability until credentials, permissions, billing,
+data flow and health checks are configured.
 
 ## Context modes
 
@@ -118,22 +124,6 @@ results. Workflow status and Artifact status are independent.
   image layering, or effect-image generation.
 
 Figma is a Tool and structured design environment, not another lifecycle mode.
-
-## Capability routing
-
-Workflows request stable capabilities instead of providers.
-
-```text
-CapabilityRequirement
-→ ToolRegistry
-→ compatible ToolAdapter
-→ provider execution
-```
-
-GUIF can register adapters for image generation, editing, segmentation, OCR,
-vision, Figma, composition, visual diff, and engine export. AIPG does not claim
-Tool availability until credentials, permissions, billing, and data flow are
-configured.
 
 ## Development
 
