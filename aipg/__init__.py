@@ -29,6 +29,8 @@ from .domains import (
     get_domain_pack,
     list_domain_packs,
 )
+from .engine import ActionHandler, WorkflowEngine, WorkflowRun
+from .events import EventBus, EventHandler, RuntimeEvent
 from .runtime import (
     NodeKind,
     WorkflowDefinition,
@@ -42,6 +44,7 @@ from .runtime import (
 DomainPack = DomainPackDefinition
 
 __all__ = [
+    "ActionHandler",
     "ArtifactRecord",
     "ArtifactRegistry",
     "ArtifactStatus",
@@ -51,15 +54,20 @@ __all__ = [
     "DomainPack",
     "DomainPackDefinition",
     "DomainRegistry",
+    "EventBus",
+    "EventHandler",
     "FRAMEWORK_GOVERNANCE_DOMAIN",
     "GUIF_VISUAL_DOMAIN",
     "NodeKind",
     "ProductionRequest",
+    "RuntimeEvent",
     "ToolAdapter",
     "ToolRegistry",
     "WorkflowDefinition",
+    "WorkflowEngine",
     "WorkflowFrame",
     "WorkflowNode",
+    "WorkflowRun",
     "WorkflowStack",
     "WorkflowStatus",
     "__version__",
