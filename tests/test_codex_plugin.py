@@ -132,16 +132,42 @@ def test_codex_plugin_manifest_marketplace_and_bundled_runtime_contract() -> Non
     assert "GUIF is its game UI and visual-production domain" in aipg_skill
     assert "Theme confirmation" in aipg_skill
 
-    blueprint = (ROOT / "docs" / "AIPG_USER_BLUEPRINT.md").read_text(
+    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    assert version == "1.1.0-dev.11"
+
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert version in readme
+    assert "Current implementation status" in readme
+    assert "Workflow Runtime" in readme
+
+    project_status = (ROOT / "docs" / "PROJECT_STATUS.md").read_text(
         encoding="utf-8"
     )
-    assert "## 5. Skill map" in blueprint
-    assert "## 6. Tool and capability map" in blueprint
-    assert "## 10. Version governance" in blueprint
-    assert "master-guided-layer-creation" in blueprint
-    assert "`chatgpt-image`" in blueprint
-    assert "`chatgpt-vision`" in blueprint
-    assert "`dry-run`" in blueprint
+    assert version in project_status
+    assert "Implemented runtime capabilities" in project_status
+    assert "Explicit limitations" in project_status
+
+    architecture = (ROOT / "docs" / "AIPG_ARCHITECTURE.md").read_text(
+        encoding="utf-8"
+    )
+    assert "AIPG" in architecture
+    assert "GUIF" in architecture
+    assert "ToolRegistry" in architecture
+
+    runtime = (ROOT / "docs" / "AIPG_WORKFLOW_RUNTIME.md").read_text(
+        encoding="utf-8"
+    )
+    assert "RecoverableWorkflowEngine" in runtime
+    assert "CheckpointStore" in runtime
+    assert "ToolRegistry" in runtime
+
+    contributing = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
+    assert "VERSION" in contributing
+    assert "main" in contributing
+
+    roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+    assert version in roadmap
+    assert "Provider Adapter" in roadmap
 
 
 def test_codex_bridge_compiles() -> None:
