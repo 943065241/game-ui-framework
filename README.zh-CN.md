@@ -8,11 +8,11 @@ AIPG 是通用 AI 生产运行时。GUIF 是它的视觉生产 Domain Pack 与�
 
 ## 项目状态
 
-- 开发版本：[`1.1.0-dev.10`](VERSION)
+- 开发版本：[`1.1.0-dev.11`](VERSION)
 - 已发布包：`aipg-framework==1.1.0b1`
 - 分支策略：直接提交到 `main`
 - 最近验证基线：`1.1.0-dev.8` 已通过 Python 3.10、3.11、3.12 CI
-- 当前重点：整理仓库并统一文档事实来源
+- 当前重点：首个真实 Provider Adapter 与执行链路集成
 
 权威项目文档：
 
