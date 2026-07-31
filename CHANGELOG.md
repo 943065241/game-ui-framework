@@ -3,6 +3,36 @@
 All notable framework changes are recorded here. Candidate entries describe
 unreleased work and do not imply adoption or publication.
 
+## Unreleased — AIPG runtime refactor
+
+### Added
+
+- Focused `aipg.runtime`, `aipg.context`, `aipg.artifacts`, and
+  `aipg.capabilities` contracts.
+- Finite nested Workflow stack, child Workflow reference validation, and
+  provider-neutral Tool adapter resolution.
+- Generic Artifact lineage and GUIF Visual Production Domain Pack declaration.
+- Contract tests for nested workflows, lifecycle modes, capability matching,
+  and Artifact ancestry.
+
+### Changed
+
+- Refactored the existing AIPG implementation directly instead of introducing
+  a parallel framework or replacement Core.
+- Removed the experimental monolithic `aipg.core`; stable contracts are exported
+  from focused AIPG modules and re-exported by `aipg`.
+- Clarified that GUIF remains the compatible visual implementation while generic
+  responsibilities migrate upward into AIPG incrementally.
+- Updated README, architecture, iteration, and migration-facing documentation to
+  describe the compatibility-preserving strangler refactor.
+
+### Compatibility
+
+- Existing `guif` imports, commands, workflows, schemas, Theme records, Artifact
+  records, and storage conventions remain supported.
+- This candidate does not claim complete scheduler, persistence, provider
+  execution, or semantic review migration.
+
 ## 1.1.0-beta.1 — 2026-07-31
 
 ### Added
