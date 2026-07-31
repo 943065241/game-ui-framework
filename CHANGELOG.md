@@ -12,8 +12,10 @@ unreleased work and do not imply adoption or publication.
 - Finite nested Workflow stack, child Workflow reference validation, and
   provider-neutral Tool adapter resolution.
 - Generic Artifact lineage and GUIF Visual Production Domain Pack declaration.
+- Authoritative `aipg.domains.DomainRegistry` with built-in visual-production
+  and framework-governance registrations.
 - Contract tests for nested workflows, lifecycle modes, capability matching,
-  and Artifact ancestry.
+  Artifact ancestry, domain ownership, serialization, and compatibility aliases.
 
 ### Changed
 
@@ -21,6 +23,8 @@ unreleased work and do not imply adoption or publication.
   a parallel framework or replacement Core.
 - Removed the experimental monolithic `aipg.core`; stable contracts are exported
   from focused AIPG modules and re-exported by `aipg`.
+- Promoted Domain Pack ownership from `guif.domains` to `aipg.domains`;
+  `guif.domains` now delegates to the AIPG registry as a compatibility surface.
 - Clarified that GUIF remains the compatible visual implementation while generic
   responsibilities migrate upward into AIPG incrementally.
 - Updated README, architecture, iteration, and migration-facing documentation to
@@ -29,7 +33,7 @@ unreleased work and do not imply adoption or publication.
 ### Compatibility
 
 - Existing `guif` imports, commands, workflows, schemas, Theme records, Artifact
-  records, and storage conventions remain supported.
+  records, Domain Pack helpers, and storage conventions remain supported.
 - This candidate does not claim complete scheduler, persistence, provider
   execution, or semantic review migration.
 
