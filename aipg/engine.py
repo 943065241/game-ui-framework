@@ -4,11 +4,20 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping
 from uuid import uuid4
 
+from .checkpoints import CheckpointStore, InMemoryCheckpointStore
 from .events import EventBus, RuntimeEvent
-from .runtime import WorkflowDefinition, WorkflowFrame, WorkflowStack, WorkflowStatus
+from .runtime import (
+    NodeKind,
+    WorkflowDefinition,
+    WorkflowFrame,
+    WorkflowNode,
+    WorkflowStack,
+    WorkflowStatus,
+)
 
 
 ActionHandler = Callable[[WorkflowFrame, Mapping[str, Any]], Mapping[str, Any] | None]
+ConditionHandler = Callable[[WorkflowFrame], bool]
 
 
 _ALLOWED_TRANSITIONS: dict[WorkflowStatus, frozenset[WorkflowStatus]] = {
@@ -34,7 +43,12 @@ _ALLOWED_TRANSITIONS: dict[WorkflowStatus, frozenset[WorkflowStatus]] = {
         {WorkflowStatus.RUNNING, WorkflowStatus.CANCELLED}
     ),
     WorkflowStatus.REVIEWING: frozenset(
-        {WorkflowStatus.REVISING, WorkflowStatus.COMPLETED, WorkflowStatus.FAILED}
+        {
+            WorkflowStatus.RUNNING,
+            WorkflowStatus.REVISING,
+            WorkflowStatus.COMPLETED,
+            WorkflowStatus.FAILED,
+        }
     ),
     WorkflowStatus.REVISING: frozenset(
         {WorkflowStatus.RUNNING, WorkflowStatus.FAILED, WorkflowStatus.CANCELLED}
@@ -67,17 +81,23 @@ class WorkflowRun:
 
 
 class WorkflowEngine:
-    """Domain-neutral workflow lifecycle engine.
+    """Domain-neutral workflow graph and lifecycle engine.
 
-    This first executable runtime deliberately owns lifecycle, retries,
-    checkpoints and events, but does not embed provider or visual-domain logic.
-    Domain packs bind actions through ``register_action``.
+    Domain packs register actions and conditions. The engine owns graph traversal,
+    nested workflow stack handling, lifecycle transitions, events and checkpoints.
+    Provider and domain-specific behavior remains outside the runtime.
     """
 
-    def __init__(self, event_bus: EventBus | None = None) -> None:
+    def __init__(
+        self,
+        event_bus: EventBus | None = None,
+        checkpoint_store: CheckpointStore | None = None,
+    ) -> None:
         self.event_bus = event_bus or EventBus()
+        self.checkpoint_store = checkpoint_store or InMemoryCheckpointStore()
         self._definitions: dict[str, WorkflowDefinition] = {}
         self._actions: dict[str, ActionHandler] = {}
+        self._conditions: dict[str, ConditionHandler] = {}
         self._runs: dict[str, WorkflowRun] = {}
 
     def register_workflow(self, definition: WorkflowDefinition) -> None:
@@ -91,14 +111,15 @@ class WorkflowEngine:
             raise ValueError(f"Action already registered: {action_id}")
         self._actions[action_id] = handler
 
+    def register_condition(self, condition_id: str, handler: ConditionHandler) -> None:
+        if condition_id in self._conditions:
+            raise ValueError(f"Condition already registered: {condition_id}")
+        self._conditions[condition_id] = handler
+
     def create_run(
         self, workflow_id: str, inputs: Mapping[str, Any] | None = None
     ) -> WorkflowRun:
-        try:
-            definition = self._definitions[workflow_id]
-        except KeyError as exc:
-            raise ValueError(f"Unknown workflow: {workflow_id}") from exc
-
+        definition = self._definition(workflow_id)
         supplied = dict(inputs or {})
         missing = [name for name in definition.inputs if name not in supplied]
         if missing:
@@ -119,6 +140,31 @@ class WorkflowEngine:
         )
         self._runs[run.run_id] = run
         self._emit(run, "workflow.created")
+        return run
+
+    def execute(self, run_id: str) -> WorkflowRun:
+        """Execute the registered graph until completion or a wait/failure state."""
+
+        run = self.get_run(run_id)
+        if run.status is WorkflowStatus.PENDING:
+            self.start(run_id)
+        elif run.status is not WorkflowStatus.RUNNING:
+            raise RuntimeError("Workflow must be pending or running before execution")
+
+        try:
+            self._execute_node(run, run.definition, run.definition.root)
+        except Exception as exc:
+            if run.status not in {WorkflowStatus.FAILED, WorkflowStatus.CANCELLED}:
+                self.fail(run_id, exc)
+            raise
+
+        if run.status is WorkflowStatus.RUNNING:
+            outputs = {
+                name: run.frame.local_context[name]
+                for name in run.definition.outputs
+                if name in run.frame.local_context
+            }
+            self.complete(run_id, outputs)
         return run
 
     def start(self, run_id: str) -> WorkflowRun:
@@ -210,18 +256,96 @@ class WorkflowEngine:
         self._transition(run, WorkflowStatus.RUNNING)
         run.frame.local_context.update(result)
         self._checkpoint(run, f"action:{action_id}")
-        self._emit(
-            run,
-            "action.completed",
-            {"action_id": action_id, "result": result},
-        )
+        self._emit(run, "action.completed", {"action_id": action_id, "result": result})
         return result
+
+    def latest_checkpoint(self, run_id: str) -> dict[str, Any] | None:
+        self.get_run(run_id)
+        return self.checkpoint_store.latest(run_id)
 
     def get_run(self, run_id: str) -> WorkflowRun:
         try:
             return self._runs[run_id]
         except KeyError as exc:
             raise ValueError(f"Unknown workflow run: {run_id}") from exc
+
+    def _execute_node(
+        self,
+        run: WorkflowRun,
+        definition: WorkflowDefinition,
+        node: WorkflowNode,
+    ) -> None:
+        run.frame.current_node_id = node.node_id
+        self._emit(run, "node.started", {"node_id": node.node_id, "kind": node.kind.value})
+
+        if node.kind in {NodeKind.SEQUENCE, NodeKind.PARALLEL}:
+            for child in node.children:
+                self._execute_node(run, definition, child)
+        elif node.kind is NodeKind.SELECTOR:
+            last_error: Exception | None = None
+            for child in node.children:
+                try:
+                    self._execute_node(run, definition, child)
+                    last_error = None
+                    break
+                except Exception as exc:
+                    last_error = exc
+            if last_error is not None:
+                raise last_error
+        elif node.kind is NodeKind.CONDITION:
+            condition_id = node.condition or ""
+            try:
+                matched = bool(self._conditions[condition_id](run.frame))
+            except KeyError as exc:
+                raise ValueError(f"Unknown condition: {condition_id}") from exc
+            branch_index = 0 if matched else 1
+            if branch_index < len(node.children):
+                self._execute_node(run, definition, node.children[branch_index])
+        elif node.kind is NodeKind.ACTION:
+            self.execute_action(run.run_id, node.action_id or "", node.policy)
+        elif node.kind is NodeKind.SUBWORKFLOW:
+            self._execute_subworkflow(run, node.workflow_id or "")
+        elif node.kind is NodeKind.APPROVAL:
+            self.pause(run.run_id, node.policy.get("reason", node.node_id))
+        elif node.kind is NodeKind.REVIEW:
+            self._transition(run, WorkflowStatus.REVIEWING)
+            for child in node.children:
+                self._execute_node(run, definition, child)
+            if run.status is WorkflowStatus.REVIEWING:
+                self._transition(run, WorkflowStatus.RUNNING)
+        else:
+            raise ValueError(f"Unsupported workflow node kind: {node.kind}")
+
+        self._emit(run, "node.completed", {"node_id": node.node_id, "kind": node.kind.value})
+
+    def _execute_subworkflow(self, run: WorkflowRun, workflow_id: str) -> None:
+        child_definition = self._definition(workflow_id)
+        parent_frame = run.frame
+        self._transition(run, WorkflowStatus.WAITING_FOR_CHILD)
+        child_frame = WorkflowFrame(
+            workflow_id=workflow_id,
+            current_node_id=child_definition.root.node_id,
+            status=WorkflowStatus.RUNNING,
+            local_context=dict(parent_frame.local_context),
+        )
+        run.stack.push(child_frame)
+        self._emit(run, "workflow.child_started", {"child_workflow_id": workflow_id})
+        try:
+            self._execute_node(run, child_definition, child_definition.root)
+            child_result = dict(run.frame.local_context)
+        finally:
+            run.stack.pop()
+        parent_frame.status = WorkflowStatus.RUNNING
+        parent_frame.child_result = child_result
+        parent_frame.local_context.update(child_result)
+        self._checkpoint(run, f"child:{workflow_id}")
+        self._emit(run, "workflow.child_completed", {"child_workflow_id": workflow_id})
+
+    def _definition(self, workflow_id: str) -> WorkflowDefinition:
+        try:
+            return self._definitions[workflow_id]
+        except KeyError as exc:
+            raise ValueError(f"Unknown workflow: {workflow_id}") from exc
 
     def _transition(self, run: WorkflowRun, target: WorkflowStatus) -> None:
         current = run.status
@@ -235,15 +359,17 @@ class WorkflowEngine:
         )
 
     def _checkpoint(self, run: WorkflowRun, reason: str) -> None:
-        run.frame.checkpoints.append(
-            {
-                "reason": reason,
-                "status": run.status.value,
-                "current_node_id": run.frame.current_node_id,
-                "retry_count": run.frame.retry_count,
-                "local_context": dict(run.frame.local_context),
-            }
-        )
+        checkpoint = {
+            "reason": reason,
+            "status": run.status.value,
+            "workflow_id": run.frame.workflow_id,
+            "current_node_id": run.frame.current_node_id,
+            "retry_count": run.frame.retry_count,
+            "stack_depth": len(run.stack.frames),
+            "local_context": dict(run.frame.local_context),
+        }
+        run.frame.checkpoints.append(checkpoint)
+        self.checkpoint_store.save(run.run_id, checkpoint)
 
     def _emit(
         self,
@@ -254,7 +380,7 @@ class WorkflowEngine:
         self.event_bus.publish(
             RuntimeEvent(
                 event_type=event_type,
-                workflow_id=run.definition.workflow_id,
+                workflow_id=run.frame.workflow_id,
                 run_id=run.run_id,
                 payload=dict(payload or {}),
             )
