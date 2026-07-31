@@ -10,10 +10,10 @@ UI and visual-production Domain Pack.
 
 ## Current iteration
 
-- Development version: `1.1.0-dev.7`
+- Development version: `1.1.0-dev.8`
 - Last updated: `2026-07-31`
 - Branch policy: direct commits to `main`
-- Latest milestone: Tool Runtime v2 governance
+- Latest milestone: Tool Runtime v2.1 compatibility fix
 
 Completed in the current development line:
 
@@ -27,6 +27,7 @@ Completed in the current development line:
 - Tool health and configuration validation
 - standard Tool errors and execution results
 - timeout, retry and provider fallback policies
+- backward-compatible capability-only Tool discovery
 
 Next planned milestones:
 
@@ -100,9 +101,10 @@ Workflow
 
 ## Tool Runtime governance
 
-Tool adapters expose provider-neutral capabilities, configuration requirements,
-health checks and execution handlers. The registry selects only available
-adapters and applies deterministic priority routing.
+`resolve()` remains a backward-compatible capability and feature discovery API.
+Health, configuration, retry, timeout and fallback governance are applied when a
+Tool is executed. Callers that explicitly need executable adapters can request
+`available_only=True`.
 
 Execution policies support:
 
