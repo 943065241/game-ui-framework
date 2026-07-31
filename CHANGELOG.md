@@ -23,10 +23,14 @@ unreleased work and do not imply adoption or publication.
   to the parent frame.
 - Persistence-neutral `CheckpointStore` protocol and default
   `InMemoryCheckpointStore`.
+- `RecoverableWorkflowEngine` with schema-versioned stack snapshots,
+  deterministic completed-node cursors and checkpoint restoration.
+- Capability execution through prioritized `ToolAdapter` selection without
+  exposing provider identity to Workflow definitions.
 - Domain-neutral synchronous `EventBus` and lifecycle events for Workflows,
-  nodes, actions, child Workflows and reviews.
+  nodes, actions, capabilities, child Workflows and reviews.
 - Contract tests for lifecycle, graph traversal, conditions, nested Workflows,
-  approval pauses, checkpoint storage, Domain Packs, capabilities and Artifacts.
+  recovery, capability execution, approval pauses, Domain Packs and Artifacts.
 
 ### Changed
 
@@ -36,8 +40,8 @@ unreleased work and do not imply adoption or publication.
   from focused AIPG modules and re-exported by `aipg`.
 - Promoted Domain Pack ownership from `guif.domains` to `aipg.domains`;
   `guif.domains` now delegates to the AIPG registry as a compatibility surface.
-- Promoted Workflow lifecycle and graph execution into AIPG while keeping visual
-  actions and provider-specific behavior outside the Runtime.
+- Promoted Workflow lifecycle, graph execution, recovery and capability routing
+  into AIPG while keeping visual behavior outside the Runtime.
 - Clarified that GUIF remains the compatible visual implementation while generic
   responsibilities migrate upward into AIPG incrementally.
 - Updated README, architecture, iteration, migration and Workflow Runtime
@@ -47,9 +51,11 @@ unreleased work and do not imply adoption or publication.
 
 - Existing `guif` imports, commands, workflows, schemas, Theme records, Artifact
   records, Domain Pack helpers, and storage conventions remain supported.
-- The Runtime is synchronous and uses deterministic ordered execution for
-  Parallel nodes; it does not yet claim durable scheduling, checkpoint restore,
-  distributed execution, provider execution, or semantic visual review migration.
+- The Runtime remains synchronous and uses deterministic ordered execution for
+  Parallel nodes. Checkpoint recovery currently provides at-least-once action
+  semantics for a failing node and skips nodes recorded as completed.
+- Distributed scheduling, durable external stores and semantic visual review
+  remain future migrations.
 
 ## 1.1.0-beta.1 — 2026-07-31
 
