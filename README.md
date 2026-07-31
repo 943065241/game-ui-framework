@@ -8,11 +8,11 @@ AIPG is a generic AI production runtime. GUIF is its visual-production Domain Pa
 
 ## Project status
 
-- Development version: [`1.1.0-dev.10`](VERSION)
+- Development version: [`1.1.0-dev.11`](VERSION)
 - Published package: `aipg-framework==1.1.0b1`
 - Branch policy: direct commits to `main`
 - Last validated baseline: Python 3.10, 3.11 and 3.12 CI passed for `1.1.0-dev.8`
-- Current focus: repository consolidation and a single documentation source of truth
+- Current focus: first real Provider Adapter and execution integration
 
 Canonical project documents:
 
