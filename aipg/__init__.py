@@ -5,7 +5,6 @@ package remains the compatibility API and visual-production implementation.
 """
 
 from guif import __version__
-from guif.domains import DomainPack, get_domain_pack, list_domain_packs
 from guif.layered_workflow import (
     approve_final_composition,
     approve_layer_plan,
@@ -20,8 +19,16 @@ from guif.layered_workflow import (
 from .artifacts import ArtifactRecord, ArtifactRegistry, ArtifactStatus
 from .capabilities import CapabilityRequirement, ToolAdapter, ToolRegistry
 from .context import ContextMode, ProductionRequest
-from .domains import GUIF_VISUAL_DOMAIN
-from .domains.model import DomainPackDefinition
+from .domains import (
+    BUILTIN_DOMAIN_REGISTRY,
+    FRAMEWORK_GOVERNANCE_DOMAIN,
+    GUIF_VISUAL_DOMAIN,
+    DomainPackDefinition,
+    DomainRegistry,
+    domain_for_workflow,
+    get_domain_pack,
+    list_domain_packs,
+)
 from .runtime import (
     NodeKind,
     WorkflowDefinition,
@@ -32,14 +39,19 @@ from .runtime import (
     validate_workflow_references,
 )
 
+DomainPack = DomainPackDefinition
+
 __all__ = [
     "ArtifactRecord",
     "ArtifactRegistry",
     "ArtifactStatus",
+    "BUILTIN_DOMAIN_REGISTRY",
     "CapabilityRequirement",
     "ContextMode",
     "DomainPack",
     "DomainPackDefinition",
+    "DomainRegistry",
+    "FRAMEWORK_GOVERNANCE_DOMAIN",
     "GUIF_VISUAL_DOMAIN",
     "NodeKind",
     "ProductionRequest",
@@ -57,6 +69,7 @@ __all__ = [
     "complete_current_layer",
     "create_layered_composition",
     "current_layer_contract",
+    "domain_for_workflow",
     "get_domain_pack",
     "list_domain_packs",
     "request_layer_revision",
