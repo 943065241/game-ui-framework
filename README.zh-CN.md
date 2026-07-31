@@ -21,6 +21,7 @@ AIPG 是通用 AI 生产运行时。GUIF 是它的视觉生产 Domain Pack 与�
 - [架构](docs/AIPG_ARCHITECTURE.md)
 - [Workflow Runtime](docs/AIPG_WORKFLOW_RUNTIME.md)
 - [变更记录](CHANGELOG.md)
+- [贡献规范](CONTRIBUTING.md)
 - [GUIF 迁移](docs/MIGRATING_GUIF_TO_AIPG.md)
 
 ## 当前架构
