@@ -8,6 +8,31 @@ AIPG 是一个本地优先的 AI 生产工作流与治理框架，负责路由�
 
 ChatGPT / Codex 是默认 Host。图片生成、语义视觉、结构化布局、游戏引擎以及未来的生产能力都是可替换的 Tool 契约，而不是硬编码依赖。
 
+## 当前迭代
+
+- 开发版本：`1.1.0-dev.6`
+- 最后更新：`2026-07-31`
+- 分支策略：直接提交到 `main`
+- 最新里程碑：可恢复的 Workflow Runtime 与 Capability 执行链路
+
+当前开发线已完成：
+
+- AIPG 自主管理的 Domain Registry
+- 可执行 Workflow 生命周期与 Event Bus
+- Workflow Graph 自动遍历
+- Subworkflow 有限调用栈执行
+- CheckpointStore 持久化边界
+- 确定性 Checkpoint 恢复与续跑
+- Capability → ToolAdapter → Provider 执行
+
+下一阶段计划：
+
+- Scheduler 与持久化执行队列
+- Artifact 生命周期 Runtime 与依赖图
+- 将 GUIF Workflow 迁移到 AIPG Runtime
+
+今后每次直接迭代 `main` 都必须递增这里的开发版本，并同步更新本节，打开仓库首页即可判断是否有新迭代。
+
 ## 发布与迭代状态
 
 `1.1.0-beta.1` 已发布。当前未发布迭代直接重构现有 AIPG，不再旁路新增第二套 Core，也不会整体推翻 GUIF。
@@ -35,9 +60,13 @@ ChatGPT / Codex 是默认 Host。图片生成、语义视觉、结构化布局�
 ```text
 AIPG
 ├─ runtime.py          工作流图、状态、调用栈、验证
+├─ engine.py           生命周期与图执行
+├─ recovery.py         Checkpoint 恢复与确定性续跑
+├─ checkpoints.py      与存储实现无关的 Checkpoint 边界
+├─ events.py           Runtime 事件分发
 ├─ context.py          Project 与 Standalone 生命周期
 ├─ artifacts.py        Artifact 身份、状态、祖先与血缘
-├─ capabilities.py     Capability 与 Tool Adapter
+├─ capabilities.py     Capability 路由与 Tool Adapter 执行
 └─ domains/
    └─ visual.py        GUIF Visual Production 注册
 
