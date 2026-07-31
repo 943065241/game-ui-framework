@@ -17,7 +17,12 @@ from guif.layered_workflow import (
 )
 
 from .artifacts import ArtifactRecord, ArtifactRegistry, ArtifactStatus
-from .capabilities import CapabilityRequirement, ToolAdapter, ToolRegistry
+from .capabilities import (
+    CapabilityRequirement,
+    ToolAdapter,
+    ToolExecutionHandler,
+    ToolRegistry,
+)
 from .checkpoints import CheckpointStore, InMemoryCheckpointStore
 from .context import ContextMode, ProductionRequest
 from .domains import (
@@ -32,6 +37,7 @@ from .domains import (
 )
 from .engine import ActionHandler, ConditionHandler, WorkflowEngine, WorkflowRun
 from .events import EventBus, EventHandler, RuntimeEvent
+from .recovery import RecoverableWorkflowEngine
 from .runtime import (
     NodeKind,
     WorkflowDefinition,
@@ -64,8 +70,10 @@ __all__ = [
     "InMemoryCheckpointStore",
     "NodeKind",
     "ProductionRequest",
+    "RecoverableWorkflowEngine",
     "RuntimeEvent",
     "ToolAdapter",
+    "ToolExecutionHandler",
     "ToolRegistry",
     "WorkflowDefinition",
     "WorkflowEngine",
