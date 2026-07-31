@@ -2,77 +2,112 @@
 
 ## Positioning
 
-AIPG is a local-first AI production workflow and governance framework. It
-coordinates production without pretending that workflow metadata created real
-media, semantic review, external Tool availability, or adoption evidence.
+AIPG is a local-first AI production workflow and governance framework. GUIF is
+the compatible visual-production Domain Pack and the first concrete production
+implementation built on AIPG.
+
+This repository evolves by promoting generic responsibilities from GUIF into
+AIPG. It does not maintain a second parallel Core.
 
 ```text
-AIPG Core
-├─ intent and domain routing
-├─ workflow runtime and checkpoints
-├─ approvals and revision scopes
-├─ Artifact lineage and protected sources
-├─ Host and Tool capability routing
-├─ deterministic and semantic review
-├─ Candidate Change and adoption
-└─ gated export and recovery
-
-Domain Packs
-├─ Framework Governance
-└─ GUIF Visual Production
+AIPG
+├─ runtime              workflow graph, hierarchical state, stack, recovery
+├─ context              project and standalone lifecycle
+├─ artifacts            Artifact identity, status, version ancestry, lineage
+├─ capabilities         provider-neutral requirements and Tool adapters
+├─ review / approval    generic governance contracts
+├─ evidence / export    verification and gated delivery
+└─ domains
+   └─ GUIF Visual Production
 ```
 
-The Core understands domain-neutral concepts such as Workflow, Stage,
-Artifact, Dependency, Constraint, Approval, Evidence, Revision, and Export.
-Background layers, buttons, Theme, alpha, and visual composition belong to
-GUIF.
+AIPG understands domain-neutral concepts such as Workflow, Stage, Artifact,
+Dependency, Constraint, Approval, Evidence, Revision, Capability, Tool Adapter,
+and Export. Buttons, alpha, Theme, masks, visual layers, composition, Figma
+mappings, and engine assets belong to GUIF.
 
-## Routing
+## Public module boundary
 
-Theme is not an AIPG top-level state. A request is first classified by domain
-and workflow. Each workflow then declares the context it requires.
+The initial refactor uses focused modules instead of a monolithic `aipg.core`:
+
+```text
+aipg.runtime
+aipg.context
+aipg.artifacts
+aipg.capabilities
+aipg.domains
+```
+
+The public `aipg` package re-exports stable contracts. Existing `guif` imports,
+commands, schemas, storage contracts, and production workflows remain available
+while their generic infrastructure is migrated incrementally.
+
+## Routing and context
+
+A request is classified by Domain Pack and workflow before context is resolved.
+Theme is a GUIF project-context type, not a mandatory AIPG top-level state.
 
 ```text
 request
--> governance context
--> domain
--> workflow
--> required context
--> approval
--> real execution
--> review
--> export
+→ domain
+→ workflow
+→ context mode
+→ required context
+→ capability resolution
+→ governed execution
+→ Artifact and lineage
+→ review and approval
+→ export
 ```
 
-## Workflow manifest v3
+Two lifecycle modes are shared by all domains:
 
-Schema v3 adds:
+- `project`: long-lived context, commonly a GUIF Theme;
+- `standalone`: finite one-off Artifact production.
 
-- `domain`;
-- `requires`;
-- `stages`;
-- `creation_direction`;
-- `constraint_policy`.
+## Workflow runtime
 
-Schema v1 and v2 remain readable for compatibility.
+Workflow definitions form a behavior-tree-like graph. Runtime execution is a
+hierarchical state machine with an explicit finite call stack.
+
+```text
+Workflow
+→ Subworkflow
+→ Control node / Stage
+→ Action
+→ Tool invocation
+```
+
+Parents wait while child workflows execute, then resume with the child result.
+Depth, retries, timeouts, and reference validation prevent unbounded execution.
+Workflow status and Artifact status are managed independently.
+
+## Capability and Tool routing
+
+Workflows request capabilities rather than providers.
+
+```text
+CapabilityRequirement
+→ ToolRegistry
+→ compatible ToolAdapter
+→ provider execution
+```
+
+GUIF may register adapters for image generation, editing, segmentation, OCR,
+vision, Figma, composition, visual diff, or engine export. AIPG does not
+reimplement mature algorithms and does not claim provider availability without
+real configuration and evidence.
 
 ## GUIF visual domain
 
-GUIF retains existing game UI workflows and introduces
-`master-guided-layer-creation`. The master image supplies style, layout
-anchors, visual hierarchy, and intent. It is not a pixel-reconstruction target.
+GUIF contributes:
 
-Each layer receives:
+- Theme-backed and standalone visual contexts;
+- visual workflows such as localized repaint, layering, visual review, Figma
+  sync, and resource export;
+- image, mask, layer, composite, visual-diff, mapping, and export Artifacts;
+- visual constraints, review rules, Tool adapters, and exporters.
 
-- the master and Theme references;
-- the current composite;
-- completed-layer lineage;
-- future layer roles;
-- hard production constraints;
-- soft art direction;
-- adaptive creative freedom;
-- an output and review contract.
-
-Production proceeds bottom to top. Each real layer is recomposed and visually
-reviewed before the next one. Revising a layer preserves earlier protected
-layers and invalidates downstream composites.
+Existing GUIF behavior is migrated through a compatibility-preserving strangler
+pattern: promote generic contracts first, delegate existing code second, and
+remove duplicate infrastructure only after regression validation.
