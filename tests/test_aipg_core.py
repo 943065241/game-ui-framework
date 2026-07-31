@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from aipg.core import (
+from aipg import (
     ArtifactRecord,
     ArtifactRegistry,
     ArtifactStatus,
@@ -31,11 +31,9 @@ def test_tool_registry_resolves_by_capability_and_required_features() -> None:
             features=("mask-guided", "transparent-output"),
         )
     )
-
     result = registry.resolve(
         CapabilityRequirement("image-editing", required_features=("mask-guided",))
     )
-
     assert [adapter.adapter_id for adapter in result] == ["provider-image-edit"]
 
 
@@ -53,15 +51,12 @@ def test_nested_workflow_references_are_validated() -> None:
             NodeKind.SEQUENCE,
             children=(
                 WorkflowNode(
-                    "create-mask",
-                    NodeKind.SUBWORKFLOW,
-                    workflow_id="mask-generation",
+                    "create-mask", NodeKind.SUBWORKFLOW, workflow_id="mask-generation"
                 ),
                 WorkflowNode("edit", NodeKind.ACTION, action_id="edit-image"),
             ),
         ),
     )
-
     validate_workflow_references([parent, child])
 
 
@@ -70,12 +65,9 @@ def test_unknown_child_workflow_is_rejected() -> None:
         workflow_id="localized-repaint",
         domain_id="visual-production",
         root=WorkflowNode(
-            "missing",
-            NodeKind.SUBWORKFLOW,
-            workflow_id="unknown-workflow",
+            "missing", NodeKind.SUBWORKFLOW, workflow_id="unknown-workflow"
         ),
     )
-
     with pytest.raises(ValueError, match="Unknown child workflow"):
         validate_workflow_references([parent])
 
@@ -92,7 +84,6 @@ def test_workflow_stack_returns_to_parent_frame() -> None:
         current_node_id="mask",
         status=WorkflowStatus.RUNNING,
     )
-
     stack.push(parent)
     stack.push(child)
     assert stack.pop() is child
@@ -102,7 +93,6 @@ def test_workflow_stack_returns_to_parent_frame() -> None:
 def test_workflow_stack_enforces_finite_depth() -> None:
     stack = WorkflowStack(max_depth=1)
     stack.push(WorkflowFrame("parent", "start"))
-
     with pytest.raises(RuntimeError, match="max depth"):
         stack.push(WorkflowFrame("child", "start"))
 
@@ -126,7 +116,6 @@ def test_artifact_registry_returns_parent_first_lineage() -> None:
             parent_ids=("source",),
         )
     )
-
     assert [record.artifact_id for record in registry.lineage("edited")] == [
         "source",
         "edited",
@@ -140,7 +129,6 @@ def test_context_modes_enforce_lifecycle_contract() -> None:
         context_mode=ContextMode.STANDALONE,
         inputs={"source": "image-1"},
     ).validate()
-
     ProductionRequest(
         domain_id="visual-production",
         workflow_id="ui-production",
@@ -148,7 +136,6 @@ def test_context_modes_enforce_lifecycle_contract() -> None:
         project_context_id="theme-1",
         inputs={},
     ).validate()
-
     with pytest.raises(ValueError, match="requires project_context_id"):
         ProductionRequest(
             domain_id="visual-production",
