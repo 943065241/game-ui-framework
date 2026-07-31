@@ -4,10 +4,11 @@ This is the canonical implementation-status map for the repository. README files
 
 ## Current development line
 
-- Development version: `1.1.0-dev.10` from the root `VERSION` file
+- Development version: `1.1.0-dev.11` from the root `VERSION` file
 - Published package version: `1.1.0-beta.1`
 - Integration policy: direct commits to `main`
 - Validated baseline: `1.1.0-dev.8` passed CI on Python 3.10, 3.11 and 3.12
+- Current focus: first real Provider Adapter and ToolRegistry integration
 - Compatibility policy: preserve existing `guif` imports, commands, schemas and records while generic responsibilities migrate into `aipg`
 
 ## Ownership map
@@ -53,7 +54,7 @@ This is the canonical implementation-status map for the repository. README files
 - No durable scheduler or external execution queue exists yet
 - The default checkpoint store is in-memory
 - Restored failing actions use at-least-once execution semantics
-- No real Provider Adapter is claimed available by the framework itself
+- The framework does not yet claim a configured real Provider Adapter as generally available
 - Not every GUIF Workflow has migrated to WorkflowEngine
 - Approval persistence, compensation and rollback are not implemented
 - Semantic visual correctness remains a GUIF and Tool responsibility
@@ -80,6 +81,7 @@ guif/
 
 - `VERSION`: canonical development version
 - `README.md` and `README.zh-CN.md`: public overview
+- `CONTRIBUTING.md`: contribution, versioning and documentation policy
 - `docs/PROJECT_STATUS.md`: current implementation truth
 - `ROADMAP.md`: future priorities only
 - `CHANGELOG.md`: chronological completed changes
@@ -89,4 +91,4 @@ guif/
 
 ## Repository consolidation
 
-The one-time repository audit and the early iteration-specific AIPG/GUIF document were removed after their still-valid conclusions were merged here and into the roadmap. New iteration-specific status documents should not be created.
+The one-time repository audit and the early iteration-specific AIPG/GUIF document were removed after their still-valid conclusions were merged into canonical documentation. New iteration-specific status and audit documents should not be created.
