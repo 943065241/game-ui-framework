@@ -86,9 +86,9 @@ def test_codex_plugin_manifest_marketplace_and_bundled_runtime_contract() -> Non
             encoding="utf-8"
         )
     )
-    assert marketplace["interface"]["displayName"] == "Game UI Framework"
+    assert marketplace["interface"]["displayName"] == "AIPG Framework"
     plugin = marketplace["plugins"][0]
-    assert plugin["name"] == "game-ui-framework"
+    assert plugin["name"] == "aipg-framework"
     assert plugin["source"] == {"source": "local", "path": "."}
     assert plugin["policy"] == {
         "installation": "AVAILABLE",
@@ -99,11 +99,11 @@ def test_codex_plugin_manifest_marketplace_and_bundled_runtime_contract() -> Non
     manifest = json.loads(
         (ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8")
     )
-    assert manifest["name"] == "game-ui-framework"
-    assert manifest["version"] == "1.0.0-beta.3"
+    assert manifest["name"] == "aipg-framework"
+    assert manifest["version"] == "1.1.0-beta.1-candidate.2"
     assert manifest["skills"] == "./plugins/game-ui-framework/skills/"
     assert manifest["repository"] == "https://github.com/943065241/game-ui-framework"
-    assert manifest["interface"]["displayName"] == "Game UI Framework"
+    assert manifest["interface"]["displayName"] == "AIPG Framework"
     assert "Read" in manifest["interface"]["capabilities"]
     assert "Write" in manifest["interface"]["capabilities"]
 
@@ -124,6 +124,24 @@ def test_codex_plugin_manifest_marketplace_and_bundled_runtime_contract() -> Non
     assert "Trial approval never implies adoption" in skill
     assert "relative to this SKILL.md" in skill
     assert "$PLUGIN_ROOT/plugins/game-ui-framework" in skill
+
+    aipg_skill = (
+        PLUGIN_FEATURE_ROOT / "skills" / "aipg-framework" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    assert aipg_skill.startswith("---\nname: aipg-framework\n")
+    assert "GUIF is its game UI and visual-production domain" in aipg_skill
+    assert "Theme confirmation" in aipg_skill
+
+    blueprint = (ROOT / "docs" / "AIPG_USER_BLUEPRINT.md").read_text(
+        encoding="utf-8"
+    )
+    assert "## 5. Skill map" in blueprint
+    assert "## 6. Tool and capability map" in blueprint
+    assert "## 10. Version governance" in blueprint
+    assert "master-guided-layer-creation" in blueprint
+    assert "`chatgpt-image`" in blueprint
+    assert "`chatgpt-vision`" in blueprint
+    assert "`dry-run`" in blueprint
 
 
 def test_codex_bridge_compiles() -> None:

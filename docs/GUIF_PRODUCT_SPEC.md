@@ -1,4 +1,10 @@
-# GUIF Product Specification / GUIF 产品规格说明
+# GUIF Visual Domain Product Specification / GUIF 视觉领域产品规格说明
+
+> AIPG 1.1 candidate note: this remains the compatibility specification for
+> the GUIF visual-production domain. See
+> [AIPG_ARCHITECTURE.md](AIPG_ARCHITECTURE.md) for the domain-neutral Core and
+> [MASTER_GUIDED_LAYER_WORKFLOW.md](MASTER_GUIDED_LAYER_WORKFLOW.md) for the new
+> layered workflow.
 
 > Status / 状态: Living document / 持续迭代文档  
 > Baseline / 基线版本: `v1.0.0-beta.2`  

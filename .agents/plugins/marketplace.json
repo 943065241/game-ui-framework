@@ -1,11 +1,11 @@
 {
-  "name": "game-ui-framework",
+  "name": "aipg-framework",
   "interface": {
-    "displayName": "Game UI Framework"
+    "displayName": "AIPG Framework"
   },
   "plugins": [
     {
-      "name": "game-ui-framework",
+      "name": "aipg-framework",
       "source": {
         "source": "local",
         "path": "."
