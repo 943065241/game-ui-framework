@@ -464,4 +464,640 @@ A raster Tool and a structured-layout Tool solve different problems:
 
 | Need | Appropriate capability |
 | --- | --- |
-| Painted background or illustration | Raster image genÛM½¶‰žËkºwµçM¥Í¥½¹Ìè()Ñ•áÐ)ÁÉ½Á½Í…°(´ø…¹‘¥‘…Ñ”µ‰Õ¥±…ÕÑ¡½É¥é…Ñ¥½¸(´ø¥Í½±…Ñ•¥µÁ±•µ•¹Ñ…Ñ¥½¸(´øÉ•…°•Ù¥‘•¹”(´ø…‘½ÁÑ¥½¸‘•¥Í¥½¸(´øÁÕ‰±¥…Ñ¥½¸)€()ð•¥Í¥½¸ð5•…¹¥¹œð)ð€´´´ð€´´´ð)ð	Õ¥±…¹‘¥‘…Ñ”ð5…ä¥µÁ±•µ•¹Ð…¹Ù…±¥‘…Ñ”¥¸¥Í½±…Ñ¥½¸ð)ðI•ÅÕ•ÍÐ¡…¹•ÌðI•ÑÕÉ¸Ñ¼…¹‘¥‘…Ñ”‰Õ¥±‘¥¹œð)ðI•©•Ð…¹‘¥‘…Ñ”ð-••ÀÍÑ…‰±”ÍåÍÑ•´ð)ð‘½ÁÐ…¹‘¥‘…Ñ”ðÕÑ¡½É¥é”ÁÕ‰±¥…Ñ¥½¸Ý½É­™±½Üð()‘½ÁÑ¥½¸¥ÌÙ…±¥½¹±ä…™Ñ•ÈÉ•…°…¹‘¥‘…Ñ”•Ù¥‘•¹”•á¥ÍÑÌ¸((ŒŒŒ€ä¸Ì¡…¹”±…ÍÍ¥™¥…Ñ¥½¸()ð¡…¹”ÑåÁ”ðUÍ”Ý¡•¸ð)ð€´´´ð€´´´ð)ðÍ­¥±°µ¡…¹•€ð9…ÑÕÉ…°µ±…¹Õ…”½Á•É…Ñ¥¹œÁ½±¥ä¥ÌÝÉ½¹œ½È¥¹½µÁ±•Ñ”ð)ð™É…µ•Ý½É¬µ¡…¹•€ð½É”‘½µ…¥¸µ¹•ÕÑÉ…°‰•¡…Ù¥½ÈµÕÍÐ¡…¹”ð)ðÝ½É­™±½Üµ¡…¹•€ðMÑ…”½É‘•È°…Ñ•Ì°½ÈÉ•ÅÕ¥É•½¹Ñ•áÐµÕÍÐ¡…¹”ð)ðµÕ±Ñ¤µ±…å•Èµ¡…¹•€ðM•Ù•É…°™É…µ•Ý½É¬±…å•ÉÌ¡…¹”Ñ½•Ñ¡•Èð)ðÑ¡•µ”µÁ½±¥äµ¡…¹•€ðQ¡•µ”ÍÑ½É…”°‰¥¹‘¥¹œ°½È…ÁÁ±¥…Ñ¥½¸ÉÕ±•Ì¡…¹”ð)ðÁÉ½Ù¥‘•ÈµÉ½ÕÑ¥¹œµ¡…¹•€ð1•…ä½ÁÉ½Ù¥‘•ÈÍ•±•Ñ¥½¸‰•¡…Ù¥½È¡…¹•Ìð)ðÑ½½°µ¡…¹•€ðMÝ¥Ñ Ñ¼…¸…±É•…‘äÉ•¥ÍÑ•É•…Ù…¥±…‰±”Q½½°ð)ðÑ½½°µ¥¹Ñ•É…Ñ¥½¸µ¡…¹•€ð9•Ü½ÈÕ¹ÍÕÁÁ½ÉÑ•Q½½°¹••‘Ì…¸‘…ÁÑ•Èð()¥…¹½Í¥ÌÍ¡½Õ±½¹Í¥‘•È…±°…™™•Ñ•±…å•ÉÌ‰•™½É”Í•±•Ñ¥¹œ„ÑåÁ”¸((ŒŒ€ÄÀ¸Y•ÉÍ¥½¸½Ù•É¹…¹”()%A¡…ÌÍ•Ù•É…°Ù•ÉÍ¥½¸…á•Ì¸Q¡•äµÕÍÐ¹½Ð‰”½±±…ÁÍ•¥¹Ñ¼½¹”¹Õµ‰•È¸((ŒŒŒ€ÄÀ¸ÄY•ÉÍ¥½¸…á•Ì()ðY•ÉÍ¥½¸ðá…µÁ±”ð½Ù•É¹Ìð)ð€´´´ð€´´´ð€´´´ð)ðA±Õ¥¸Ù•ÉÍ¥½¸ð€Ä¸Ä¸Àµ‰•Ñ„¸Å€ð%¹ÍÑ…±±•½‘•àÁ±Õ¥¸Í¹…ÁÍ¡½Ðð)ð…¹‘¥‘…Ñ”Á±Õ¥¸Ù•ÉÍ¥½¸ð€Ä¸Ä¸Àµ‰•Ñ„¸Äµ…¹‘¥‘…Ñ”¸É€ð%Í½±…Ñ•ÁÉ”µ…‘½ÁÑ¥½¸‰Õ¥±ð)ðAåÑ¡½¸Á…­…”Ù•ÉÍ¥½¸ð€Ä¸Ä¸ÁˆÅ€ð…¥Áœµ™É…µ•Ý½É­€‘¥ÍÑÉ¥‰ÕÑ¥½¸ð)ðAÕ‰±¥ŒA$Ù•ÉÍ¥½¸ð€Å€ð½µÁ…Ñ¥‰¥±¥ÑäÍÕÉ™…”ð)ð]½É­™±½ÜÍ¡•µ„ð€Í€ð]½É­™±½Üµ…¹¥™•ÍÐÍÑÉÕÑÕÉ”ð)ðÉÑ¥™…ÐÍ¡•µ„ð€Å€ðÉÑ¥™…ÐÉ•½ÉÍÑÉÕÑÕÉ”ð)ðQ…Í¬Í¡•µ„ð€É€°€Í€ðA•ÉÍ¥ÍÑ•Q…Í¬½µÁ…Ñ¥‰¥±¥Ñäð)ðQ¡•µ”Ù•ÉÍ¥½¸ð%µµÕÑ…‰±”¥¹Ñ••ÈÙ•ÉÍ¥½¸ðUÍ•Èµ½Ý¹•Q¡•µ”•Ù½±ÕÑ¥½¸ð)ðQ½½°µ…¹¥™•ÍÐÙ•ÉÍ¥½¸ðQ½½°µÍÁ•¥™¥Œ°”¹œ¸€Ä¸Á€ð‘…ÁÑ•È…Á…‰¥±¥Ñä‘•±…É…Ñ¥½¸ð)ð½µ…¥¸A…¬Í¡•µ„ð€Å€ð½µ…¥¸É•¥ÍÑÉä½¹ÑÉ…Ðð((ŒŒŒ€ÄÀ¸ÈM•µ…¹Ñ¥ŒÙ•ÉÍ¥½¹¥¹œÁ½±¥ä()ð¡…¹”ðY•ÉÍ¥½¸¥µÁ…Ðð)ð€´´´ð€´´´ð)ð½Õµ•¹Ñ…Ñ¥½¸±…É¥™¥…Ñ¥½¸½¹±äðA…Ñ ½È¹¼ÉÕ¹Ñ¥µ”Ù•ÉÍ¥½¸¡…¹”ð)ð	…­Ý…Éµ½µÁ…Ñ¥‰±”Ý½É­™±½Ü½Q½½°…Á…‰¥±¥Ñäð5¥¹½Èð)ð9•Ü½µ…¥¸A…¬ð5¥¹½Èð)ð9•Ü½ÁÑ¥½¹…°]½É­™±½ÜØÌð5¥¹½Èð)ð	Õœ™¥àÝ¥Ñ¡½ÕÐ½¹ÑÉ…Ð¡…¹”ðA…Ñ ð)ðA±Õ¥¸Á…­…¥¹œ½ÉÉ•Ñ¥½¸ðA…Ñ ð)ð	É•…­¥¹œÁÕ‰±¥ŒA$½ÈÁ•ÉÍ¥ÍÑ•Í¡•µ„ð5…©½È½È¹•ÜÁÕ‰±¥ŒA$Ù•ÉÍ¥½¸ð)ð…¹‘¥‘…Ñ”¥Ñ•É…Ñ¥½¸ð…¹‘¥‘…Ñ”ÍÕ™™¥à½¹±äÕ¹Ñ¥°…‘½ÁÑ¥½¸ð()AÉ•É•±•…Í”¥‘•¹Ñ¥™¥•ÉÌ‘¼¹½Ðµ…­”„‰É•…­¥¹œ¡…¹”Í…™”¸½µÁ…Ñ¥‰¥±¥ÑäÍÑ¥±°)É•ÅÕ¥É•Ì…¸•áÁ±¥¥Ðµ¥É…Ñ¥½¸Á…Ñ ¸((ŒŒŒ€ÄÀ¸Ì½µÁ…Ñ¥‰¥±¥ÑäÉÕ±•Ì()%A€Ä¹àÕÉÉ•¹Ñ±äÁÉ•Í•ÉÙ•Ìè((´Õ¥™€AåÑ¡½¸¥µÁ½ÉÐì(´Õ¥™€1$…±¥…Ìì(´€‘…µ”µÕ¤µ™É…µ•Ý½É­€ì(´•á¥ÍÑ¥¹œU%ÁÉ¥Ù…Ñ”µ‘…Ñ„•¹Ù¥É½¹µ•¹ÐÙ…É¥…‰±•Ìì(´]½É­™±½ÜÍ¡•µ„ØÄ…¹ØÈì(´•á¥ÍÑ¥¹œQ¡•µ”°M½ÕÉ”°ÉÑ¥™…Ð°Q…Í¬°…¹…¹‘¥‘…Ñ”É•½É‘ÌÝ¥Ñ¡¥¸‘•±…É•(€ÍÕÁÁ½ÉÑ•Í¡•µ…Ìì(´•áÁ±¥¥Ð1•…äAÉ½Ù¥‘•É‘…ÁÑ•È½µÁ…Ñ¥‰¥±¥Ñä¸()9•Ü‘½µ…¥¸µ¹•ÕÑÉ…°¥¹Ñ•É…Ñ¥½¹ÌÍ¡½Õ±ÕÍ”…¥Á€ìÙ¥ÍÕ…°¥¹Ñ•É…Ñ¥½¹Ìµ…äÕÍ”)Õ¥™€¸((ŒŒŒ€ÄÀ¸ÐI•±•…Í”½Ù•É¹…¹”()µ•Éµ…¥)™±½Ý¡…ÉÐQ(€€€%l‰%ÍÍÕ”€¼‘•Í¥É•¡…¹”‰t€´´øMl‰AÉ¥Ù…Ñ”%µÁÉ½Ù•µ•¹Ð…Í”‰t(€€€M€´´ø	Il‰…¹‘¥‘…Ñ”‰É…¹ ‰t(€€€	H€´´ø=l‰%µÁ±•µ•¹Ñ…Ñ¥½¸€¬‘½Ì€¬µ¥É…Ñ¥½¸‰t(€€€=€´´øQMQl‰U¹¥Ð°½¹ÑÉ…Ð°É•É•ÍÍ¥½¸°‰Õ¥±°¥¹ÍÑ…±°Ñ•ÍÑÌ‰t(€€€QMP€´´øY%l‰I•½ÉÉ•…°…¹‘¥‘…Ñ”•Ù¥‘•¹”‰t(€€€Y%€´´ø=AQì‰UÍ•È…‘½ÁÑÌü‰ô(€€€=AP€´´ùñ9¼°…‘©ÕÍÑð=(€€€=AP€´´ùñI•©•Ñð1=Ml‰±½Í”ìÍÑ…‰±”É•Ñ…¥¹•‰t(€€€=AP€´´ùñe•ÍðAUM!l‰AÕÍ …¹‘¥‘…Ñ”‰É…¹ ‰t(€€€AUM €´´øAIl‰=Á•¸AH‰t(€€€AH€´´ø%l‰I•ÅÕ¥É•$…¹É•Ù¥•Ü‰t(€€€$€´´ùñ…¥±ð=(€€€$€´´ùñA…ÍÍð5Il‰5•É”Ñ¼ÁÉ½Ñ•Ñ•µ…¥¸‰t(€€€5I€´´øQl‰I•±•…Í”Ù•ÉÍ¥½¸€¼Ñ…œ€¼Á…­…”‰t(€€€Q€´´øI=Il‰I•½ÉÉ•Á½Í¥Ñ½Éä°AH°µ•É”½µµ¥Ð°µ¥¹¥µÕ´Á±Õ¥¸Ù•ÉÍ¥½¸‰t(€€€I=I€´´øIIM!l‰UÍ•ÈÉ•™É•Í¡•ÌÁ±Õ¥¸‰t(€€€IIM €´´øMMM%=9l‰MÑ…ÉÐ„¹•Ü½‘•àÍ•ÍÍ¥½¸‰t(€€€MMM%=8€´´øIl‰I•Á±…ä™½Éµ…°É•É•ÍÍ¥½¸‰t(€€€I€´´ùñA…ÍÍðIMU5l‰I•ÍÕµ”ÁÉ½‘ÕÑ¥½¸‰t(€€€I€´´ùñ…¥±ð=)€((ŒŒŒ€ÄÀ¸ÔI•ÅÕ¥É•É•±•…Í”É•½É‘Ì()ÁÕ‰±¥Í¡•™É…µ•Ý½É¬¡…¹”É•½É‘Ìè((´É•Á½Í¥Ñ½Éäì(´‰É…¹ ì(´ÁÕ±°É•ÅÕ•ÍÐì(´µ•É”½µµ¥Ðì(´É•±•…Í•Ù•ÉÍ¥½¸ì(´µ¥¹¥µÕ´Á±Õ¥¸Ù•ÉÍ¥½¸ì(´‰Õ¥±…¹Ñ•ÍÐ½ÕÑ½µ”ì(´µ¥É…Ñ¥½¸¹½Ñ•Ìì(´É•™É•Í É•ÅÕ¥É•µ•¹Ðì(´™½Éµ…°É•É•ÍÍ¥½¸½ÕÑ½µ”¸((ŒŒŒ€ÄÀ¸ØY•ÉÍ¥½¸µ™¥±”µ…¥¹Ñ•¹…¹”¡•­±¥ÍÐ()]¡•¸„É•±•…Í”¡…¹•ÌÙ•ÉÍ¥½¸½È¥‘•¹Ñ¥Ñä°¥¹ÍÁ•Ð…¹ÕÁ‘…Ñ”è((´€¹½‘•àµÁ±Õ¥¸½Á±Õ¥¸¹©Í½¹€ì(´É•Á½Í¥Ñ½Éäµ…É­•ÑÁ±…”µ•Ñ…‘…Ñ„ì(´ÁåÁÉ½©•Ð¹Ñ½µ±€ì(´…¥Á€…¹Õ¥™€Á…­…”Ù•ÉÍ¥½¸•áÁ½ÍÕÉ”ì(´$Ù•ÉÍ¥½¸…ÍÍ•ÉÑ¥½¹Ìì(´I5…¹¡¥¹•Í”I5ì(´!91=ì(´…¹‘¥‘…Ñ”½É•±•…Í”¹½Ñ•Ìì(´…É¡¥Ñ•ÑÕÉ”…¹µ¥É…Ñ¥½¸‘½Õµ•¹ÑÌì(´Á±Õ¥¸M­¥±±Ì…¹Ñ¡•¥ÈÕÍ•Èµ™…¥¹œÉ•™É•Í ¹…µ”ì(´Á…­…”ÁÉ½Ù•¹…¹”•áÁ•Ñ…Ñ¥½¹Ìì(´Ñ•ÍÑÌÑ¡…Ð…ÍÍ•ÉÐÁ±Õ¥¸½Á…­…”¥‘•¹Ñ¥Ñä¸()!¥ÍÑ½É¥…°É•±•…Í”¹½Ñ•ÌÍ¡½Õ±É•µ…¥¸¡¥ÍÑ½É¥…±±ä…ÕÉ…Ñ”É…Ñ¡•ÈÑ¡…¸‰•¥¹œ)µ•¡…¹¥…±±äÉ•ÝÉ¥ÑÑ•¸¸((ŒŒ€ÄÄ¸¹µÑ¼µ•¹ÕÍ•È©½ÕÉ¹•åÌ((ŒŒŒ€ÄÄ¸Ä•¹•É…°½Ù•É¹•ÁÉ½‘ÕÑ¥½¸((Ä¸UÍ•È‘•ÍÉ¥‰•ÌÑ¡”½ÕÑ½µ”¸(È¸€‘…¥Áœµ™É…µ•Ý½É­€¥‘•¹Ñ¥™¥•ÌÑ¡”½µ…¥¸¸(Ì¸%AÍ•±•ÑÌ½ÈÉ•ÅÕ•ÍÑÌ„]½É­™±½Ü¸(Ð¸Q¡”]½É­™±½Ü‘•±…É•ÌÉ•ÅÕ¥É•½¹Ñ•áÐ¸(Ô¸5¥ÍÍ¥¹œ½¹Ñ•áÐ¥ÌÉ•ÅÕ•ÍÑ•Ý¥Ñ¡½ÕÐ•áÁ½Í¥¹œÉÕ¹Ñ¥µ”¥¹Ñ•É¹…±Ì¸(Ø¸ÁÉ½‘ÕÑ¥½¸½¹ÑÉ…Ð¥ÌÁÉ•Í•¹Ñ•¸(Ü¸UÍ•È…ÁÁÉ½Ù•Ì°É•ÅÕ•ÍÑÌ¡…¹•Ì°½ÈÉ•©•ÑÌ¸(à¸Q½½°É•Í½±ÕÑ¥½¸Ù•É¥™¥•Ì…Á…‰¥±¥Ñä…¹¡•…±Ñ ¸(ä¸I•…°É•ÍÕ±ÑÌ‰•½µ”É•¥ÍÑ•É•ÉÑ¥™…ÑÌ¸(ÄÀ¸I•ÅÕ¥É•É•Ù¥•ÜÉÕ¹Ì…ÐÑ¡”½ÉÉ•Ð…ÍÍÕÉ…¹”±•Ù•°¸(ÄÄ¸I•Ù¥Í¥½¹ÌÉ••¥Ù”¥¹‘•Á•¹‘•¹Ð…ÁÁÉ½Ù…°¸(ÄÈ¸áÁ½ÉÐ½ÕÉÌ½¹±äÝ¡•¸Ñ¡”…Ñ”Á…ÍÍ•Ì¸((ŒŒŒ€ÄÄ¸ÈÉ•…Ñ”½¹”…µ”U$•™™•Ð¥µ…”()MÕ•ÍÑ•É•ÅÕ•ÍÐè((øUÍ”U%Ñ¼É•…Ñ”„™¥Ñ¥½¹…°Í¤µ™¤¥¹Ù•¹Ñ½ÉäÍÉ••¸¸½¹™¥É´Ñ¡”Q¡•µ”…¹(øÁ±…¸‰•™½É”•¹•É…Ñ¥¹œ¸()áÁ•Ñ•É½ÕÑ”è()Ñ•áÐ(‘…µ”µÕ¤µ™É…µ•Ý½É¬(´øÙ¥ÍÕ…°µÁÉ½‘ÕÑ¥½¸(´ø•™™•Ðµ¥µ…”½ÈÕ¤µÁÉ½‘ÕÑ¥½¸(´øQ¡•µ”(´øÁ±…¸…ÁÁÉ½Ù…°(´ø¡…ÑÁÐµ¥µ…”(´øÉÑ¥™…Ð(´ø¡…ÑÁÐµÙ¥Í¥½¸(´ø™¥¹…°…ÁÁÉ½Ù…°(´ø½ÁÑ¥½¹…°•áÁ½ÉÐ)€((ŒŒŒ€ÄÄ¸ÌÉ•…Ñ”„±…å•É•…µ”U$()MÕ•ÍÑ•É•ÅÕ•ÍÐè((øUÍ”Ñ¡”…ÁÁÉ½Ù•µ…ÍÑ•È…ÌÍÑå±”…¹±…å½ÕÐÕ¥‘…¹”¸¹…±åé”½…ÉÍ”±…å•ÉÌ°(ø±•Ð$É•…Ñ¥Ù•±ä¥¹Ñ•ÉÁÉ•ÐÍ½™Ð‘•Ñ…¥±Ì°Ñ¡•¸ÁÉ½‘Õ”™É½´‰…­É½Õ¹Ñ¼(ø™½É•É½Õ¹…¹•áÁ½ÉÐ¥¹‘•Á•¹‘•¹Ð…ÍÍ•ÑÌ¸()áÁ•Ñ•É½ÕÑ”è()Ñ•áÐ(‘…µ”µÕ¤µ™É…µ•Ý½É¬(´øµ…ÍÑ•ÈµÕ¥‘•µ±…å•ÈµÉ•…Ñ¥½¸(´øQ¡•µ”€¬µ…ÍÑ•ÈµÉ•™•É•¹”(´øµ…ÍÑ•È…ÁÁÉ½Ù…°(´ø±…å•ÈµÁ±…¸…ÁÁÉ½Ù…°(´ø‰…­É½Õ¹(´øÕÉÉ•¹Ð½µÁ½Í¥Ñ”(´ø½¹Ñ…¥¹•È½™É…µ”(´øÕÉÉ•¹Ð½µÁ½Í¥Ñ”(´ø½¹ÑÉ½±Ì½½¹Ñ•¹Ð(´øÕÉÉ•¹Ð½µÁ½Í¥Ñ”(´ø‘•½É…Ñ¥½¸½•™™•ÑÌ(´ø™¥¹…°Í•µ…¹Ñ¥ŒÉ•Ù¥•Ü(´ø±…å•Èµ…¹¥™•ÍÐ€¬•¹¥¹”•áÁ½ÉÐ)€((ŒŒŒ€ÄÄ¸Ð‘¥Ð…¸•á¥ÍÑ¥¹œ¥µ…”Í…™•±ä((Ä¸U%¡•­ÌÝ¡•Ñ¡•ÈÑ¡”¥µ…”¥ÌÉ•¥ÍÑ•É•¸(È¸%˜¹½Ð°Ñ¡”ÕÍ•È¡½½Í•Ìè(€€€´•‘¥Ñ…‰±”Í½ÕÉ”ì(€€€´Q¡•µ”É•™•É•¹”ì(€€€´µ…ÍÑ•ÈÉ•™•É•¹”ì(€€€´±•…Ù”Ñ¡”™½Éµ…°¡…¥¸¸(Ì¸‘¥Ñ…‰±”µÍ½ÕÉ”É•¥ÍÑÉ…Ñ¥½¸É•…Ñ•Ì¥µµÕÑ…‰±”±¥¹•…”¸(Ð¸Q¡”•‘¥ÐÁ±…¸¥‘•¹Ñ¥™¥•ÌÁÉ½Ñ•Ñ•É•¥½¹Ì¸(Ô¸UÍ•È…ÁÁÉ½Ù•ÌÑ¡”•‘¥Ð¸(Ø¸I•…°•‘¥Ñ¥¹œ½ÕÉÌ¸(Ü¸AÉ½Ñ•Ñ•Á¥á•±Ì…¹Í•µ…¹Ñ¥ŒÅÕ…±¥Ñä…É”É•Ù¥•Ý•¸(à¸Á…ÍÍ¥¹œÉ•Á±…•µ•¹Ðµ…äÍÕÁ•ÉÍ•‘”Ñ¡”Í½ÕÉ”¸((ŒŒŒ€ÄÄ¸Ô‘„¹•ÜQ½½°()MÕ•ÍÑ•É•ÅÕ•ÍÐè((ø‘„ÍÑÉÕÑÕÉ•±…å½ÕÐQ½½°™½ÈU%½µÁ½¹•¹Ð¡¥•É…É¡ä°‰ÕÐ­••ÀÉ…ÍÑ•È(ø•¹•É…Ñ¥½¸½¸Ñ¡”ÕÉÉ•¹Ð¥µ…”Q½½°¸()áÁ•Ñ•É½ÕÑ”è()Ñ•áÐ(‘…¥Áœµ™É…µ•Ý½É¬(´ø…Á…‰¥±¥Ñä…¹…±åÍ¥Ì(´øQ½½°‘¥Í½Ù•Éä(´øÉ•¥ÍÑ•É•…¹¡•…±Ñ¡äü(€€€´øå•ÌèQ…Í¬µ½¹±äQ½½°ÑÉ¥…°(€€€´ø¹¼èQ½½°%¹Ñ•É…Ñ¥½¸…¹‘¥‘…Ñ”(´øÁ•Éµ¥ÍÍ¥½¹Ì½‘…Ñ„½‰¥±±¥¹œ½É•‘•¹Ñ¥…±Ì‘¥Í±½ÍÕÉ”(´ø‘…ÁÑ•È½¹ÑÉ…Ð(´øÉ•…°É•ÍÕ±Ð(´ø…‘½ÁÑ¥½¸Í½Á”)€((ŒŒŒ€ÄÄ¸Ø%µÁÉ½Ù”%A¥ÑÍ•±˜((Ä¸%‘•¹Ñ¥™ä½‰Í•ÉÙ•…¹•áÁ•Ñ•‰•¡…Ù¥½È¸(È¸¥…¹½Í”M­¥±°°]½É­™±½Ü°½É”°Q½½°°Q¡•µ”Á½±¥ä°AÉ½µÁÐ%H°É•Ù¥•Ü°…¹(€€•áÁ½ÉÐ±…å•ÉÌ¸(Ì¸=Á•¸½¹”%µÁÉ½Ù•µ•¹Ð…Í”¸(Ð¸AÉ•Í•ÉÙ”Ñ¡”ÁÉ½‘ÕÑ¥½¸¡•­Á½¥¹Ð¸(Ô¸	Õ¥±½¸…¸¥Í½±…Ñ•Í½ÕÉ”‰É…¹ ¸(Ø¸UÍ”™¥Ñ¥½¹…°ÁÕ‰±¥Œ™¥áÑÕÉ•Ì¸(Ü¸IÕ¸É•…°Ñ•ÍÑÌ…¹É•½É•Ù¥‘•¹”¸(à¸‘½ÁÐ°…‘©ÕÍÐ°½ÈÉ•©•Ð¸(ä¸™Ñ•È…‘½ÁÑ¥½¸°ÁÕ‰±¥Í Ñ¡É½Õ AH…¹$¸(ÄÀ¸I•™É•Í Ñ¡”Á±Õ¥¸…¹ÉÕ¸™½Éµ…°É•É•ÍÍ¥½¸¸((ŒŒ€ÄÈ¸I•½Ù•Éä…¹™…¥±ÕÉ”µ…À()ð…¥±ÕÉ”ðUÍ•ÈµÙ¥Í¥‰±”½ÕÑ½µ”ð½ÉÉ•ÐÉ•½Ù•Éäð)ð€´´´ð€´´´ð€´´´ð)ð5¥ÍÍ¥¹œQ¡•µ”É•ÅÕ¥É•‰äU%ðQ¡•µ”½¹™¥Éµ…Ñ¥½¸ðM•±•Ð°É•…Ñ”°‘•É¥Ù”°½È•áÁ±¥¥Ñ±ä½¹Ñ¥¹Õ”Õ¹‰½Õ¹¥˜…±±½Ý•ð)ð5¥ÍÍ¥¹œÉ•¥ÍÑ•É•Í½ÕÉ”ðM½ÕÉ”¥µÁ½ÉÐÉ•ÅÕ¥É•ðUÍ•È¡½½Í•ÌÍ½ÕÉ”ÕÍ…”ð)ðQ½½°¹½ÐÉ•¥ÍÑ•É•ð]…¥Ñ¥¹œ™½ÈQ½½°ð	¥¹°¥¹Ñ•É…Ñ”°½È…¹•°ð)ðQ½½°Õ¹¡•…±Ñ¡äð]…¥Ñ¥¹œ™½ÈQ½½°ðI•ÑÉä¡•…±Ñ °Í•±•Ð…¹½Ñ¡•ÈQ½½°°½È¥¹Ñ•É…Ñ”ð)ðáÑ•É¹…°…±±‰…¬¥¹Ñ•ÉÉÕÁÑ•ðI•½Ù•É…‰±”•ÉÉ½ÈðI•½Ù•È½ÈÉ•ÑÉäÁ•ÉÍ¥ÍÑ•Ý½É¬ð)ðM•µ…¹Ñ¥Œ™¥¹‘¥¹ÌðI•Ù¥Í¥½¸É•ÅÕ¥É•ðÉ•…Ñ”Í½Á•É•Ù¥Í¥½¸…¹…ÁÁÉ½Ù”Í•Á…É…Ñ•±äð)ð…¹‘¥‘…Ñ”™…¥±•ð…¹‘¥‘…Ñ”‰Õ¥±‘¥¹œð‘©ÕÍÐ…¹‘¥‘…Ñ”ìÍÑ…‰±”É•µ…¥¹ÌÕ¹¡…¹•ð)ðA±Õ¥¸ÁÕ‰±¥Í¡•‰ÕÐ½±Í•ÍÍ¥½¸…Ñ¥Ù”ðA±Õ¥¸É•™É•Í É•ÅÕ¥É•ðI•™É•Í Á±Õ¥¸…¹ÍÑ…ÉÐ¹•ÜÍ•ÍÍ¥½¸ð)ð½Éµ…°É•É•ÍÍ¥½¸™…¥±•ð…¹‘¥‘…Ñ”É•½Á•¹•ð¥à…¹É•ÁÕ‰±¥Í ì‘¼¹½ÐÉ•ÍÕµ”ÁÉ½‘ÕÑ¥½¸ð)ðáÁ½ÉÐ…Ñ”‰±½­•ðáÁ½ÉÐ‘•¹¥•ðI•Í½±Ù”…ÁÁÉ½Ù…±Ì°E°±¥¹•…”°½Èµ¥ÍÍ¥¹œÉÑ¥™…ÑÌð()I•½Ù•ÉäµÕÍÐÕÍ”Á•ÉÍ¥ÍÑ•¡•­Á½¥¹ÑÌ¸%ÐµÕÍÐ¹½Ð¥¹Ù•¹Ð½µÁ±•Ñ•Ý½É¬½È)‘ÕÁ±¥…Ñ”•áÑ•É¹…°½Á•É…Ñ¥½¹Ì‰±¥¹‘±ä¸((ŒŒ€ÄÌ¸áÑ•¹Í¥½¸‰±Õ•ÁÉ¥¹Ð((ŒŒŒ€ÄÌ¸Ä‘‘¥¹œ„½µ…¥¸A…¬()I•ÅÕ¥É•‘•±¥Ù•É…‰±•Ìè((´ÍÑ…‰±”½µ…¥¸%ì(´½µ…¥¸A…¬Í¡•µ„ì(´ÕÍ•Èµ™…¥¹œM­¥±°½ÈÉ½ÕÑ¥¹œÉÕ±•Ìì(´]½É­™±½Üµ…¹¥™•ÍÑÌì(´‘½µ…¥¸½¹Ñ•áÐÍ¡•µ…Ìì(´ÉÑ¥™…Ð­¥¹‘Ìì(´Q½½°…Á…‰¥±¥Ñ¥•Ì…¹…‘…ÁÑ•ÉÌì(´‘•Ñ•Éµ¥¹¥ÍÑ¥ŒEì(´Í•µ…¹Ñ¥Œ¥¹ÍÁ•Ñ½È½¹ÑÉ…Ðì(´É•Ù¥Í¥½¸Á½±¥äì(´•áÁ½ÉÑ•Èì(´ÁÉ¥Ù…äÁ½±¥äì(´™¥Ñ¥½¹…°™¥áÑÕÉ•Ìì(´µ¥É…Ñ¥½¸…¹Ù•ÉÍ¥½¸¹½Ñ•Ìì(´™…¥±ÕÉ”É•½Ù•ÉäÑ•ÍÑÌ¸((ŒŒŒ€ÄÌ¸È‘‘¥¹œ„]½É­™±½Ü()¡•­±¥ÍÐè((Ä¸%‘•¹Ñ¥™ä½µ…¥¸½Ý¹•ÉÍ¡¥À¸(È¸•™¥¹”ÕÍ•È¥¹Ñ•¹Ð…¹¹½¸µ½…±Ì¸(Ì¸•™¥¹”É•ÅÕ¥É•½¹Ñ•áÐ¸(Ð¸•™¥¹”½É‘•É•ÍÑ…•Ì¸(Ô¸•™¥¹”¡…É…¹Í½™Ð½¹ÍÑÉ…¥¹ÑÌ¸(Ø¸•™¥¹”…ÁÁÉ½Ù…°…Ñ•Ì¸(Ü¸•™¥¹”Q½½°…Á…‰¥±¥Ñ¥•Ì¸(à¸•™¥¹”ÉÑ¥™…Ð½ÕÑÁÕÑÌ¸(ä¸•™¥¹”‘•Ñ•Éµ¥¹¥ÍÑ¥Œ…¹Í•µ…¹Ñ¥ŒÉ•Ù¥•Ü¸(ÄÀ¸•™¥¹”É•Ù¥Í¥½¸¥¹Ù…±¥‘…Ñ¥½¸¸(ÄÄ¸•™¥¹”•áÁ½ÉÐÁÉ•É•ÅÕ¥Í¥Ñ•Ì¸(ÄÈ¸‘]½É­™±½ÜØÌµ…¹¥™•ÍÐ¸(ÄÌ¸‘™¥Ñ¥½¹…°Ñ•ÍÑÌ¸(ÄÐ¸UÁ‘…Ñ”½µ…¥¸É•¥ÍÑÉä°I5°!91=°…¹µ¥É…Ñ¥½¸¹½Ñ•Ì¸((ŒŒŒ€ÄÌ¸Ì‘‘¥¹œ…¸¹¥¹”‘…ÁÑ•È()¸¹¥¹”‘…ÁÑ•ÈÍ¡½Õ±è((´…•ÁÐ½¹±ä•áÁ½ÉÐµ•±¥¥‰±”ÉÑ¥™…ÑÌì(´ÁÉ•Í•ÉÙ”ÉÑ¥™…Ð…¹µ…¹¥™•ÍÐ¥‘•¹Ñ¥Ñäì(´µ…À‘¥µ•¹Í¥½¹Ì°…±Á¡„°Á¥Ù½Ð°Í±¥¥¹œ°¡¥•É…É¡ä°ÍÑ…Ñ•Ì°µ…Ñ•É¥…±Ì°…¹(€Ñ…É•ÐÍ•ÑÑ¥¹ÌÝ¡•É”ÍÕÁÁ½ÉÑ•ì(´É•Á½ÉÐ•á…Ñ±äÝ¡…ÐÝ…ÌÝÉ¥ÑÑ•¸ì(´™…¥°Í…™•±äÝ¥Ñ¡½ÕÐ±…¥µ¥¹œ•¹¥¹”¥µÁ½ÉÐÍÕ••‘•ì(´ÍÕÁÁ½ÉÐÉ½±±‰…¬½ÈÁÉ½Ù¥‘”„±•…È¹½¸µÉ½±±‰…¬‰½Õ¹‘…Éä¸((ŒŒŒ€ÄÌ¸Ð‘‘¥¹œ…¸¥¹ÍÁ•Ñ½È()¸¥¹ÍÁ•Ñ½È½¹ÑÉ…Ð¹••‘Ìè((´ÍÑ…‰±”¥¹ÍÁ•Ñ½È¥‘•¹Ñ¥Ñäì(´ÍÕÁÁ½ÉÑ•µ•‘¥„…¹É¥Ñ•É¥„ì(´Á•Éµ¥ÍÍ¥½¸…¹‘…Ñ„µÍ½Á”‘¥Í±½ÍÕÉ”ì(´…ÑÕ…°ÉÑ¥™…Ð…ÑÑ…¡µ•¹Ðì(´ÍÑÉÕÑÕÉ•ÍÑ…ÑÕÌ°ÍÕµµ…Éä°…¹™¥¹‘¥¹Ìì(´¹¼µ•Ñ…‘…Ñ„µ½¹±äÍ•µ…¹Ñ¥ŒÁ…ÍÌì(´É•ÑÉä…¹™…¥±ÕÉ”‰•¡…Ù¥½Èì(´Ñ•ÍÑÌÕÍ¥¹œ™¥Ñ¥½¹…°µ•‘¥„¸((ŒŒ€ÄÐ¸=Á•É…Ñ¥½¹…°¡•­±¥ÍÑÌ((ŒŒŒ	•™½É”ÁÉ½‘ÕÑ¥½¸((´lt½ÉÉ•Ð½µ…¥¸…¹]½É­™±½ÜÍ•±•Ñ•¸(´ltI•ÅÕ¥É•½¹Ñ•áÐ¥ÌÁÉ•Í•¹Ð¸(´ltI•…°Í½ÕÉ”ÕÍ…”¥ÌÉ•¥ÍÑ•É•¸(´ltQ½½°…Á…‰¥±¥Ñ¥•Ì…É”…Ù…¥±…‰±”…¹¡•…±Ñ¡ä¸(´ltA•Éµ¥ÍÍ¥½¹Ì°‘…Ñ„™±½Ü°É•‘•¹Ñ¥…±Ì°…¹‰¥±±¥¹œ…É”Õ¹‘•ÉÍÑ½½¸(´ltAÉ½‘ÕÑ¥½¸½¹ÑÉ…Ð¥Ì½µÁ±•Ñ”¸(´ltI•ÅÕ¥É•…ÁÁÉ½Ù…°¥ÌÉ•½É‘•¸((ŒŒŒ	•™½É”…•ÁÑ¥¹œ…¸ÉÑ¥™…Ð((´ltI•ÍÕ±Ð™¥±”¥ÌÉ•…°…¹É•¥ÍÑ•É•¸(´ltQ½½°…¹µ½‘•°¥‘•¹Ñ¥Ñä…É”ÑÉÕÑ¡™Õ°¸(´ltM¥µÕ±…Ñ¥½¸™±…œ¥Ì™…±Í”™½ÈÁÉ½‘ÕÑ¥½¸¸(´ltI•™•É•¹•Ì…¹±¥¹•…”…É”Ù…±¥¸(´lt5•Ñ…‘…Ñ„EÁ…ÍÍ•¸(´ltAÉ½Ñ•Ñ•µÁ¥á•°EÁ…ÍÍ•Ý¡•¸…ÁÁ±¥…‰±”¸(´ltM•µ…¹Ñ¥ŒÉ•Ù¥•ÜÕÍ•Ñ¡”É•…°ÉÑ¥™…Ð¸(´ltUÍ•È½¹™¥Éµ•ÍÕ‰©•Ñ¥Ù”…•ÁÑ…¹”Ý¡•¸É•ÅÕ¥É•¸((ŒŒŒ	•™½É”•áÁ½ÉÐ((´ltÑ¥Ù”ÉÑ¥™…ÑÌ…É”…ÁÁÉ½Ù•¸(´lt9¼‰±½­¥¹œÙ¥ÍÕ…°™¥¹‘¥¹ÌÉ•µ…¥¸¸(´ltI•ÅÕ¥É•±…å•È‘•Á•¹‘•¹¥•Ì…É”½µÁ±•Ñ”¸(´lt½µÁ½Í¥Ñ¥½¸µ…¹¥™•ÍÐ¥ÌÙ…±¥¸(´ltQ…É•Ð¹¥¹”‘…ÁÑ•È¥ÌÍÕÁÁ½ÉÑ•¸(´ltáÁ½ÉÐ‘•ÍÑ¥¹…Ñ¥½¸…¹½Ù•ÉÝÉ¥Ñ”Á½±¥ä…É”•áÁ±¥¥Ð¸(´ltI½±±‰…¬‰½Õ¹‘…Éä¥ÌÕ¹‘•ÉÍÑ½½¸((ŒŒŒ	•™½É”…‘½ÁÑ¥¹œ„™É…µ•Ý½É¬¡…¹”((´ltMÑ…‰±”‰…Í•±¥¹”É•½É‘•Ý¡•É”ÁÉ…Ñ¥…°¸(´lt…¹‘¥‘…Ñ”‰É…¹ …¹Ù•ÉÍ¥½¸±¥¹­•¸(´ltI•…°…¹‘¥‘…Ñ”•Ù¥‘•¹”É•½É‘•¸(´lt9¼ÕÍ•ÈµÁÉ¥Ù…Ñ”‘…Ñ„•¹Ñ•É•ÁÕ‰±¥Œ¥Ð¸(´lt	…­Ý…É½µÁ…Ñ¥‰¥±¥Ñä…ÍÍ•ÍÍ•¸(´ltI5°!91=°µ¥É…Ñ¥½¸°µ…¹¥™•ÍÑÌ°…¹Ñ•ÍÑÌÕÁ‘…Ñ•¸(´ltUÍ•È¡…ÌÉ•Ù¥•Ý•Ñ¡”…¹‘¥‘…Ñ”É•ÍÕ±Ð¸(´lt‘½ÁÑ¥½¸‘•¥Í¥½¸¥Ì•áÁ±¥¥Ð¸((ŒŒŒ	•™½É”ÁÕ‰±¥…Ñ¥½¸((´lt‘½ÁÑ¥½¸ÍÑ…Ñ”…ÕÑ¡½É¥é•ÌÁÕ‰±¥…Ñ¥½¸¸(´lt	É…¹ ¥ÌÁÕÍ¡•¸(´ltAH¥Ì½Á•¸Ý¥Ñ µ¥É…Ñ¥½¸…¹•Ù¥‘•¹”ÍÕµµ…Éä¸(´ltI•ÅÕ¥É•$Á…ÍÍ•Ì¸(´ltI•Ù¥•Ü¥ÍÍÕ•Ì…É”É•Í½±Ù•¸(´lt5…¥¸¥ÌÁÉ½Ñ•Ñ•™É½´Õ¹É•Ù¥•Ý•¡…¹•Ì¸(´ltI•±•…Í”Ù•ÉÍ¥½¸¥Ì½¹Í¥ÍÑ•¹Ð…É½ÍÌ™¥±•Ì¸(´ltI•Á½Í¥Ñ½Éä°AH°µ•É”½µµ¥Ð°…¹µ¥¹¥µÕ´Á±Õ¥¸Ù•ÉÍ¥½¸…É”É•½É‘•¸(´ltA±Õ¥¸É•™É•Í …¹¹•ÜµÍ•ÍÍ¥½¸É•ÅÕ¥É•µ•¹Ð¥Ì½µµÕ¹¥…Ñ•¸(´lt½Éµ…°É•É•ÍÍ¥½¸Á±…¸¥ÌÉ•…‘ä¸((ŒŒ€ÄÔ¸EÕ¥¬µÉ•™•É•¹”µ…ÑÉ¥à()ðUÍ•È…Í­Ì™½ÈðM­¥±°ð½µ…¥¸ð]½É­™±½Ü€¼ÁÉ½•ÍÌðAÉ¥µ…ÉäQ½½°½È…‘…ÁÑ•Èð-•ä…Ñ”ð)ð€´´´ð€´´´ð€´´´ð€´´´ð€´´´ð€´´´ð)ð•¹•É…°$ÁÉ½‘ÕÑ¥½¸ð€‘…¥Áœµ™É…µ•Ý½É­€ðI½ÕÑ•ðI•¥ÍÑ•É•]½É­™±½Üð…Á…‰¥±¥Ñäµ‘•Á•¹‘•¹ÐðA±…¸…ÁÁÉ½Ù…°ð)ð…µ”U$‘•Í¥¸ð€‘…µ”µÕ¤µ™É…µ•Ý½É­€ðY¥ÍÕ…°ðU$ÁÉ½‘ÕÑ¥½¸ð¡…ÑÁÐµ¥µ…•€ðAÉ½‘ÕÑ¥½¸…ÁÁÉ½Ù…°ð)ð=¹”•™™•Ð¥µ…”ð€‘…µ”µÕ¤µ™É…µ•Ý½É­€ðY¥ÍÕ…°ð™™•Ð¥µ…”ð¡…ÑÁÐµ¥µ…•€ðY¥ÍÕ…°É•Ù¥•Üð)ðAÉ½Ñ•Ñ•¥µ…”•‘¥Ðð€‘…µ”µÕ¤µ™É…µ•Ý½É­€ðY¥ÍÕ…°ð%µ…”•‘¥Ñ¥¹œð¡…ÑÁÐµ¥µ…•€ðM½ÕÉ”€¬É•Ù¥Í¥½¸…ÁÁÉ½Ù…°ð)ð1…å•É•U$…ÍÍ•ÑÌð€‘…µ”µÕ¤µ™É…µ•Ý½É­€ðY¥ÍÕ…°ð5…ÍÑ•ÈµÕ¥‘•±…å•ÉÌð¡…ÑÁÐµ¥µ…•€€¬¥¹ÍÁ•Ñ½Èð1…å•ÈµÁ±…¸€¬™¥¹…°…ÁÁÉ½Ù…°ð)ðY¥ÍÕ…°¥¹ÍÁ•Ñ¥½¸ð€‘…µ”µÕ¤µ™É…µ•Ý½É­€ðY¥ÍÕ…°ðEð¡…ÑÁÐµÙ¥Í¥½¹€ðI•…°ÉÑ¥™…ÐÉ•ÅÕ¥É•ð)ðU¹¥Ñä½ÕÑÁÕÐð€‘…µ”µÕ¤µ™É…µ•Ý½É­€ðY¥ÍÕ…°ðáÁ½ÉÐðU¹¥Ñä¹¥¹”‘…ÁÑ•ÈðáÁ½ÉÐ…Ñ”ð)ð½¹ÑÉ…Ðµ½¹±äÑ•ÍÐð•Ù•±½Á•È½½Á•É…Ñ½Èð¹äÍÕÁÁ½ÉÑ•ðá¥ÍÑ¥¹œ]½É­™±½Üð‘ÉäµÉÕ¹€ð9•Ù•ÈÑÉ•…Ñ•…ÌÁÉ½‘ÕÑ¥½¸ð)ð¡…¹”Q½½°É½ÕÑ”ð€‘…¥Áœµ™É…µ•Ý½É­€ð½Ù•É¹…¹”ðQ½½°¡…¹”ðI•¥ÍÑ•É•Q½½°ðÙ¥‘•¹”€¬…‘½ÁÑ¥½¸Í½Á”ð)ð%¹Ñ•É…Ñ”¹•ÜQ½½°ð€‘…¥Áœµ™É…µ•Ý½É­€ð½Ù•É¹…¹”ðQ½½°%¹Ñ•É…Ñ¥½¸…¹‘¥‘…Ñ”ð9•Ü‘…ÁÑ•Èð‘½ÁÑ¥½¸ð)ð¡…¹”™É…µ•Ý½É¬ð€‘…¥Áœµ™É…µ•Ý½É­€ð½Ù•É¹…¹”ð…¹‘¥‘…Ñ”¡…¹”ðM½ÕÉ”É•Á½Í¥Ñ½Éäð‘½ÁÑ¥½¸€¬ÁÕ‰±¥…Ñ¥½¸ð((ŒŒ€ÄØ¸½±‘•¸ÉÕ±•Ì((Ä¸I½ÕÑ”‰ä½µ…¥¸…¹]½É­™±½Ü‰•™½É”…Í­¥¹œ™½È‘½µ…¥¸µÍÁ•¥™¥Œ½¹Ñ•áÐ¸(È¸Q¡•µ”‰•±½¹ÌÑ¼U%°¹½ÐÑ¡”%AÑ½À±•Ù•°¸(Ì¸M­¥±°½Ù•É¹ÌìQ½½°•á•ÕÑ•ÌìÉÑ¥™…ÐÉ•½É‘ÌìÉ•Ù¥•Ü•Ù…±Õ…Ñ•Ì¸(Ð¸Q½½°¥‘•¹Ñ¥Ñä¥Ì¹½ÐÑ¡”Í…µ”…Ì…Á…‰¥±¥Ñä¸(Ô¸ÉäÉÕ¸¥Ì¹•Ù•È„É•…°µ•‘¥„É•ÍÕ±Ð¸(Ø¸5•Ñ…‘…Ñ„¥Ì¹•Ù•ÈÍ•µ…¹Ñ¥ŒÉ•Ù¥•Ü¸(Ü¸Ù•ÉäÉ•Ù¥Í¥½¸¡…Ì¥ÑÌ½Ý¸Í½Á”…¹…ÁÁÉ½Ù…°¸(à¸I•…°Í½ÕÉ•Ì…¹•Ù¥‘•¹”É•µ…¥¸ÁÉ¥Ù…Ñ”‰ä‘•™…Õ±Ð¸(ä¸…¹‘¥‘…Ñ”‘½•Ì¹½Ð…±Ñ•ÈÍÑ…‰±”ÁÉ½‘ÕÑ¥½¸¸(ÄÀ¸‘½ÁÑ¥½¸°ÁÕ‰±¥…Ñ¥½¸°Á±Õ¥¸É•™É•Í °…¹™½Éµ…°É•É•ÍÍ¥½¸…É”Í•Á…É…Ñ”(€€€ÍÑ…Ñ•Ì¸(ÄÄ¸	…­Ý…É½µÁ…Ñ¥‰¥±¥ÑäÉ•ÅÕ¥É•Ì•áÁ±¥¥Ð½¹ÑÉ…ÑÌ…¹µ¥É…Ñ¥½¸¸(ÄÈ¸%˜„…Á…‰¥±¥Ñä¥ÌÕ¹…Ù…¥±…‰±”°ÍÑ½ÀÑÉÕÑ¡™Õ±±ä½È¥¹Ñ•É…Ñ”¥ÓŠQ¹•Ù•È(€€€™…‰É¥…Ñ”ÍÕ•ÍÌ¸(
+| Painted background or illustration | Raster image generation |
+| Pixel-level edit | Image editing |
+| Transparent layer asset | Transparent image output |
+| Structured UI hierarchy | Structured layout Tool |
+| Editable component library | Design-system / component Tool |
+| Visual semantic judgment | Visual inspector |
+| Unity import and hierarchy | Engine Adapter |
+
+Selecting a structured layout Tool must not automatically replace raster image
+generation.
+
+## 7. Data, privacy, and lineage map
+
+```mermaid
+flowchart LR
+    PG["Framework Git"] --> PUB["Code, public docs, fictional fixtures"]
+    PJ["Project Git"] --> PA["Explicitly selected project assets and config"]
+    PD["Private framework data"] --> TH["Theme records"]
+    PD --> SO["Source Library"]
+    PD --> CV["Conversation and Task state"]
+    PD --> EV["Candidate evidence"]
+    PD --> CR["Credentials, claims, callbacks"]
+
+    PUB -. "must not contain" .-> TH
+    PUB -. "must not contain" .-> SO
+    PA -. "default exclusion" .-> CV
+    PA -. "default exclusion" .-> EV
+```
+
+### Storage rules
+
+| Data | Default storage | Public Git allowed? |
+| --- | --- | --- |
+| Framework source and public docs | Framework Git | Yes |
+| Fictional tests and fixtures | Framework Git | Yes |
+| Real Theme content | Private framework data | No |
+| Uploaded or conversation images | Private Source Library | No |
+| Prompts and decisions | Private framework data | No |
+| Credentials and tokens | Private framework data | No |
+| Candidate evidence | Private framework data | No |
+| Exported project asset | User-selected Project location | Only after explicit selection |
+| Public regression image | Framework Git | Only if wholly fictional |
+
+### Source roles
+
+| Source usage | Meaning |
+| --- | --- |
+| `editable-source` | Authorized source for protected editing |
+| `theme-reference` | Visual direction reference |
+| `master-reference` | Master guidance for composition and style |
+
+An unregistered image cannot silently become a protected GUIF edit source.
+
+### Artifact lineage
+
+Every real Artifact should identify:
+
+- source Task and job;
+- Tool identity and model identity when available;
+- input references;
+- output contract;
+- approval snapshot;
+- file identity;
+- simulation and visual flags;
+- QA state;
+- supersession relationship;
+- export relationship.
+
+## 8. GUIF visual workflow map
+
+### 8.1 Standard UI production
+
+```text
+Theme/context
+-> requirement
+-> structured plan
+-> art direction
+-> resource contract
+-> model-neutral Prompt IR
+-> approval
+-> real image production
+-> metadata + semantic review
+-> revision when needed
+-> export
+```
+
+Use when the desired output is an interface or visual asset set but does not
+require the master-guided bottom-to-top method.
+
+### 8.2 Existing-image editing
+
+```text
+actual image
+-> source-registration decision
+-> editable-source registration
+-> protected edit contract
+-> edit approval
+-> real image edit
+-> protected-pixel check
+-> semantic review
+-> replacement / supersession
+```
+
+Initial generation approval does not authorize later editing. Every revision
+has its own approval.
+
+### 8.3 Master-guided layer creation
+
+```mermaid
+flowchart TD
+    T["Theme"] --> M["Master effect image"]
+    M --> MA["Master approval"]
+    MA --> LA["Coarse semantic layer analysis"]
+    LA --> LP["Layer-plan approval"]
+    LP --> B["Activate bottom layer"]
+    B --> LC["Create current layer with adaptive freedom"]
+    LC --> RC["Recompose with completed layers"]
+    RC --> SV["Semantic visual review"]
+    SV --> OK{"Layer accepted?"}
+    OK -->|No| REV["Revise selected layer"]
+    REV --> RC
+    OK -->|Yes| NEXT{"More layers?"}
+    NEXT -->|Yes| LC
+    NEXT -->|No| FV["Final composition review"]
+    FV --> EXP["Export layers, composite, and manifest"]
+```
+
+The master policy is:
+
+```json
+{
+  "role": "style-and-layout-guidance",
+  "pixel_matching": false,
+  "layout_anchors": "preserve",
+  "style_intent": "preserve",
+  "creative_interpretation": "allowed"
+}
+```
+
+Hard constraints:
+
+- functional role;
+- major layout anchors;
+- independent asset boundary;
+- required text or information;
+- protected content;
+- transparency and canvas contract;
+- interaction-state requirements.
+
+Soft guidance:
+
+- shape details;
+- materials;
+- texture;
+- lighting;
+- decoration;
+- local color interpretation;
+- visual response to completed layers.
+
+Creative freedom:
+
+| Level | Typical layers |
+| --- | --- |
+| Low | Brand marks, key controls, critical information |
+| Medium | Panels, frames, icons, secondary controls |
+| High | Backgrounds, atmosphere, decorative effects, foreground particles |
+
+Revising layer N:
+
+- preserves approved protected layers below N;
+- invalidates layer N;
+- invalidates downstream composites and dependent layers;
+- requires a new semantic review;
+- does not authorize unrelated edits.
+
+### 8.4 Visual assurance ladder
+
+| Level | Can establish | Cannot establish |
+| --- | --- | --- |
+| File validation | File exists, readable format | Visual correctness |
+| Metadata QA | Dimensions, MIME type, alpha declaration, naming | Composition or quality |
+| Pixel QA | Protected pixels unchanged within tolerance | Theme or usability |
+| Contract QA | Required structured fields and approvals exist | Actual model output quality |
+| Semantic visual review | Composition, readability, Theme consistency, visual findings | User preference without user confirmation |
+| User approval | Subjective acceptance and authorization | Tool execution that never happened |
+
+## 9. Approval and governance map
+
+### 9.1 Production approvals
+
+| Gate | Authorizes | Does not authorize |
+| --- | --- | --- |
+| Plan approval | Execute the approved initial plan | Future revisions |
+| Layer-plan approval | Execute listed layers in order | Unlisted assets or major layout changes |
+| Revision approval | Apply the specified scoped edit | Other layers or protected regions |
+| Final visual approval | Mark reviewed composition acceptable | Export to every target |
+| Export approval/request | Materialize approved assets for target | Framework publication |
+
+### 9.2 Candidate Change approvals
+
+Candidate governance has two independent decisions:
+
+```text
+proposal
+-> candidate-build authorization
+-> isolated implementation
+-> real evidence
+-> adoption decision
+-> publication
+```
+
+| Decision | Meaning |
+| --- | --- |
+| Build candidate | May implement and validate in isolation |
+| Request changes | Return to candidate building |
+| Reject candidate | Keep stable system |
+| Adopt candidate | Authorize publication workflow |
+
+Adoption is valid only after real candidate evidence exists.
+
+### 9.3 Change classification
+
+| Change type | Use when |
+| --- | --- |
+| `skill-change` | Natural-language operating policy is wrong or incomplete |
+| `framework-change` | Core domain-neutral behavior must change |
+| `workflow-change` | Stage order, gates, or required context must change |
+| `multi-layer-change` | Several framework layers change together |
+| `theme-policy-change` | Theme storage, binding, or application rules change |
+| `provider-routing-change` | Legacy/provider selection behavior changes |
+| `tool-change` | Switch to an already registered available Tool |
+| `tool-integration-change` | New or unsupported Tool needs an Adapter |
+
+Diagnosis should consider all affected layers before selecting a type.
+
+## 10. Version governance
+
+AIPG has several version axes. They must not be collapsed into one number.
+
+### 10.1 Version axes
+
+| Version | Example | Governs |
+| --- | --- | --- |
+| Plugin version | `1.1.0-beta.1` | Installed Codex plugin snapshot |
+| Candidate plugin version | `1.1.0-beta.1-candidate.2` | Isolated pre-adoption build |
+| Python package version | `1.1.0b1` | `aipg-framework` distribution |
+| Public API version | `1` | Compatibility surface |
+| Workflow schema | `3` | Workflow manifest structure |
+| Artifact schema | `1` | Artifact record structure |
+| Task schema | `2`, `3` | Persisted Task compatibility |
+| Theme version | Immutable integer version | User-owned Theme evolution |
+| Tool manifest version | Tool-specific, e.g. `1.0` | Adapter capability declaration |
+| Domain Pack schema | `1` | Domain registry contract |
+
+### 10.2 Semantic versioning policy
+
+| Change | Version impact |
+| --- | --- |
+| Documentation clarification only | Patch or no runtime version change |
+| Backward-compatible workflow/Tool capability | Minor |
+| New Domain Pack | Minor |
+| New optional Workflow v3 | Minor |
+| Bug fix without contract change | Patch |
+| Plugin packaging correction | Patch |
+| Breaking public API or persisted schema | Major or new public API version |
+| Candidate iteration | Candidate suffix only until adoption |
+
+Prerelease identifiers do not make a breaking change safe. Compatibility still
+requires an explicit migration path.
+
+### 10.3 Compatibility rules
+
+AIPG 1.x currently preserves:
+
+- `guif` Python import;
+- `guif` CLI alias;
+- `$game-ui-framework`;
+- existing GUIF private-data environment variables;
+- Workflow schema v1 and v2;
+- existing Theme, Source, Artifact, Task, and Candidate records within declared
+  supported schemas;
+- explicit Legacy ProviderAdapter compatibility.
+
+New domain-neutral integrations should use `aipg`; visual integrations may use
+`guif`.
+
+### 10.4 Release governance
+
+```mermaid
+flowchart TD
+    I["Issue / desired change"] --> CASE["Private Improvement Case"]
+    CASE --> BR["Candidate branch"]
+    BR --> CODE["Implementation + docs + migration"]
+    CODE --> TEST["Unit, contract, regression, build, install tests"]
+    TEST --> EVID["Record real candidate evidence"]
+    EVID --> ADOPT{"User adopts?"}
+    ADOPT -->|No, adjust| CODE
+    ADOPT -->|Reject| CLOSE["Close; stable retained"]
+    ADOPT -->|Yes| PUSH["Push candidate branch"]
+    PUSH --> PR["Open PR"]
+    PR --> CI["Required CI and review"]
+    CI -->|Fail| CODE
+    CI -->|Pass| MERGE["Merge to protected main"]
+    MERGE --> TAG["Release version / tag / package"]
+    TAG --> RECORD["Record repository, PR, merge commit, minimum plugin version"]
+    RECORD --> REFRESH["User refreshes plugin"]
+    REFRESH --> SESSION["Start a new Codex session"]
+    SESSION --> REG["Replay formal regression"]
+    REG -->|Pass| RESUME["Resume production"]
+    REG -->|Fail| CODE
+```
+
+### 10.5 Required release records
+
+A published framework change records:
+
+- repository;
+- branch;
+- pull request;
+- merge commit;
+- released version;
+- minimum plugin version;
+- build and test outcome;
+- migration notes;
+- refresh requirement;
+- formal regression outcome.
+
+### 10.6 Version-file maintenance checklist
+
+When a release changes version or identity, inspect and update:
+
+- `.codex-plugin/plugin.json`;
+- repository marketplace metadata;
+- `pyproject.toml`;
+- `aipg` and `guif` package version exposure;
+- CI version assertions;
+- README and Chinese README;
+- CHANGELOG;
+- candidate/release notes;
+- architecture and migration documents;
+- plugin Skills and their user-facing refresh name;
+- package provenance expectations;
+- tests that assert plugin/package identity.
+
+Historical release notes should remain historically accurate rather than being
+mechanically rewritten.
+
+## 11. End-to-end user journeys
+
+### 11.1 General governed production
+
+1. User describes the outcome.
+2. `$aipg-framework` identifies the Domain.
+3. AIPG selects or requests a Workflow.
+4. The Workflow declares required context.
+5. Missing context is requested without exposing runtime internals.
+6. A production contract is presented.
+7. User approves, requests changes, or rejects.
+8. Tool resolution verifies capability and health.
+9. Real results become registered Artifacts.
+10. Required review runs at the correct assurance level.
+11. Revisions receive independent approval.
+12. Export occurs only when the gate passes.
+
+### 11.2 Create one game UI effect image
+
+Suggested request:
+
+> Use GUIF to create a fictional sci-fi inventory screen. Confirm the Theme and
+> plan before generating.
+
+Expected route:
+
+```text
+$game-ui-framework
+-> visual-production
+-> effect-image or ui-production
+-> Theme
+-> plan approval
+-> chatgpt-image
+-> Artifact
+-> chatgpt-vision
+-> final approval
+-> optional export
+```
+
+### 11.3 Create a layered game UI
+
+Suggested request:
+
+> Use the approved master as style and layout guidance. Analyze coarse layers,
+> let AI creatively interpret soft details, then produce from background to
+> foreground and export independent assets.
+
+Expected route:
+
+```text
+$game-ui-framework
+-> master-guided-layer-creation
+-> Theme + master-reference
+-> master approval
+-> layer-plan approval
+-> background
+-> current composite
+-> container/frame
+-> current composite
+-> controls/content
+-> current composite
+-> decoration/effects
+-> final semantic review
+-> layer manifest + engine export
+```
+
+### 11.4 Edit an existing image safely
+
+1. GUIF checks whether the image is registered.
+2. If not, the user chooses:
+   - editable source;
+   - Theme reference;
+   - master reference;
+   - leave the formal chain.
+3. Editable-source registration creates immutable lineage.
+4. The edit plan identifies protected regions.
+5. User approves the edit.
+6. Real editing occurs.
+7. Protected pixels and semantic quality are reviewed.
+8. A passing replacement may supersede the source.
+
+### 11.5 Add a new Tool
+
+Suggested request:
+
+> Add a structured layout Tool for GUIF component hierarchy, but keep raster
+> generation on the current image Tool.
+
+Expected route:
+
+```text
+$aipg-framework
+-> capability analysis
+-> Tool discovery
+-> registered and healthy?
+   -> yes: Task-only Tool trial
+   -> no: Tool Integration Candidate
+-> permissions/data/billing/credentials disclosure
+-> Adapter contract
+-> real result
+-> adoption scope
+```
+
+### 11.6 Improve AIPG itself
+
+1. Identify observed and expected behavior.
+2. Diagnose Skill, Workflow, Core, Tool, Theme policy, Prompt IR, review, and
+   export layers.
+3. Open one Improvement Case.
+4. Preserve the production checkpoint.
+5. Build on an isolated source branch.
+6. Use fictional public fixtures.
+7. Run real tests and record evidence.
+8. Adopt, adjust, or reject.
+9. After adoption, publish through PR and CI.
+10. Refresh the plugin and run formal regression.
+
+## 12. Recovery and failure map
+
+| Failure | User-visible outcome | Correct recovery |
+| --- | --- | --- |
+| Missing Theme required by GUIF | Theme confirmation | Select, create, derive, or explicitly continue unbound if allowed |
+| Missing registered source | Source import required | User chooses source usage |
+| Tool not registered | Waiting for Tool | Bind, integrate, or cancel |
+| Tool unhealthy | Waiting for Tool | Retry health, select another Tool, or integrate |
+| External callback interrupted | Recoverable error | Recover or retry persisted work |
+| Semantic findings | Revision required | Create scoped revision and approve separately |
+| Candidate failed | Candidate building | Adjust candidate; stable remains unchanged |
+| Plugin published but old session active | Plugin refresh required | Refresh plugin and start new session |
+| Formal regression failed | Candidate reopened | Fix and republish; do not resume production |
+| Export gate blocked | Export denied | Resolve approvals, QA, lineage, or missing Artifacts |
+
+Recovery must use persisted checkpoints. It must not invent completed work or
+duplicate external operations blindly.
+
+## 13. Extension blueprint
+
+### 13.1 Adding a Domain Pack
+
+Required deliverables:
+
+- stable Domain ID;
+- Domain Pack schema;
+- user-facing Skill or routing rules;
+- Workflow manifests;
+- domain context schemas;
+- Artifact kinds;
+- Tool capabilities and adapters;
+- deterministic QA;
+- semantic inspector contract;
+- revision policy;
+- exporter;
+- privacy policy;
+- fictional fixtures;
+- migration and version notes;
+- failure recovery tests.
+
+### 13.2 Adding a Workflow
+
+Checklist:
+
+1. Identify Domain ownership.
+2. Define user intent and non-goals.
+3. Define required context.
+4. Define ordered stages.
+5. Define hard and soft constraints.
+6. Define approval gates.
+7. Define Tool capabilities.
+8. Define Artifact outputs.
+9. Define deterministic and semantic review.
+10. Define revision invalidation.
+11. Define export prerequisites.
+12. Add Workflow v3 manifest.
+13. Add fictional tests.
+14. Update Domain registry, README, CHANGELOG, and migration notes.
+
+### 13.3 Adding an Engine Adapter
+
+An Engine Adapter should:
+
+- accept only export-eligible Artifacts;
+- preserve Artifact and manifest identity;
+- map dimensions, alpha, pivot, slicing, hierarchy, states, materials, and
+  target settings where supported;
+- report exactly what was written;
+- fail safely without claiming engine import succeeded;
+- support rollback or provide a clear non-rollback boundary.
+
+### 13.4 Adding an inspector
+
+An inspector contract needs:
+
+- stable inspector identity;
+- supported media and criteria;
+- permission and data-scope disclosure;
+- actual Artifact attachment;
+- structured status, summary, and findings;
+- no metadata-only semantic pass;
+- retry and failure behavior;
+- tests using fictional media.
+
+## 14. Operational checklists
+
+### Before production
+
+- [ ] Correct Domain and Workflow selected.
+- [ ] Required context is present.
+- [ ] Real source usage is registered.
+- [ ] Tool capabilities are available and healthy.
+- [ ] Permissions, data flow, credentials, and billing are understood.
+- [ ] Production contract is complete.
+- [ ] Required approval is recorded.
+
+### Before accepting an Artifact
+
+- [ ] Result file is real and registered.
+- [ ] Tool and model identity are truthful.
+- [ ] Simulation flag is false for production.
+- [ ] References and lineage are valid.
+- [ ] Metadata QA passed.
+- [ ] Protected-pixel QA passed when applicable.
+- [ ] Semantic review used the real Artifact.
+- [ ] User confirmed subjective acceptance when required.
+
+### Before export
+
+- [ ] Active Artifacts are approved.
+- [ ] No blocking visual findings remain.
+- [ ] Required layer dependencies are complete.
+- [ ] Composition manifest is valid.
+- [ ] Target Engine Adapter is supported.
+- [ ] Export destination and overwrite policy are explicit.
+- [ ] Rollback boundary is understood.
+
+### Before adopting a framework change
+
+- [ ] Stable baseline recorded where practical.
+- [ ] Candidate branch and version linked.
+- [ ] Real candidate evidence recorded.
+- [ ] No user-private data entered public Git.
+- [ ] Backward compatibility assessed.
+- [ ] README, CHANGELOG, migration, manifests, and tests updated.
+- [ ] User has reviewed the candidate result.
+- [ ] Adoption decision is explicit.
+
+### Before publication
+
+- [ ] Adoption state authorizes publication.
+- [ ] Branch is pushed.
+- [ ] PR is open with migration and evidence summary.
+- [ ] Required CI passes.
+- [ ] Review issues are resolved.
+- [ ] Main is protected from unreviewed changes.
+- [ ] Release version is consistent across files.
+- [ ] Repository, PR, merge commit, and minimum plugin version are recorded.
+- [ ] Plugin refresh and new-session requirement is communicated.
+- [ ] Formal regression plan is ready.
+
+## 15. Quick-reference matrix
+
+| User asks for | Skill | Domain | Workflow / process | Primary Tool or adapter | Key gate |
+| --- | --- | --- | --- | --- | --- |
+| General AI production | `$aipg-framework` | Routed | Registered Workflow | Capability-dependent | Plan approval |
+| Game UI design | `$game-ui-framework` | Visual | UI production | `chatgpt-image` | Production approval |
+| One effect image | `$game-ui-framework` | Visual | Effect image | `chatgpt-image` | Visual review |
+| Protected image edit | `$game-ui-framework` | Visual | Image editing | `chatgpt-image` | Source + revision approval |
+| Layered UI assets | `$game-ui-framework` | Visual | Master-guided layers | `chatgpt-image` + inspector | Layer-plan + final approval |
+| Visual inspection | `$game-ui-framework` | Visual | QA | `chatgpt-vision` | Real Artifact required |
+| Unity output | `$game-ui-framework` | Visual | Export | Unity Engine Adapter | Export gate |
+| Contract-only test | Developer/operator | Any supported | Existing Workflow | `dry-run` | Never treated as production |
+| Change Tool route | `$aipg-framework` | Governance | Tool Change | Registered Tool | Evidence + adoption scope |
+| Integrate new Tool | `$aipg-framework` | Governance | Tool Integration Candidate | New Adapter | Adoption |
+| Change framework | `$aipg-framework` | Governance | Candidate Change | Source repository | Adoption + publication |
+
+## 16. Golden rules
+
+1. Route by Domain and Workflow before asking for domain-specific context.
+2. Theme belongs to GUIF, not the AIPG top level.
+3. Skill governs; Tool executes; Artifact records; review evaluates.
+4. Tool identity is not the same as capability.
+5. Dry run is never a real media result.
+6. Metadata is never semantic review.
+7. Every revision has its own scope and approval.
+8. Real sources and evidence remain private by default.
+9. A candidate does not alter stable production.
+10. Adoption, publication, plugin refresh, and formal regression are separate
+    states.
+11. Backward compatibility requires explicit contracts and migration.
+12. If a capability is unavailable, stop truthfully or integrate itâ€”never
+    fabricate success.
