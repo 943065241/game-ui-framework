@@ -15,13 +15,18 @@ unreleased work and do not imply adoption or publication.
 - Authoritative `aipg.domains.DomainRegistry` with built-in visual-production
   and framework-governance registrations.
 - Executable `WorkflowEngine` with run creation, lifecycle transitions,
-  action binding, pause/resume, bounded retry, cancellation, checkpoints, and
-  output contract validation.
-- Domain-neutral synchronous `EventBus` and `RuntimeEvent` contracts for
-  Workflow and action lifecycle events.
-- Contract tests for nested workflows, lifecycle modes, capability matching,
-  Artifact ancestry, domain ownership, serialization, compatibility aliases,
-  runtime state transitions, event delivery, and retry limits.
+  action binding, pause/resume, bounded retry, cancellation and output contract
+  validation.
+- Automatic graph traversal for Sequence, Parallel, Selector, Condition,
+  Action, Subworkflow, Approval and Review nodes.
+- Nested Workflow execution on the finite call stack with child context returned
+  to the parent frame.
+- Persistence-neutral `CheckpointStore` protocol and default
+  `InMemoryCheckpointStore`.
+- Domain-neutral synchronous `EventBus` and lifecycle events for Workflows,
+  nodes, actions, child Workflows and reviews.
+- Contract tests for lifecycle, graph traversal, conditions, nested Workflows,
+  approval pauses, checkpoint storage, Domain Packs, capabilities and Artifacts.
 
 ### Changed
 
@@ -31,20 +36,20 @@ unreleased work and do not imply adoption or publication.
   from focused AIPG modules and re-exported by `aipg`.
 - Promoted Domain Pack ownership from `guif.domains` to `aipg.domains`;
   `guif.domains` now delegates to the AIPG registry as a compatibility surface.
-- Promoted Workflow lifecycle execution into AIPG while keeping visual actions
-  and provider-specific behavior outside the Runtime.
+- Promoted Workflow lifecycle and graph execution into AIPG while keeping visual
+  actions and provider-specific behavior outside the Runtime.
 - Clarified that GUIF remains the compatible visual implementation while generic
   responsibilities migrate upward into AIPG incrementally.
-- Updated README, architecture, iteration, and migration-facing documentation to
-  describe the compatibility-preserving strangler refactor.
+- Updated README, architecture, iteration, migration and Workflow Runtime
+  documentation to describe the compatibility-preserving strangler refactor.
 
 ### Compatibility
 
 - Existing `guif` imports, commands, workflows, schemas, Theme records, Artifact
   records, Domain Pack helpers, and storage conventions remain supported.
-- The first executable Runtime is in-memory and synchronous; it does not yet
-  claim durable scheduling, persistent checkpoints, distributed execution,
-  provider execution, or semantic visual review migration.
+- The Runtime is synchronous and uses deterministic ordered execution for
+  Parallel nodes; it does not yet claim durable scheduling, checkpoint restore,
+  distributed execution, provider execution, or semantic visual review migration.
 
 ## 1.1.0-beta.1 — 2026-07-31
 
