@@ -12,6 +12,32 @@ ChatGPT / Codex is the default Host. Image generation, semantic vision, layout
 tools, engines, and future production capabilities are replaceable Tool
 contracts rather than hard-coded dependencies.
 
+## Current iteration
+
+- Development version: `1.1.0-dev.6`
+- Last updated: `2026-07-31`
+- Branch policy: direct commits to `main`
+- Latest milestone: recoverable Workflow Runtime and Capability execution
+
+Completed in the current development line:
+
+- AIPG-owned Domain Registry
+- executable Workflow lifecycle and Event Bus
+- automatic Workflow Graph traversal
+- nested Subworkflow call-stack execution
+- CheckpointStore persistence boundary
+- deterministic checkpoint restore and resume
+- Capability → ToolAdapter → Provider execution
+
+Next planned milestones:
+
+- scheduler and durable execution queue
+- Artifact lifecycle runtime and dependency graph
+- GUIF Workflow migration onto the AIPG Runtime
+
+Every direct iteration on `main` must increment this development version and
+update this section, so repository visitors can identify new work immediately.
+
 ## Release status
 
 Version `1.1.0-beta.1` is published. The current unreleased iteration directly
@@ -41,9 +67,13 @@ Important documents:
 ```text
 AIPG
 ├─ runtime.py          workflow graph, state, stack, validation
+├─ engine.py           lifecycle and graph execution
+├─ recovery.py         checkpoint restore and deterministic resume
+├─ checkpoints.py      persistence-neutral checkpoint boundary
+├─ events.py           runtime event delivery
 ├─ context.py          project and standalone lifecycle
 ├─ artifacts.py        Artifact identity, status, ancestry, lineage
-├─ capabilities.py     capability requirements and Tool adapters
+├─ capabilities.py     capability routing and Tool adapter execution
 └─ domains/
    └─ visual.py        GUIF Visual Production registration
 
