@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
+
+
+ToolExecutionHandler = Callable[[Mapping[str, Any]], Mapping[str, Any] | None]
 
 
 @dataclass(frozen=True)
@@ -22,11 +25,20 @@ class ToolAdapter:
     capabilities: tuple[str, ...]
     features: tuple[str, ...] = ()
     configuration_schema: Mapping[str, Any] = field(default_factory=dict)
+    priority: int = 100
+    execute_handler: ToolExecutionHandler | None = field(
+        default=None, repr=False, compare=False
+    )
 
     def supports(self, requirement: CapabilityRequirement) -> bool:
         return requirement.capability_id in self.capabilities and set(
             requirement.required_features
         ).issubset(self.features)
+
+    def execute(self, arguments: Mapping[str, Any]) -> dict[str, Any]:
+        if self.execute_handler is None:
+            raise RuntimeError(f"Tool adapter has no execution handler: {self.adapter_id}")
+        return dict(self.execute_handler(dict(arguments)) or {})
 
 
 @dataclass
@@ -41,8 +53,27 @@ class ToolRegistry:
         self.adapters[adapter.adapter_id] = adapter
 
     def resolve(self, requirement: CapabilityRequirement) -> list[ToolAdapter]:
-        return [
-            adapter
-            for adapter in self.adapters.values()
-            if adapter.supports(requirement)
-        ]
+        return sorted(
+            (
+                adapter
+                for adapter in self.adapters.values()
+                if adapter.supports(requirement)
+            ),
+            key=lambda adapter: (adapter.priority, adapter.adapter_id),
+        )
+
+    def select(self, requirement: CapabilityRequirement) -> ToolAdapter:
+        matches = self.resolve(requirement)
+        if not matches:
+            raise LookupError(
+                f"No tool adapter satisfies capability: {requirement.capability_id}"
+            )
+        return matches[0]
+
+    def execute(
+        self,
+        requirement: CapabilityRequirement,
+        arguments: Mapping[str, Any] | None = None,
+    ) -> tuple[ToolAdapter, dict[str, Any]]:
+        adapter = self.select(requirement)
+        return adapter, adapter.execute(dict(arguments or {}))
