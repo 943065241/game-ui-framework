@@ -114,14 +114,20 @@ class ToolAdapter:
         if self.health_handler is None:
             return ToolHealth.AVAILABLE
         try:
-            return ToolHealth.AVAILABLE if self.health_handler(dict(self.configuration)) else ToolHealth.UNAVAILABLE
+            return (
+                ToolHealth.AVAILABLE
+                if self.health_handler(dict(self.configuration))
+                else ToolHealth.UNAVAILABLE
+            )
         except Exception:
             return ToolHealth.UNAVAILABLE
 
     def execute(self, arguments: Mapping[str, Any]) -> dict[str, Any]:
         self.validate_configuration()
         if self.execute_handler is None:
-            raise ToolUnavailableError(f"Tool adapter has no execution handler: {self.adapter_id}")
+            raise ToolUnavailableError(
+                f"Tool adapter has no execution handler: {self.adapter_id}"
+            )
         return dict(self.execute_handler(dict(arguments)) or {})
 
 
@@ -143,24 +149,47 @@ class ToolRegistry:
             raise LookupError(f"Unknown tool adapter: {adapter_id}") from exc
 
     def health(self) -> dict[str, ToolHealth]:
-        return {adapter_id: adapter.health() for adapter_id, adapter in self.adapters.items()}
+        return {
+            adapter_id: adapter.health()
+            for adapter_id, adapter in self.adapters.items()
+        }
 
     def resolve(
         self,
         requirement: CapabilityRequirement,
         *,
-        available_only: bool = True,
+        available_only: bool = False,
     ) -> list[ToolAdapter]:
-        matches = [adapter for adapter in self.adapters.values() if adapter.supports(requirement)]
+        """Return capability matches without changing legacy discovery semantics.
+
+        Health and configuration are execution concerns. Callers that explicitly
+        need only currently executable adapters may opt into ``available_only``.
+        """
+        matches = [
+            adapter
+            for adapter in self.adapters.values()
+            if adapter.supports(requirement)
+        ]
         if available_only:
-            matches = [adapter for adapter in matches if adapter.health() is ToolHealth.AVAILABLE]
+            matches = [
+                adapter
+                for adapter in matches
+                if adapter.health() is ToolHealth.AVAILABLE
+            ]
         return sorted(matches, key=lambda adapter: (adapter.priority, adapter.adapter_id))
 
-    def select(self, requirement: CapabilityRequirement) -> ToolAdapter:
-        matches = self.resolve(requirement)
+    def select(
+        self,
+        requirement: CapabilityRequirement,
+        *,
+        available_only: bool = False,
+    ) -> ToolAdapter:
+        matches = self.resolve(requirement, available_only=available_only)
         if not matches:
+            qualifier = "available " if available_only else ""
             raise ToolUnavailableError(
-                f"No available tool adapter satisfies capability: {requirement.capability_id}"
+                f"No {qualifier}tool adapter satisfies capability: "
+                f"{requirement.capability_id}"
             )
         return matches[0]
 
@@ -174,13 +203,18 @@ class ToolRegistry:
         candidates = self.resolve(requirement)
         if not candidates:
             raise ToolUnavailableError(
-                f"No available tool adapter satisfies capability: {requirement.capability_id}"
+                f"No tool adapter satisfies capability: {requirement.capability_id}"
             )
         if not execution_policy.allow_fallback:
             candidates = candidates[:1]
 
         errors: list[str] = []
         for adapter in candidates:
+            health = adapter.health()
+            if health is not ToolHealth.AVAILABLE:
+                errors.append(f"{adapter.adapter_id}: health={health.value}")
+                continue
+
             started = monotonic()
             for attempt in range(1, execution_policy.max_attempts + 1):
                 try:
@@ -199,7 +233,10 @@ class ToolRegistry:
                 except Exception as exc:
                     normalized = self._normalize_error(adapter, exc)
                     errors.append(f"{adapter.adapter_id}: {normalized}")
-                    if not normalized.retryable or attempt >= execution_policy.max_attempts:
+                    if (
+                        not normalized.retryable
+                        or attempt >= execution_policy.max_attempts
+                    ):
                         break
                     if execution_policy.retry_delay_seconds:
                         sleep(execution_policy.retry_delay_seconds)
