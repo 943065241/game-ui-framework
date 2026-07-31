@@ -1,9 +1,17 @@
 # Roadmap
 
-Current version: `1.1.0-dev.10`.
+Current version: `1.1.0-dev.11`.
 
-1. Real Provider Adapter.
-2. Scheduler and durable queue.
-3. Durable checkpoint storage.
-4. Artifact lifecycle integration.
-5. GUIF Workflow migration.
+## Current iteration
+
+1. Implement the first real Provider Adapter.
+2. Connect it to ToolRegistry execution without provider coupling in Workflows.
+3. Add configuration, health, error and fallback integration tests.
+4. Document deployment requirements without claiming unconfigured availability.
+
+## Next
+
+1. Scheduler and durable queue.
+2. Durable checkpoint storage.
+3. Artifact lifecycle integration.
+4. GUIF Workflow migration.
